@@ -386,7 +386,8 @@ class PostgresRepository:
                 if union is None:
                     continue
                 multi = union if isinstance(union, MultiPolygon) else MultiPolygon([union])
-                rows.append({"tid": stable_uuid("territory", [cand.candidate_id, label]), "cid": cand.candidate_id,
+                tid = stable_uuid("territory", [str(run_id), cand.candidate_id, label])
+                rows.append({"tid": tid, "cid": cand.candidate_id,
                              "r": run_id, "m": mesh.mesh_id, "lv": cand.level, "lb": label, "g": multi.wkt,
                              "meth": cand.method, "fam": cand.family.value,
                              "seed": json.dumps(cand.params, sort_keys=True)})
