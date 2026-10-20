@@ -1,0 +1,10 @@
+# Spec 14 §2. Contenu qualitatif : les parametres quantitatifs arrivent en M6.
+regime_id: R0_CURRENT_LIKE
+name: Current-like
+version: "0.1.0"
+description: Comparaison realiste proche du statu quo institutionnel.
+mobility_rules: {free_movement: variable}
+fiscal_transfer_rules: {equalization: weak}
+defence_rules: {defence: national}
+market_rules: {common_market: partial}
+resource_rules: {resources: national}

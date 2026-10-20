@@ -1,0 +1,10 @@
+# Spec 14 §4.
+regime_id: R2_CONFEDERAL
+name: Confederation
+version: "0.1.0"
+description: Marche commun, mobilite, arbitrage constitutionnel, coordination securite, transferts.
+mobility_rules: {free_movement: strong}
+fiscal_transfer_rules: {equalization: mechanism}
+defence_rules: {defence: coordinated}
+market_rules: {common_market: strong, constitutional_arbitration: true}
+resource_rules: {resources: partially_common}

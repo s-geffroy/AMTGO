@@ -1,0 +1,48 @@
+# NormativeManifest par defaut -- AMTGO V1.0-RC1.
+#
+# AVERTISSEMENT : seule la valeur severe_domination_probability_max = 0.05 vient
+# de la spec (prompt §59). Toutes les autres valeurs numeriques sont des
+# PLACEHOLDERS PROVISOIRES, choisis pour etre conservateurs, en attente d'une
+# decision du comite de gouvernance (06 §6). Ce ne sont pas des resultats
+# scientifiques. Tout run les reporte dans son RunManifest (hash du contenu).
+manifest_id: default
+version: "0.1.0-provisional"
+description: >
+  Manifeste par defaut, conservateur. Valeurs provisoires sauf mention contraire.
+
+hard_rights:
+  - right_id: civic_equality
+    description: Aucun droit individuel ne depend de l'origine ethnoculturelle (06 §2).
+  - right_id: no_forced_displacement
+    description: Aucun deplacement force ni relocalisation induite par la reforme (S1, S2A).
+  - right_id: internal_minority_protection
+    description: Aucune decision majoritaire n'annule les hard rights d'une minorite interne (14 §10).
+  - right_id: no_consent_inference
+    description: L'adoption reste externe au modele (prompt §30).
+
+rights:
+  severe_domination_threshold: 0.5        # PROVISOIRE
+  severe_domination_probability_max: 0.05 # spec, prompt §59
+  urgent_domination_threshold: 0.7        # PROVISOIRE
+  urgent_probability: 0.5                 # PROVISOIRE
+
+stability:
+  scale_min: 0.8     # PROVISOIRE (tau_scale)
+  publish_min: 0.8   # PROVISOIRE (tau de S_publish)
+  overlap_min: 0.2   # PROVISOIRE (tau_O)
+
+robustness:
+  cvar_alpha: 0.9    # PROVISOIRE
+  lambda_tail: 1.0   # PROVISOIRE
+  lambda_var: 0.0    # PROVISOIRE
+
+optimization:
+  reification_penalty_enabled: true   # spec, prompt §59
+  state_count_penalty_enabled: false  # invariant, prompt §42
+  priority_profile: []                # pas d'ordre lexicographique par defaut : Pareto
+
+consent:
+  model_may_infer_final_consent: false  # invariant, prompt §59
+
+privacy:
+  default_access: CONTROLLED  # spec, prompt §59

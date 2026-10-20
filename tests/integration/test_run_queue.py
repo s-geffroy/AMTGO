@@ -1,0 +1,123 @@
+"""Intégration M0–M2 : file de runs, reprise après interruption, reproductibilité."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from amtgo.config.settings import Settings
+from amtgo.db.repository import NullRepository
+from amtgo.runs.queue import advance_one, list_runs, run_to_completion, runs_dir, submit
+from amtgo.runs.state import RunStatus, load_state
+
+
+def _run(settings: Settings, request: str) -> str:
+    manifest, created = submit(settings.configs_dir / request, settings)
+    assert created
+    state = run_to_completion(settings, NullRepository(), str(manifest.run_id))
+    assert state.status is RunStatus.SUCCEEDED, state.error
+    return str(manifest.run_id)
+
+
+def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
+    run_id = _run(settings, "runs/synthetic_pilot.yaml")
+    d = runs_dir(settings) / run_id
+    report = (d / "report.md").read_text()
+    assert "NOT_IDENTIFIABLE" in report and "CAUSAL_EFFECT_UNKNOWN" in report
+    assert "prouve" not in report  # 06 §15
+    ms = json.loads((d / "artifacts" / "multiscale.json").read_text())
+    assert set(ms["meshes"]) == {"pilot_h3_r5", "pilot_h3_r6", "pilot_grid_l4", "pilot_grid_l5"}
+    for t in ms["transfers"]:
+        assert t["mass_out"] + t["unallocated"] == pytest.approx(t["mass_in"], rel=1e-6)
+    assert len(list((d / "provenance").glob("*.json"))) >= 6
+
+
+def test_resubmission_is_idempotent(settings: Settings) -> None:
+    a, created_a = submit(settings.configs_dir / "runs/synthetic_pilot.yaml", settings)
+    b, created_b = submit(settings.configs_dir / "runs/synthetic_pilot.yaml", settings)
+    assert created_a and not created_b and a.run_id == b.run_id
+    assert len(list_runs(settings)) == 1
+
+
+def test_interrupted_step_resumes(settings: Settings) -> None:
+    manifest, _ = submit(settings.configs_dir / "runs/synthetic_pilot.yaml", settings)
+    rid = str(manifest.run_id)
+    repo = NullRepository()
+    assert advance_one(settings, repo).outcome == "done"  # type: ignore[union-attr]
+    # SIGTERM pendant l'ingestion : l'étape est rejouée, sans compter comme échec.
+    adv = advance_one(settings, repo, should_stop=lambda: True)
+    assert adv is not None and adv.outcome == "interrupted"
+    state = load_state(runs_dir(settings) / rid)
+    assert state.steps[1].attempts == 0 and not state.steps[1].done
+    final = run_to_completion(settings, repo, rid)
+    assert final.status is RunStatus.SUCCEEDED
+
+
+def test_reproducibility_same_manifest_same_outputs(tmp_path: Path, configs_dir: Path) -> None:
+    """prompt §53 : même manifeste + même code ⇒ même résultat."""
+    hashes = []
+    for k in ("a", "b"):
+        s = Settings(state_dir=tmp_path / k, configs_dir=configs_dir, db_host=None)
+        rid = _run(s, "runs/synthetic_pilot.yaml")
+        hashes.append(json.loads((runs_dir(s) / rid / "outputs.json").read_text())["outputs_hash"])
+    assert hashes[0] == hashes[1]
+
+
+def test_deterministic_failure_fails_fast(settings: Settings) -> None:
+    p = settings.configs_dir / "sources" / "synthetic_pilot.yaml"
+    p.write_text(p.read_text().replace("n_clusters: 200", "n_clusters: oops"))
+    manifest, _ = submit(settings.configs_dir / "runs/synthetic_pilot.yaml", settings)
+    state = run_to_completion(settings, NullRepository(), str(manifest.run_id))
+    assert state.status is RunStatus.FAILED
+    assert state.error and "n_clusters" in state.error  # le message n'est jamais avalé
+
+
+def test_transient_failure_retried(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
+    from amtgo.runs import stages
+
+    calls = {"n": 0}
+    original = stages.STAGES["validate_sources"]
+
+    def flaky(ctx, arg):  # type: ignore[no-untyped-def]
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("disque momentanément indisponible")
+        return original(ctx, arg)
+
+    monkeypatch.setitem(stages.STAGES, "validate_sources", flaky)
+    manifest, _ = submit(settings.configs_dir / "runs/synthetic_pilot.yaml", settings)
+    adv = advance_one(settings, NullRepository())
+    assert adv is not None and adv.outcome == "retry"
+    final = run_to_completion(settings, NullRepository(), str(manifest.run_id))
+    assert final.status is RunStatus.SUCCEEDED
+
+
+def test_pages_export_from_fixture(settings: Settings, ne_mini: Path, tmp_path: Path) -> None:
+    from amtgo.export.pages_map import export_pages_map
+
+    rid = _run(settings, "runs/mini_pages.yaml")
+    out = tmp_path / "map"
+    meta = export_pages_map(runs_dir(settings) / rid, out)
+    countries = json.loads((out / "countries.geojson").read_text())
+    names = {f["properties"]["name"] for f in countries["features"]}
+    assert names == {"Testland A", "Testland B"}  # filtre continent appliqué
+    assert all("pop_est" not in f["properties"] for f in countries["features"])
+    lines = json.loads((out / "boundaries.geojson").read_text())
+    assert lines["features"][0]["properties"]["disputed"] is True
+    cand = json.loads((out / "candidates.json").read_text())
+    assert cand["status"] == "NOT_IDENTIFIABLE" and cand["candidates"] == []
+    assert {layer["id"] for layer in meta["layers"]} >= {"countries", "boundaries", "mesh_mini_h3_r3"}
+
+
+def test_mesh_extent_requires_declared_role(settings: Settings, ne_mini: Path) -> None:
+    import yaml
+
+    from amtgo.errors import ConfigurationError
+
+    data = yaml.safe_load(ne_mini.read_text())
+    data["sources"][0]["roles"] = ["basemap_display"]
+    ne_mini.write_text(yaml.safe_dump(data))
+    with pytest.raises(ConfigurationError):
+        submit(ne_mini, settings)

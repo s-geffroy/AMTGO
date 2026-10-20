@@ -1,0 +1,10 @@
+# Spec 14 §5. Ce regime est un SCENARIO, pas la doctrine du modele.
+regime_id: R3_FEDERAL_CONTINENTAL
+name: Federal Continental
+version: "0.1.0"
+description: Citoyennete commune forte, defense strategique commune, fiscalite partagee.
+mobility_rules: {free_movement: full, common_citizenship: strong}
+fiscal_transfer_rules: {equalization: shared_taxation}
+defence_rules: {defence: common_strategic}
+market_rules: {common_market: complete}
+resource_rules: {resources: large_common_infrastructure}

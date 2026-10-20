@@ -1,0 +1,10 @@
+# Spec 14 §3.
+regime_id: R1_COMMON_MARKET
+name: Common Market
+version: "0.1.0"
+description: Libre circulation forte et marche commun ; defense nationale, transferts limites.
+mobility_rules: {free_movement: strong, cross_border_recognition: true}
+fiscal_transfer_rules: {equalization: limited}
+defence_rules: {defence: national}
+market_rules: {common_market: strong}
+resource_rules: {resources: national}
