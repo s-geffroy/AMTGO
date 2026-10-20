@@ -85,6 +85,12 @@ class TestUncertainValue:
         u = UncertainValue.from_samples(list(range(10)))
         assert u.cvar(0.8) == pytest.approx(8.5)
 
+    def test_skewed_samples_mean_outside_central_interval(self) -> None:
+        """Régression M5 : moyenne hors de l'intervalle à 90 % pour une loi très asymétrique."""
+        samples = [0.0] * 97 + [100.0] * 3
+        u = UncertainValue.from_samples(samples)
+        assert u.mean == pytest.approx(3.0) and u.upper == pytest.approx(0.0)
+
     def test_invalid(self) -> None:
         with pytest.raises(ValueError):
             UncertainValue(mean=2.0, lower=0.0, upper=1.0, distribution_type=DistributionType.NORMAL)
