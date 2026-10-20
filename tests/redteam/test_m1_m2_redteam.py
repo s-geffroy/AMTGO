@@ -26,7 +26,7 @@ from amtgo.privacy.guard import ExportLayer, PrivacyAction, evaluate, require_al
 
 
 def _synthetic(configs_dir: Path) -> SourceManifest:
-    return load_source_manifest(configs_dir / "sources" / "synthetic_pilot.yaml")
+    return load_source_manifest(configs_dir / "sources" / "synthetic_survey.yaml")
 
 
 def test_forbidden_role_refused_before_any_fetch(configs_dir: Path, tmp_path: Path,
@@ -47,18 +47,18 @@ def test_ne_cannot_be_legal_truth_or_population(configs_dir: Path) -> None:
 
 
 def test_redistribution_refused_when_license_forbids(configs_dir: Path, tmp_path: Path) -> None:
-    raw = yaml.safe_load((configs_dir / "sources" / "synthetic_pilot.yaml").read_text())
+    raw = yaml.safe_load((configs_dir / "sources" / "synthetic_survey.yaml").read_text())
     raw.update(access="restricted", data_zone="RESTRICTED_LOCAL", privacy_class="CONTROLLED")
     raw["license"]["redistribution"] = False
     m = SourceManifest.model_validate(raw)
     with pytest.raises(DataLicenseError):
-        ingest_source(m, IngestRequest(roles=("population_prior",), redistribute=True),
+        ingest_source(m, IngestRequest(roles=("population_measurement",), redistribute=True),
                       tmp_path / "c", tmp_path / "o")
 
 
 def test_observation_less_protected_than_source(configs_dir: Path, tmp_path: Path,
                                                 monkeypatch: pytest.MonkeyPatch) -> None:
-    raw = yaml.safe_load((configs_dir / "sources" / "synthetic_pilot.yaml").read_text())
+    raw = yaml.safe_load((configs_dir / "sources" / "synthetic_survey.yaml").read_text())
     raw.update(access="restricted", data_zone="RESTRICTED_LOCAL", privacy_class="CONTROLLED")
     m = SourceManifest.model_validate(raw)
     original = SyntheticAdapter.normalize
@@ -69,12 +69,12 @@ def test_observation_less_protected_than_source(configs_dir: Path, tmp_path: Pat
 
     monkeypatch.setattr(SyntheticAdapter, "normalize", leaky)
     with pytest.raises(PrivacyViolation):
-        ingest_source(m, IngestRequest(roles=("population_prior",)), tmp_path / "c", tmp_path / "o")
+        ingest_source(m, IngestRequest(roles=("population_measurement",)), tmp_path / "c", tmp_path / "o")
 
 
 def test_silent_evidence_promotion_refused(configs_dir: Path, tmp_path: Path,
                                            monkeypatch: pytest.MonkeyPatch) -> None:
-    raw = yaml.safe_load((configs_dir / "sources" / "synthetic_pilot.yaml").read_text())
+    raw = yaml.safe_load((configs_dir / "sources" / "synthetic_survey.yaml").read_text())
     raw["default_evidence_status"] = "M"
     m = SourceManifest.model_validate(raw)
     original = SyntheticAdapter.normalize
@@ -85,7 +85,7 @@ def test_silent_evidence_promotion_refused(configs_dir: Path, tmp_path: Path,
 
     monkeypatch.setattr(SyntheticAdapter, "normalize", promote)
     with pytest.raises(ProvenanceError):
-        ingest_source(m, IngestRequest(roles=("population_prior",)), tmp_path / "c", tmp_path / "o")
+        ingest_source(m, IngestRequest(roles=("population_measurement",)), tmp_path / "c", tmp_path / "o")
 
 
 def test_checksum_mismatch_refused(ne_mini: Path, configs_dir: Path, tmp_path: Path) -> None:
@@ -100,7 +100,7 @@ def test_provenance_rooted(configs_dir: Path, tmp_path: Path) -> None:
     from amtgo.core.provenance import ProvenanceGraph
 
     m = _synthetic(configs_dir)
-    r = ingest_source(m, IngestRequest(roles=("population_prior",)), tmp_path / "c", tmp_path / "o",
+    r = ingest_source(m, IngestRequest(roles=("population_measurement",)), tmp_path / "c", tmp_path / "o",
                       recorded_at=datetime(2025, 6, 1, tzinfo=UTC))
     g = ProvenanceGraph(r.records)
     g.require_rooted(f"observations:{r.observations_hash}", {str(r.source.id)})
@@ -111,9 +111,9 @@ def test_provenance_rooted(configs_dir: Path, tmp_path: Path) -> None:
 
 def test_observations_roundtrip_and_hash_excludes_clock(configs_dir: Path, tmp_path: Path) -> None:
     m = _synthetic(configs_dir)
-    a = ingest_source(m, IngestRequest(roles=("population_prior",)), tmp_path / "c", tmp_path / "a",
+    a = ingest_source(m, IngestRequest(roles=("population_measurement",)), tmp_path / "c", tmp_path / "a",
                       recorded_at=datetime(2025, 1, 1, tzinfo=UTC))
-    b = ingest_source(m, IngestRequest(roles=("population_prior",)), tmp_path / "c", tmp_path / "b",
+    b = ingest_source(m, IngestRequest(roles=("population_measurement",)), tmp_path / "c", tmp_path / "b",
                       recorded_at=datetime(2026, 1, 1, tzinfo=UTC))
     assert a.observations_hash == b.observations_hash
     back = ingestion.read_observations(a.observations_path)
@@ -149,12 +149,19 @@ def test_no_forbidden_functions_exist() -> None:
 
 
 def test_synthetic_points_inside_declared_extent(configs_dir: Path, tmp_path: Path) -> None:
-    """Régression : les grappes étaient tirées dans un rectangle LAEA tourné, hors emprise."""
+    """Régression : les points étaient tirés dans un rectangle LAEA tourné, hors emprise.
+
+    Les EA sont tirées dans l'emprise puis géomasquées : leur position publiée reste à
+    moins d'un rayon de déplacement de l'emprise.
+    """
     from shapely.geometry import box
 
+    from amtgo.geo.crs import to_equal_area
+
     m = _synthetic(configs_dir)
-    r = ingest_source(m, IngestRequest(roles=("population_prior",)), tmp_path / "c", tmp_path / "o")
-    extent = box(*m.retrieval.parameters["bbox"])
+    p = m.retrieval.parameters
+    r = ingest_source(m, IngestRequest(roles=("population_measurement",)), tmp_path / "c", tmp_path / "o")
+    extent = to_equal_area(box(*p["world"]["bbox"])).buffer(p["survey"]["displacement_km"] * 1000 + 1)
     for o in ingestion.read_observations(r.observations_path):
         g = o.geometry()
-        assert g is not None and extent.contains(g)
+        assert g is not None and extent.contains(to_equal_area(g))

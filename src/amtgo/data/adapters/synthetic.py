@@ -1,9 +1,9 @@
-"""Source synthétique déterministe (M1 ; mondes A–F en M5).
+"""Sources synthétiques déterministes issues d'un même monde à vérité connue.
 
-Le territoire synthétique est placé **en plein océan** (Atlantique Sud, au large
-de toute côte) : aucune lecture ne peut le confondre avec une population réelle.
-Il ne contient à ce stade que des comptes de population géomasqués — aucune
-catégorie identitaire avant M4/M5.
+``instrument: survey`` produit des comptes de zones d'énumération géomasquées
+(UNCERTAIN_POINT) ; ``instrument: census`` produit des totaux de districts
+(ADMIN). Aucune catégorie identitaire avant M4/M5. La vérité du monde n'est
+jamais écrite dans les observations : seuls les instruments le sont.
 """
 
 from __future__ import annotations
@@ -13,27 +13,29 @@ from datetime import UTC, datetime, time
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-from pyproj import Transformer
-from shapely.geometry import Point, box
-from shapely.prepared import prep
-
 from amtgo.core.enums import SupportType
-from amtgo.core.uncertainty import UncertainValue
+from amtgo.core.uncertainty import DistributionType, UncertainValue
 from amtgo.data.observations import Observation
 from amtgo.data.sources import ResourceRef, SourceManifest
+from amtgo.data.synthetic_world import (
+    CensusDesign,
+    SurveyDesign,
+    SyntheticWorld,
+    simulate_census,
+    simulate_survey,
+)
 from amtgo.errors import ConfigurationError
-from amtgo.geo.crs import AFRICA_LAEA, WGS84, to_equal_area
-from amtgo.utils.canonical import content_hash
+from amtgo.utils.canonical import canonical_json, content_hash
+
+VARIABLE_EA_COUNT = "population_count_ea"
+VARIABLE_DISTRICT_TOTAL = "population_total_admin"
 
 
-def _param[T](params: dict[str, Any], name: str, kind: type[T]) -> T:
-    if name not in params:
-        raise ConfigurationError(f"synthetic : paramètre {name!r} manquant")
-    try:
-        return kind(params[name])  # type: ignore[call-arg]
-    except (TypeError, ValueError) as exc:
-        raise ConfigurationError(f"synthetic : paramètre {name!r} invalide ({exc})") from exc
+def world_of(manifest: SourceManifest) -> SyntheticWorld:
+    p = manifest.retrieval.parameters
+    if "world" not in p:
+        raise ConfigurationError(f"{manifest.source_id} : bloc 'world' manquant")
+    return SyntheticWorld.from_params(p["world"])
 
 
 class SyntheticAdapter:
@@ -44,8 +46,6 @@ class SyntheticAdapter:
         # Rien à télécharger : le « fichier » est le jeu de paramètres, figé dans le manifeste.
         target = cache_dir / manifest.source_id / manifest.release / "parameters.json"
         target.parent.mkdir(parents=True, exist_ok=True)
-        from amtgo.utils.canonical import canonical_json
-
         target.write_text(canonical_json(manifest.retrieval.parameters), encoding="utf-8")
         return target
 
@@ -56,56 +56,45 @@ class SyntheticAdapter:
         self, manifest: SourceManifest, files: dict[str, Path], recorded_at: datetime
     ) -> Iterator[Observation]:
         p: dict[str, Any] = manifest.retrieval.parameters
-        seed = _param(p, "seed", int)
-        bbox = _param(p, "bbox", list)
-        try:
-            minx, miny, maxx, maxy = (float(v) for v in bbox)
-        except (TypeError, ValueError) as exc:
-            raise ConfigurationError(f"synthetic : paramètre 'bbox' invalide ({exc})") from exc
-        n_clusters = _param(p, "n_clusters", int)
-        displacement_km = _param(p, "displacement_km", float)
-        pop_mean = _param(p, "population_mean", float)
-        pop_dispersion = _param(p, "population_dispersion", float)
-        n_samples = _param(p, "n_samples", int)
         if manifest.temporal_start is None:
             raise ConfigurationError("synthetic : temporal_start requis")
-
-        rng = np.random.default_rng(seed)
+        world = world_of(manifest)
         valid_from = datetime.combine(manifest.temporal_start, time.min, tzinfo=UTC)
+        valid_until = (datetime.combine(manifest.temporal_end, time.max, tzinfo=UTC)
+                       if manifest.temporal_end else None)
         src = str(manifest.source_uuid)
-        to_wgs = Transformer.from_crs(AFRICA_LAEA, WGS84, always_xy=True)
-        # Densité uniforme EN SURFACE dans l'emprise lon/lat : tirage avec rejet dans
-        # l'emprise projetée (loin du centre LAEA, elle n'est pas un rectangle).
-        region = to_equal_area(box(minx, miny, maxx, maxy).segmentize(0.05))
-        inside = prep(region)
-        bx0, by0, bx1, by1 = region.bounds
-        xs: list[float] = []
-        ys: list[float] = []
-        while len(xs) < n_clusters:
-            x, y = rng.uniform(bx0, bx1), rng.uniform(by0, by1)
-            if inside.contains(Point(x, y)):
-                xs.append(float(x))
-                ys.append(float(y))
-        for k in range(n_clusters):
-            lon, lat = to_wgs.transform(xs[k], ys[k])
-            # Gamma-Poisson : la dispersion encode une incertitude de comptage.
-            shape_k = pop_dispersion
-            rate = shape_k / pop_mean
-            lam = rng.gamma(shape_k, 1.0 / rate, n_samples)
-            draws = rng.poisson(lam).astype(float)
-            yield Observation(
-                id=Observation.make_id(src, "population_count", f"cluster-{k:05d}", valid_from),
-                version=manifest.release,
-                source_id=src,
-                variable_id="population_count",
-                support_type=SupportType.UNCERTAIN_POINT,
-                geometry_wkt=f"POINT ({lon:.6f} {lat:.6f})",
-                displacement_km=displacement_km,
-                valid_from=valid_from,
-                recorded_at=recorded_at,
-                value=UncertainValue.from_samples(draws),
-                attributes={"synthetic": True, "cluster": k},
-                quality=manifest.quality,
-                evidence_status=manifest.default_evidence_status,
-                sensitivity=manifest.privacy_class,
-            )
+        instrument = p.get("instrument")
+        common: dict[str, Any] = dict(
+            version=manifest.release, source_id=src, valid_from=valid_from, valid_until=valid_until,
+            recorded_at=recorded_at, quality=manifest.quality,
+            evidence_status=manifest.default_evidence_status, sensitivity=manifest.privacy_class,
+        )
+
+        if instrument == "survey":
+            design = SurveyDesign.from_params(p.get("survey", {}))
+            for ea in simulate_survey(world, design):
+                lon, lat = ea.released_lonlat
+                yield Observation(
+                    id=Observation.make_id(src, VARIABLE_EA_COUNT, ea.key, valid_from),
+                    variable_id=VARIABLE_EA_COUNT, support_type=SupportType.UNCERTAIN_POINT,
+                    geometry_wkt=f"POINT ({lon:.6f} {lat:.6f})",
+                    displacement_km=design.displacement_km,
+                    value=UncertainValue.exact(float(ea.count)),
+                    attributes={"synthetic": True, "world_hash": world.world_hash,
+                                "ea_area_km2": design.ea_area_km2},
+                    **common,
+                )
+        elif instrument == "census":
+            design_c = CensusDesign.from_params(p.get("census", {}))
+            for d in simulate_census(world, design_c):
+                yield Observation(
+                    id=Observation.make_id(src, VARIABLE_DISTRICT_TOTAL, d.key, valid_from),
+                    variable_id=VARIABLE_DISTRICT_TOTAL, support_type=SupportType.ADMIN,
+                    geometry_wkt=d.polygon.wkt, admin_code=d.key,
+                    value=UncertainValue(mean=d.reported_total, std=d.reported_sd,
+                                         distribution_type=DistributionType.NORMAL),
+                    attributes={"synthetic": True, "world_hash": world.world_hash},
+                    **common,
+                )
+        else:
+            raise ConfigurationError(f"synthetic : instrument inconnu {instrument!r} (survey | census)")

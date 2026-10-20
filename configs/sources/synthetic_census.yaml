@@ -1,0 +1,47 @@
+# Instrument SYNTHETIQUE "recensement" : totaux par district, erreur relative.
+source_id: synthetic_census
+name: Monde synthetique - recensement (totaux de districts)
+provider: AMTGO (genere)
+release: "0.2.0"
+citation: "AMTGO synthetic world v0.2.0, instrument census (genere, aucune donnee reelle)."
+license:
+  license_id: synthetic-no-restriction
+  name: Donnees synthetiques generees par AMTGO
+  redistribution: true
+  commercial_use: true
+  attribution_required: false
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [population_measurement, multiscale_validation]
+  forbidden: [real_world_inference]
+method: Totaux exhaustifs par district, erreur relative gaussienne.
+temporal_start: 2025-01-01
+temporal_end: 2025-12-31
+default_evidence_status: D
+quality:
+  source_reliability: 1.0
+  spatial_precision: 0.4
+  temporal_precision: 1.0
+  construct_validity: 1.0
+  representativeness: 1.0
+  license_usability: 1.0
+  privacy_usability: 1.0
+retrieval:
+  kind: synthetic
+  adapter: synthetic
+  parameters:
+    instrument: census
+    world:
+      seed: 20251020
+      bbox: [-25.0, -26.0, -21.0, -22.0]
+      background_density: 5.0
+      n_towns: 25
+      town_peak_density: [50.0, 800.0]
+      town_scale_km: [3.0, 15.0]
+      quadrature_km: 2.0
+    census:
+      districts_x: 4
+      districts_y: 4
+      relative_error: 0.03

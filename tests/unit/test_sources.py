@@ -72,7 +72,7 @@ def test_historical_needs_context(configs_dir: Path) -> None:
 
 
 def test_commercial_license_check(configs_dir: Path) -> None:
-    raw = _raw(configs_dir, "synthetic_pilot")
+    raw = _raw(configs_dir, "synthetic_survey")
     raw["license"]["commercial_use"] = False
     m = SourceManifest.model_validate(raw)
     with pytest.raises(DataLicenseError):
