@@ -36,6 +36,7 @@ from amtgo.manifests.viability import ViabilityManifest
 from amtgo.measurement.composition import CompositionManifest
 from amtgo.measurement.manifest import MeasurementManifest
 from amtgo.ontology.model import Ontology, OntologyCrosswalk
+from amtgo.optimization.manifest import OptimizerManifest
 from amtgo.scenarios.model import Scenario
 from amtgo.utils.canonical import content_hash, stable_uuid
 from amtgo.utils.code_version import code_commit, code_version
@@ -77,6 +78,7 @@ class RunRequest(BaseModel):
     causal_library: str | None = None
     candidate_model: str | None = None
     composer_model: str | None = None
+    optimizer_model: str | None = None
     ontology_set: tuple[str, ...] = ()
     scenario_set: tuple[str, ...] = ()
     seeds: tuple[int, ...] = (0,)
@@ -120,6 +122,7 @@ class RunManifest(BaseModel):
     causal_library: CausalLibraryManifest | None = None
     candidate_model: CandidateManifest | None = None
     composer_model: ComposerManifest | None = None
+    optimizer_model: OptimizerManifest | None = None
     # Couches non encore disponibles : explicitement nulles, jamais inventées.
     solver: dict[str, Any] | None = None
     seeds: tuple[int, ...]
@@ -262,6 +265,12 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         if candidates.reference_mesh not in ids:
             raise ConfigurationError(f"candidats : maillage de référence {candidates.reference_mesh} hors mesh_set")
 
+    optimizer = None
+    if request.optimizer_model:
+        optimizer = load_model(OptimizerManifest, configs_dir / request.optimizer_model)
+        if candidates is None or viability is None or dfi is None:
+            raise ConfigurationError("l'optimiseur exige les candidats (M8), la viabilité (M6) et D/F/I (M5)")
+
     body: dict[str, Any] = {
         "code_commit": code_commit(),
         "code_version": code_version(),
@@ -285,6 +294,7 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         "causal_library": causal,
         "candidate_model": candidates,
         "composer_model": composer,
+        "optimizer_model": optimizer,
         "seeds": request.seeds,
     }
     draft = RunManifest(run_id=uuid.UUID(int=0), manifest_hash="", created_at=utcnow(), **body)

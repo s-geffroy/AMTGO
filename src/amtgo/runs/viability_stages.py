@@ -8,6 +8,7 @@ district, puis agrégés par juridiction. S2C ne produit qu'un diagnostic agrég
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -16,6 +17,7 @@ from amtgo.core.enums import EvidenceStatus, SupportType
 from amtgo.core.provenance import ProvenanceRecord
 from amtgo.data.ingestion import read_observations
 from amtgo.errors import ConfigurationError, TopologyError
+from amtgo.geo.mesh import Mesh
 from amtgo.institutions.regimes import ConstitutionalRegime
 from amtgo.institutions.status_quo import assign_cells_to_polygons
 from amtgo.institutions.viability import (
@@ -61,6 +63,50 @@ def _summary(a: ViabilityAssessment) -> dict[str, Any]:
             "exploratory_dependency": a.exploratory_dependency, "statement": a.statement()}
 
 
+@dataclass(frozen=True)
+class CellAccounts:
+    """Comptes par cellule et par tirage (S, N) : population gelée, recettes et coûts imputés."""
+
+    population: np.ndarray
+    revenue: np.ndarray
+    service_cost: np.ndarray
+
+    def union(self, assignment: np.ndarray, territory_ids: list[str]) -> FiscalUnion:
+        to_t = np.eye(len(territory_ids))[assignment]  # (N, K)
+        return FiscalUnion(territory_ids, self.population @ to_t, self.revenue @ to_t, self.service_cost @ to_t)
+
+
+def cell_accounts(ctx: StageContext, mesh: Mesh) -> CellAccounts:
+    """Comptes fiscaux de districts rapportés à la population du champ, puis imputés par cellule."""
+    vm = ctx.manifest.viability_model
+    if vm is None:
+        raise ConfigurationError("aucun modèle de viabilité dans ce run")
+    fiscal = [o for o in read_observations(ctx.observations_path(vm.fiscal_source))
+              if o.support_type in (SupportType.ADMIN, SupportType.POLYGON) and o.value is not None]
+    revenue = sorted((o for o in fiscal if o.variable_id == vm.revenue_variable), key=lambda o: o.admin_code or "")
+    cost = sorted((o for o in fiscal if o.variable_id == vm.cost_variable), key=lambda o: o.admin_code or "")
+    if not revenue or [o.admin_code for o in revenue] != [o.admin_code for o in cost]:
+        raise ConfigurationError(f"viabilité : recettes et coûts de {vm.fiscal_source} non appariés par district")
+    fiscal_assign, _ = assign_cells_to_polygons(mesh, revenue)
+    population = fields_mod.read_field(ctx.run_dir, mesh.mesh_id)[2].astype(np.float64)  # (S, N)
+    n_draws, seed = population.shape[0], ctx.manifest.seeds[0]
+    pop_d = population @ np.eye(len(revenue))[fiscal_assign]
+    if np.any(pop_d <= 0):
+        raise TopologyError(f"{mesh.mesh_id} : un district fiscal ne reçoit aucune population du champ")
+    rev_pc = _fiscal_draws(revenue, n_draws, seed) / pop_d
+    cost_pc = _fiscal_draws(cost, n_draws, seed + 1) / pop_d
+    return CellAccounts(population, population * rev_pc[:, fiscal_assign], population * cost_pc[:, fiscal_assign])
+
+
+def viability_effects(ctx: StageContext) -> tuple[Any, Any]:
+    vm = ctx.manifest.viability_model
+    assert vm is not None
+    lib = frozen_library(ctx)
+    region = ctx.manifest.request.region
+    return (lib.query(vm.effects.market_access_elasticity, region),
+            lib.query(vm.effects.infrastructure_cost_reduction, region))
+
+
 def viability(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
     vm = ctx.manifest.viability_model
     observed = ctx.manifest.observed_regime
@@ -69,30 +115,12 @@ def viability(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
     mesh = artifacts.read_mesh(ctx.run_dir, mesh_id)
     partition = status_quo_partition(ctx, mesh)
     level = next(lv for lv in partition.levels if lv.name == vm.level)
-    fiscal = [o for o in read_observations(ctx.observations_path(vm.fiscal_source))
-              if o.support_type in (SupportType.ADMIN, SupportType.POLYGON) and o.value is not None]
-    revenue = sorted((o for o in fiscal if o.variable_id == vm.revenue_variable), key=lambda o: o.admin_code or "")
-    cost = sorted((o for o in fiscal if o.variable_id == vm.cost_variable), key=lambda o: o.admin_code or "")
-    if not revenue or [o.admin_code for o in revenue] != [o.admin_code for o in cost]:
-        raise ConfigurationError(f"viabilité : recettes et coûts de {vm.fiscal_source} non appariés par district")
-    fiscal_assign, _ = assign_cells_to_polygons(mesh, revenue)
-    population = fields_mod.read_field(ctx.run_dir, mesh_id)[2].astype(np.float64)  # (S, N)
+    accounts = cell_accounts(ctx, mesh)
+    population = accounts.population
     n_draws, seed = population.shape[0], ctx.manifest.seeds[0]
-    to_district = np.eye(len(revenue))[fiscal_assign]  # (N, D)
-    pop_d = population @ to_district
-    if np.any(pop_d <= 0):
-        raise TopologyError(f"{mesh_id} : un district fiscal ne reçoit aucune population du champ")
-    per_capita = {"revenue": _fiscal_draws(revenue, n_draws, seed) / pop_d,
-                  "cost": _fiscal_draws(cost, n_draws, seed + 1) / pop_d}
-    to_territory = np.eye(len(level.jurisdictions))[level.assignment]  # (N, K)
-    union = FiscalUnion(
-        territory_ids=list(level.jurisdictions), population=population @ to_territory,
-        revenue=(population * per_capita["revenue"][:, fiscal_assign]) @ to_territory,
-        service_cost=(population * per_capita["cost"][:, fiscal_assign]) @ to_territory)
+    union = accounts.union(level.assignment, list(level.jurisdictions))
     lib = frozen_library(ctx)
-    region = ctx.manifest.request.region
-    effects = (lib.query(vm.effects.market_access_elasticity, region),
-               lib.query(vm.effects.infrastructure_cost_reduction, region))
+    effects = viability_effects(ctx)
     exploratory, overhead = draw_model(vm, effects, n_draws, seed)
     thresholds = ctx.manifest.normative_manifest.viability
     results: dict[str, Any] = {}

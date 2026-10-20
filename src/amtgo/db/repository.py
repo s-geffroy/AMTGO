@@ -48,6 +48,7 @@ class Repository(Protocol):
     def record_causal_library(self, run_id: uuid.UUID, effects: Sequence[CausalEffect], freeze_hash: str) -> None: ...
     def record_candidates(self, run_id: uuid.UUID, mesh: Mesh, candidates: Sequence[TerritoryCandidate],
                           assignments: dict[str, Any]) -> None: ...
+    def record_solutions(self, run_id: uuid.UUID, regime_id: str, archive: dict[str, Any]) -> None: ...
 
 
 class NullRepository:
@@ -89,6 +90,9 @@ class NullRepository:
                           assignments: dict[str, Any]) -> None:
         pass
 
+    def record_solutions(self, run_id: uuid.UUID, regime_id: str, archive: dict[str, Any]) -> None:
+        pass
+
 
 def _batches[T](items: Iterable[T], n: int = BATCH) -> Iterable[list[T]]:
     batch: list[T] = []
@@ -127,7 +131,8 @@ class PostgresRepository:
                 "mesh_set": json.dumps([m.model_dump(mode="json") for m in manifest.mesh_set]),
                 "scenario_set": json.dumps([{"scenario_id": sc.scenario_id, "content_hash": sc.content_hash}
                                             for sc in manifest.scenario_set]),
-                "solver": json.dumps(manifest.solver),
+                "solver": json.dumps(None if manifest.optimizer_model is None
+                                     else manifest.optimizer_model.model_dump(mode="json")),
                 "created_at": manifest.created_at,
             })
 
@@ -398,4 +403,24 @@ class PostgresRepository:
                         geometry, generation_method, family, seed, active)
                     VALUES (:tid, :cid, :r, :m, :lv, :lb, ST_GeomFromText(:g, 4326), :meth, :fam, :seed, false)
                     ON CONFLICT (territory_id) DO NOTHING
+                """), batch)
+
+    def record_solutions(self, run_id: uuid.UUID, regime_id: str, archive: dict[str, Any]) -> None:
+        from amtgo.utils.canonical import stable_uuid
+
+        rows = [{"id": stable_uuid("solution", [str(run_id), s["key"]]), "r": run_id, "reg": regime_id,
+                 "k": s["key"], "fam": s["family"], "st": archive["recommendation_status"], "f": s["feasible"],
+                 "rank": s["rank"], "m": json.dumps(s["objectives"]),
+                 "stab": json.dumps({"s_ontology": s["s_ontology"], "s_scale": s["s_scale"],
+                                     "s_publish": s["s_publish"]}),
+                 "cs": json.dumps({"note": "efficacités I7 ; aucun effet territorial identifié"}),
+                 "p": archive["privacy_class"]} for s in archive["solutions"]]
+        with self.engine.begin() as cx:
+            for batch in _batches(rows):
+                cx.execute(text("""
+                    INSERT INTO solutions (solution_id, run_id, regime_id, variant_key, family, status, feasible,
+                        pareto_rank, metrics, stability, causal_support, privacy_status)
+                    VALUES (:id, :r, :reg, :k, :fam, CAST(:st AS recommendation_status), :f, :rank,
+                        CAST(:m AS jsonb), CAST(:stab AS jsonb), CAST(:cs AS jsonb), CAST(:p AS privacy_class))
+                    ON CONFLICT (solution_id) DO NOTHING
                 """), batch)

@@ -28,7 +28,7 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
     from amtgo.runs.state import RunStatus
 
     upgrade(db_settings)
-    assert current_revision(db_settings) == "0010"
+    assert current_revision(db_settings) == "0011"
     repo = make_repository(db_settings)
     manifest, _ = submit(db_settings.configs_dir / "runs/synthetic_pilot.yaml", db_settings)
     state = run_to_completion(db_settings, repo, str(manifest.run_id))
@@ -71,6 +71,9 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
         # M8 : territoires candidats enregistrés, valides, jamais actifs.
         assert count("SELECT count(*) FROM territory_candidates WHERE run_id = :r") > 0
         assert count("SELECT count(*) FROM territory_candidates WHERE run_id = :r AND active") == 0
+        # M10 : archive enregistrée, aucune solution autre que NOT_IDENTIFIABLE.
+        assert count("SELECT count(*) FROM solutions WHERE run_id = :r") == 15
+        assert count("SELECT count(*) FROM solutions WHERE run_id = :r AND status <> 'NOT_IDENTIFIABLE'") == 0
 
     # Rejouer toutes les écritures ne duplique rien.
     from amtgo.data.ingestion import read_observations

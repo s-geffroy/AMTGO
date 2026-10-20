@@ -28,6 +28,7 @@ viability_model: viability/pilot_v1.yaml
 causal_library: causal/library_pilot.yaml
 candidate_model: candidates/pilot_v1.yaml
 composer_model: composer/pilot_v1.yaml
+optimizer_model: optimizer/pilot_v1.yaml
 scenario_set:
   - scenarios/s1_baseline.yaml
   - scenarios/s1_stress.yaml

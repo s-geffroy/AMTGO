@@ -168,9 +168,11 @@ def render_report(
     if candidates is None:
         a("Aucune archive de Pareto : aucun candidat n'a été généré. Baselines prévues : "
           "STATUS_QUO, NO_TERRITORIAL_CHANGE, INSTITUTIONAL_ONLY_REFORM.\n")
+    elif "pareto" not in candidates:
+        a("Aucune archive de Pareto : les candidats sont générés mais **non évalués**. Les trois baselines "
+          "sont présentes.\n")
     else:
-        a("Aucune archive de Pareto : les candidats sont générés mais **non évalués** (composeur M9, "
-          "optimiseur M10). Les trois baselines sont présentes.\n")
+        _pareto_section(a, manifest, candidates["pareto"])
     a("## Stability summary\n")
     if candidates is None:
         a(_NA.format(m="M8+") + "\n")
@@ -546,3 +548,46 @@ def _composer_section(a: Any, manifest: RunManifest, comp: dict[str, Any]) -> No
     a("Les efficacités sont des hypothèses d'expert (I7) : toute conclusion du composeur est **exploratoire**. "
       "NO_CHANGE ou NO_TERRITORIAL_CHANGE_SUFFICIENT sont des résultats valides et attendus (01 §31) ; "
       "INSTITUTIONAL_INSUFFICIENT_AT_FIXED_GEOMETRY ne serait pas une recommandation de frontière.\n")
+
+
+def _fmt_obj(x: float | None) -> str:
+    return "UNKNOWN" if x is None else f"{x:.3g}"
+
+
+def _pareto_section(a: Any, manifest: RunManifest, p: dict[str, Any]) -> None:
+    rw = p["robustness"]
+    a(f"Archive de Pareto **robuste** : ρ(J) = E_ω[J] + {rw['lambda_tail']}·CVaR_{rw['cvar_alpha']}(J) + "
+      f"{rw['lambda_var']}·Var_ω(J) sur ω = (maillage × ontologie) ; ε-dominance ; contrainte de droits dure. "
+      "Aucune pondération entre objectifs, aucune « meilleure solution ». Institutions : gabarit du statu quo.\n")
+    a(f"**Conclusion : {p['conclusion']}**.")
+    if p["improving_on_status_quo"]:
+        a("Variantes qui font au moins aussi bien que le statu quo partout (hors coût de transition) : "
+          + ", ".join(f"`{k}`" for k in p["improving_on_status_quo"]) + ". C'est une propriété de l'archive "
+          "sous les objectifs modélisés, jamais une recommandation : voir les biais connus ci-dessous.")
+    else:
+        a("Aucune variante ne fait au moins aussi bien que le statu quo sur tous les objectifs (hors coût de "
+          "transition) : le statu quo reste sur le front, et rien ne justifie un redécoupage.")
+    a("")
+    objs = [o for o in p["objectives"]]
+    a("| rang | famille | paramètres | faisable | " + " | ".join(f"ρ({o})" for o in objs) + " | S^ont | S^scale |")
+    a("|---|---|---|---|" + "---|" * len(objs) + "---|---|")
+    for s in p["solutions"]:
+        params = ", ".join(f"{k}={v}" for k, v in s["params"].items()) or "—"
+        ss = "—" if s["s_scale"] is None else f"{s['s_scale']:.2f}"
+        a(f"| {s['rank'] or '—'} | {s['family']} | {params} | {'oui' if s['feasible'] else '**non**'} | "
+          + " | ".join(_fmt_obj(s["objectives"][o]) for o in objs) + f" | {s['s_ontology']:.2f} | {ss} |")
+    a("")
+    if p["infeasibility"]:
+        c = p["infeasibility"]
+        a(f"**INFEASIBLE** — contraintes liantes : {c['binding_constraints']} ; conflits minimaux : "
+          f"{c['minimal_conflict_sets']}. Aucune relaxation appliquée.\n")
+    a("Biais connus : " + " ; ".join(p["known_biases"]) + ".\n")
+    a(f"Objectifs **UNKNOWN** (jamais comptés à 0) : {', '.join(p['unknown_objectives'])}. ε : "
+      + ", ".join(f"{k} {v:g}" for k, v in p["epsilon"].items()) + ".\n")
+    b = p["benchmark"]
+    a(f"**Gate O : {p['gate_o']}** — benchmark exact sur {b['partitions_enumerated']} bipartitions contiguës "
+      f"d'une grille 4×4 fictive, {len(b['seeds'])} départs : k-means, écart à l'optimum {b['kmeans']['best_gap']:.1%} "
+      f"(pire départ {max(b['kmeans']['relative_gaps']):.1%}) ; coupe spectrale {b['spectral']['best_gap']:.1%}. "
+      f"La coupe seule a pour front exact des micro-territoires ({b['cut_only_front']['smallest_state_cells']} "
+      "cellule(s)) : elle n'est jamais un objectif isolé.\n")
+    a(f"Publication : {p['publication']}. Statut : **{p['recommendation_status']}**.\n")

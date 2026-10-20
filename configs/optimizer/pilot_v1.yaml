@@ -1,0 +1,18 @@
+# Optimiseur regional (M10). Parametres de MODELE, PROVISOIRES.
+# Aucune ponderation entre objectifs : archive de Pareto robuste, epsilon-dominance.
+optimizer_id: optimizer_pilot
+version: "0.1.0"
+description: >
+  Archive de Pareto des candidats territoriaux (M8), avec le gabarit institutionnel du
+  statu quo, robustes sur ontologies x maillages ; contrainte de droits dure.
+epsilon:                 # resolution : un ecart plus petit ne departage jamais
+  J_D: 0.01              # probabilite
+  J_F: 0.0005
+  J_conn: 0.0001
+  J_V: 0.02              # probabilite
+  J_G: 0.005
+  J_T: 0.01              # part de population
+  J_inst: 1.0e6          # unites fiscales fictives
+  J_reif: 0.001
+border_cost_per_km: 5.0e4
+benchmark_tolerance: 0.05

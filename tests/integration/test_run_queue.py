@@ -113,7 +113,7 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
     assert sq["s_scale"] >= 0.8  # le statu quo suit des districts : stable entre maillages
     assert {v["n_states_by_mesh"]["pilot_grid_l4"] for v in ce["variants"].values()
             if v["family"] == "GEOGRAPHIC"} == {1, 2, 3, 4}
-    assert "Candidate generation" in report and "non évalués" in report
+    assert "Candidate generation" in report and "unités analytiques" in report
     # M9 : composeur à géométrie fixe ; le statu quo fictif ne viole aucun droit → NO_CHANGE, stable.
     ie = json.loads((d / "artifacts" / "institutional_ensemble.json").read_text())
     assert ie["conclusion"] == "NO_CHANGE" and ie["stability"] == "STABLE"
@@ -123,6 +123,15 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
             assert res["deferred_to_territorial_search"] == ["confederation", "sovereignty"]
             assert all(o["status"] in ("NOT_NEEDED", "CREATES_VIOLATION") for o in res["options"])
     assert "Institutional composition (fixed geometry)" in report
+    # M10 : archive robuste, baselines au front, J_R UNKNOWN, Gate O, rien de publiable.
+    pa = json.loads((d / "artifacts" / "pareto_archive.json").read_text())
+    sq = next(s for s in pa["solutions"] if s["family"] == "STATUS_QUO")
+    assert sq["feasible"] and sq["rank"] == 1  # coût de transition nul : le statu quo n'est jamais exclu
+    assert all(s["objectives"]["J_R"] is None for s in pa["solutions"])
+    assert pa["gate_o"] == "PASSED" and pa["recommendation_status"] == "NOT_IDENTIFIABLE"
+    assert pa["known_biases"] and pa["infeasibility"] is None
+    assert sum(1 for s in pa["solutions"] if s["rank"] == 1) > 1  # un front, jamais une solution unique
+    assert "Archive de Pareto **robuste**" in report and "Biais connus" in report
     freeze = json.loads((d / "measurement_freeze.json").read_text())
     assert set(freeze["compositions"]) == set(ms["meshes"])
     assert "Parts seulement" in report
