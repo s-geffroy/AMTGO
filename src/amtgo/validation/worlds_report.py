@@ -1,4 +1,4 @@
-"""Rapport des mondes synthétiques A–F (D/F/I) et V (viabilité) : publiable, catégories fictives."""
+"""Rapport des mondes synthétiques A–F (D/F/I), V (viabilité), I (composeur) : publiable, catégories fictives."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from amtgo.fragmentation.engine import fragmentation
 from amtgo.institutions.regimes import ConstitutionalRegime
 from amtgo.integration.engine import integration
 from amtgo.manifests.normative import RightsThresholds, ViabilityThresholds
+from amtgo.validation import composer_worlds as I
 from amtgo.validation import viability_worlds as V
 from amtgo.validation import worlds as W
 
@@ -72,15 +73,16 @@ def all_checks(rights: RightsThresholds, weights: dict[IntegChannel, float],
                regimes: dict[str, ConstitutionalRegime], viability: ViabilityThresholds,
                observed: str = "R0_CURRENT_LIKE") -> list[tuple[str, bool, str]]:
     """Propriétés des mondes A–F (D/F/I) et du monde V (viabilité contextuelle, M6)."""
-    return checks(evaluate_all(rights, weights)) + V.checks(V.evaluate(regimes, observed, viability), observed)
+    return (checks(evaluate_all(rights, weights)) + V.checks(V.evaluate(regimes, observed, viability), observed)
+            + I.checks(I.evaluate_all(rights, weights)))
 
 
 def render(rights: RightsThresholds, weights: dict[IntegChannel, float],
            regimes: dict[str, ConstitutionalRegime], viability: ViabilityThresholds) -> str:
-    lines = ["# Mondes synthétiques A–F et V\n",
+    lines = ["# Mondes synthétiques A–F, V et I\n",
              "> Mondes **fictifs** à vérité connue (prompt §56). A–F vérifient les composantes D/F/I, "
-             "V la viabilité contextuelle, que l'optimiseur utilisera (M10) ; ils ne produisent aucune "
-             "recommandation.\n",
+             "V la viabilité contextuelle, I le composeur institutionnel à géométrie fixe ; ils ne produisent "
+             "aucune recommandation.\n",
              "| propriété attendue | vérifiée | valeurs |", "|---|---|---|"]
     for text, ok, vals in all_checks(rights, weights, regimes, viability):
         lines.append(f"| {text} | {'oui' if ok else '**NON**'} | {vals} |")
