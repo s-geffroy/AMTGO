@@ -15,7 +15,7 @@ NORMALIZATION          amtgo.data.observations     M1  ✔  valid time, support,
 (maillages)            amtgo.geo                   M2  ✔  h3 + grid_laea, transferts, distance de partitions
     ↓
 MEASUREMENT MODELS     amtgo.measurement           M3  ✔  vraisemblances, log-normal + Laplace, marges, validation
-ONTOLOGY ENSEMBLE      amtgo.ontology              M4
+ONTOLOGY ENSEMBLE      amtgo.ontology              M4  ✔  ontologies, crosswalks Dirichlet, composition, S^ontology
 LATENT STATE FIELDS    amtgo.measurement.fields    M3  ✔  statut MODEL, tirages, calculabilité ; measurement_freeze
 CAUSAL LIBRARY—FROZEN  amtgo.causal                M7
 CONSTITUTIONAL REGIME  amtgo.institutions.regimes  M0 (config) / M6
@@ -60,3 +60,7 @@ interne), `cli` (jetable : tests, CLI). Aucun service n'est exposé.
 | aucune surface en degrés | `geo.crs` |
 | export public = couches sans population ni groupe | `privacy.guard` |
 | pas de `best_solution`, `ethnic_score`, `optimize_africa`… | test red-team d'introspection |
+| pas d'étiquette de zone (dominant, majority, main_language…) ; parts seulement | `measurement.composition`, test red-team |
+| aucun crosswalk entre dimensions (ethnoculturelle, nationale, territoriale…) | `OntologyCrosswalk.check_against` |
+| champs de groupe au minimum CONTROLLED, jamais exportés | `composition_stages`, `privacy.guard` |
+| aucune valeur de donnée dans les logs d'erreur | `runs.queue.safe_error` |

@@ -66,6 +66,7 @@ absent et déclaré comme tel dans chaque rapport de run.
 | 13 | Fusion 03 §27 : famille de lois, positivité, contraintes de somme, représentativité | [ADR-0013](decisions/ADR-0013-modele-de-mesure.md) |
 | 14 | Validation de la mesure sans vérité terrain | [ADR-0014](decisions/ADR-0014-monde-synthetique.md) |
 | 15 | Performances sous quota CPU | [ADR-0015](decisions/ADR-0015-ressources-calcul.md) |
+| 16 | Ontologies concurrentes, crosswalks, composition et vie privée de groupe | [ADR-0016](decisions/ADR-0016-ontologies-composition.md) |
 
 Autres points relevés, sans décision nécessaire à ce stade :
 
@@ -98,4 +99,4 @@ Autres points relevés, sans décision nécessaire à ce stade :
 | M1 | registre de sources : modèle de source, licences, contrat d'ingestion, provenance | **fait** |
 | M2 | cœur spatial : cellules, deux familles de maillage, opérations multi-échelles | **fait** |
 | M3 | mesure : interface de likelihood, champs latents, fusion bayésienne simple, incertitude | **fait** |
-| M4 | ontologies : concepts, crosswalks probabilistes, exécution en ensemble | après revue |
+| M4 | ontologies : concepts, crosswalks probabilistes, exécution en ensemble | **fait** |

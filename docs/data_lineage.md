@@ -17,6 +17,9 @@ manifest:<sha256 du SourceManifest>
 observations:* + mesh:* + measurement:<sha256 du MeasurementManifest>
    └─ measurement.fuse ─► field:<field_id>            (statut MODEL)
           └─ measurement.freeze ─► measurement_freeze:<sha256>
+
+field:* + composition:<sha256> + ontology:* + crosswalk:*
+   └─ composition.fit_project ─► composition:<mesh>:<sha256>   (CONTROLLED, inclus dans le gel)
 ```
 
 Chaque `ProvenanceRecord` porte `input_ids`, `output_ids`, `code_version`,
