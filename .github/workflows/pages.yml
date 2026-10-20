@@ -1,0 +1,45 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      AMTGO_CONFIGS_DIR: ${{ github.workspace }}/configs
+      AMTGO_CODE_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.4"
+      - run: uv python install 3.12
+      - run: uv sync --frozen --all-groups
+      # Execute les runs publics (Natural Earth est recupere ici, sha256 verifie),
+      # exporte carte et rapports, puis mkdocs --strict.
+      - run: uv run sh scripts/build_docs.sh site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

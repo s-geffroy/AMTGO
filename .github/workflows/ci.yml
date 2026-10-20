@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: amtgo
+          POSTGRES_USER: amtgo
+          POSTGRES_PASSWORD: ci-only-not-a-secret
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U amtgo -d amtgo"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      AMTGO_CONFIGS_DIR: ${{ github.workspace }}/configs
+      AMTGO_DB_HOST: localhost
+      AMTGO_DB_PASSWORD_FILE: ${{ github.workspace }}/.ci_db_password
+      AMTGO_CODE_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.4"
+      - run: uv python install 3.12
+      - run: uv sync --frozen --all-groups
+      - run: printf 'ci-only-not-a-secret' > .ci_db_password
+      - name: ruff
+        run: uv run ruff check src tests
+      - name: mypy
+        run: uv run mypy
+      - name: pytest
+        run: uv run pytest
+      - name: smoke (worker)
+        run: AMTGO_DB_HOST= uv run bash tests/test_smoke.sh

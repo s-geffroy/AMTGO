@@ -1,0 +1,51 @@
+# AMTGO
+
+**African Multilayer Territorial Geometry Optimization** — implémentation de la
+spécification V1.0-RC1.
+
+AMTGO **n'est pas** une carte ethnique, un outil de partition automatique, un
+générateur d'États, ni un système qui inférerait une « vraie frontière
+naturelle ». C'est un **laboratoire de géométries constitutionnelles
+multi-couches** : il compare des configurations institutionnelles sous
+incertitude, contraintes de droits, causalité explicite, plusieurs ontologies,
+plusieurs maillages et plusieurs régimes constitutionnels.
+
+Son résultat principal n'est pas une carte unique, mais un ensemble de solutions
+de Pareto robustes **conditionnelles** :
+
+$$
+\mathcal P^*(R, O, S, \Theta)
+$$
+
+à un régime constitutionnel $R$, une ontologie $O$, un scénario $S$ et des
+paramètres normatifs $\Theta$. Il doit toujours pouvoir conclure **aucun
+changement territorial** ou **non identifiable** — c'est un succès scientifique,
+pas un échec.
+
+!!! note "Formulation"
+    AMTGO ne « prouve » jamais qu'une région devrait changer de statut. La seule
+    formulation admise est : *sous le régime R, l'ontologie O et les hypothèses
+    causales C, cette configuration appartient à l'ensemble de Pareto ; sa
+    robustesse est X et son adoption exige un consentement politique externe au
+    modèle.*
+
+## État d'avancement
+
+| milestone | contenu | état |
+|---|---|---|
+| M0 | bootstrap : configuration, logs, migrations, manifestes, file de runs, CI | fait |
+| M1 | registre de sources, licences, ingestion, provenance | fait |
+| M2 | maillages H3 et grille équivalente, opérations multi-échelles | fait |
+| M3 | modèles de mesure, champs latents, incertitude | à venir |
+| M4 | ontologies concurrentes, crosswalks probabilistes | à venir |
+| M5+ | domination / fragmentation / intégration, régimes, causalité, candidats, optimiseur | à venir |
+
+À ce stade, **aucun découpage n'existe** : la [carte](carte.md) montre les pays
+actuels et les maillages d'analyse, et sa couche de candidats affiche
+*NOT_IDENTIFIABLE*.
+
+## Lire ensuite
+
+- [Évaluation d'implémentation](IMPLEMENTATION_ASSESSMENT.md) — compréhension, incohérences tranchées, risques.
+- [Architecture](architecture.md) et [décisions](decisions/index.md).
+- [Rapports de milestone](milestones/M0_REPORT.md) et [runs synthétiques](runs/index.md).

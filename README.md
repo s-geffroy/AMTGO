@@ -1,86 +1,61 @@
-# amtgo
+# AMTGO — African Multilayer Territorial Geometry Optimization
 
-Worker heberge sur le VPS multi-applications : du travail de fond, **aucune
-surface HTTP**.
+Implémentation de la spécification **V1.0-RC1** : un laboratoire de géométries
+constitutionnelles multi-couches. Ce n'est **pas** une carte ethnique ni un
+générateur d'États. Le système compare des configurations institutionnelles sous
+incertitude, et doit toujours pouvoir conclure *aucun changement territorial* ou
+*non identifiable*.
 
-## Ou est le travail
+Documentation publique : <https://s-geffroy.github.io/AMTGO/>, avec l'évaluation
+d'implémentation, les ADR, les rapports de milestone, les rapports de runs
+synthétiques et la carte.
 
-`src/worker.py`, fonction `cycle()`. Tout le reste est la charpente :
+État actuel : **M0–M2** (bootstrap, registre de sources, cœur spatial). Aucun
+découpage n'est produit à ce stade.
 
-| element | role |
+## Sur le VPS
+
+Worker sans surface HTTP (`exposure: none`), hébergé par appctl. Services :
+
+| service | rôle |
 |---|---|
-| boucle | rappelle `cycle()` toutes les `WORKER_INTERVAL` secondes |
-| battement | `/tmp/heartbeat`, touche a chaque tour, lu par le healthcheck |
-| arret propre | SIGTERM honore, sommeil fractionne, fin du cycle en cours |
-| `/state` | volume `amtgo_state`, ce qui doit survivre a un redemarrage |
-
-## Cycle de developpement
+| `worker` | file de runs : chaque cycle exécute **une** étape du plus ancien run, avec écriture atomique dans `/state` |
+| `db` | PostgreSQL/PostGIS **dédiée**, réseau interne, volume `amtgo_pgdata` |
+| `cli` | conteneur jetable (`profil cli`) : tests et CLI `amtgo` ; rien ne tourne sur l'hôte |
 
 ```bash
-sudo -iu amtgo
-cd /srv/apps/amtgo
-claude
+make validate             # sudo appctl validate
+make smoke                # le worker exécute un run synthétique, battement, arrêt propre
+make test                 # pytest dans le conteneur cli (PostGIS compris)
+make lint typecheck       # ruff, mypy strict
+make rebuild status logs  # appctl rebuild / status / logs
+make pilot                # soumet configs/runs/synthetic_pilot.yaml à la file du worker
+make docs                 # construit le site (vérification locale)
 ```
 
-Puis, apres modification :
+Un worker n'a pas d'URL : **les logs sont l'interface** (une ligne JSON par
+événement : `run.submitted`, `run.step`, `run.succeeded`…). Les rapports de run
+sont dans `/state/runs/<run_id>/report.md`.
 
-```bash
-tests/test_smoke.sh      # un cycle, un battement, un arret propre
-sudo appctl validate
-sudo appctl rebuild
-sudo appctl status       # le conteneur doit passer 'healthy'
-sudo appctl logs -f      # c'est ici qu'on voit si le travail se fait
-```
+## Réglages
 
-Un worker n'a pas d'URL a ouvrir : **les logs sont l'interface**. `status` dit
-que la boucle tourne, `logs` dit que le travail se fait. Les deux sont
-necessaires.
-
-## Reglages
-
-| variable | defaut | role |
+| variable | défaut | rôle |
 |---|---|---|
-| `WORKER_INTERVAL` | `30` | secondes entre deux cycles |
-| `WORKER_STATE` | `/state` | repertoire d'etat (volume persistant) |
-| `WORKER_HEARTBEAT` | `/tmp/heartbeat` | fichier de battement |
+| `WORKER_INTERVAL` | `30` | secondes entre deux cycles (le seuil du healthcheck, 180 s, doit rester > 2 × l'intervalle) |
+| `AMTGO_STATE_DIR` | `/state` | volume `amtgo_state` : runs, cache des sources |
+| `AMTGO_DB_HOST` | `db` | vide = base désactivée (artefacts fichiers seuls) |
+| `AMTGO_DB_PASSWORD_FILE` | `/run/secrets/db_password` | secret Compose |
 
-Le seuil du healthcheck (180 s dans `compose.yaml`) doit rester superieur a
-deux fois `WORKER_INTERVAL`.
-
-## Exposition
-
-`app.yaml` le declare en `none` : le conteneur ne parle qu'au reseau interne de
-l'application. Pour ouvrir une page de metriques ou une sonde :
-
-```bash
-sudo /opt/infra/scripts/app-exposure.py amtgo --set worker=tailnet --port worker=9100
-```
-
-`app.yaml` et les labels Traefik sont mis a jour ensemble.
+Les **paramètres normatifs** ne sont jamais dans l'environnement : ils vivent dans
+`configs/normative/*.yaml` et sont figés dans chaque RunManifest.
 
 ## Secrets
 
-Les secrets reels vont dans `/etc/app-secrets/amtgo/` (root uniquement),
-jamais dans ce depot :
+`/etc/app-secrets/amtgo/db_password` (root, mode `0444`), injecté par Docker
+Compose Secrets. Jamais dans le dépôt, le `.env` ou les logs.
 
-```bash
-printf '%s\n' "<la cle>" | sudo tee /etc/app-secrets/amtgo/api_key
-sudo chmod 0444 /etc/app-secrets/amtgo/api_key   # lisible dans le conteneur
-```
+## Spécification
 
-et dans `compose.yaml` :
-
-```yaml
-    secrets:
-      - api_key
-    environment:
-      API_KEY_FILE: /run/secrets/api_key
-
-secrets:
-  api_key:
-    file: /etc/app-secrets/amtgo/api_key
-```
-
-`0444` et non `0400` : le mode est reporte tel quel dans le conteneur, ou le
-worker tourne en utilisateur non privilegie. Sur l'hote, c'est le repertoire
-(0700 root) qui protege le secret.
+Le corpus V1.0-RC1 est lu depuis `spec/` (local, **non versionné**, car le dépôt
+est public). Ses empreintes sha256 figurent dans
+`docs/IMPLEMENTATION_ASSESSMENT.md`.
