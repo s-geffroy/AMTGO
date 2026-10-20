@@ -7,3 +7,16 @@ __pycache__/
 # Marqueur local du VPS, lu par scripts/infra-reconcile.sh : il dit que cette
 # application redemarre au boot de CETTE machine. Rien a faire dans un depot.
 .autostart
+
+# Corpus de specification AMTGO V1.0-RC1 : copie locale, NON publiee (le depot
+# est public). Son empreinte est citee dans docs/IMPLEMENTATION_ASSESSMENT.md.
+spec/
+
+# Artefacts locaux
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+site/
+docs/assets/generated/
+docs/runs/generated/

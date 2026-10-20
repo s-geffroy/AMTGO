@@ -1,24 +1,41 @@
-# Un worker : du travail de fond, aucune surface HTTP. Donc pas de labels
-# Traefik, pas de reseau edge, et 'exposure: none' dans app.yaml -- appctl
-# refuse l'un sans l'autre.
+# AMTGO : un worker (file de runs), sa base PostGIS dediee, et un service 'cli'
+# jetable pour les tests et la ligne de commande. Aucune surface HTTP : pas de
+# labels Traefik, pas de reseau edge, 'exposure: none' partout dans app.yaml.
 services:
   worker:
     build:
-      context: ./src
+      # Contexte a la racine du projet : l'image embarque pyproject.toml,
+      # uv.lock, src/ et configs/ (ADR-0001).
+      context: .
+      dockerfile: src/Dockerfile
+    image: amtgo-worker
     restart: unless-stopped
     networks:
       - internal
-    environment:
+    environment: &app-env
       APP_NAME: amtgo
       TZ: Europe/Paris
       WORKER_INTERVAL: "30"
+      AMTGO_STATE_DIR: /state
+      AMTGO_CONFIGS_DIR: /app/configs
+      AMTGO_DB_HOST: db
+      AMTGO_DB_PORT: "5432"
+      AMTGO_DB_NAME: amtgo
+      AMTGO_DB_USER: amtgo
+      AMTGO_DB_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
     volumes:
       - state:/state
+    depends_on:
+      db:
+        condition: service_healthy
     deploy:
       resources:
         limits:
           cpus: "1.0"
-          memory: 256M
+          # Pile GIS (shapely, pyproj, h3, pandas) : 256M ne suffit plus.
+          memory: 768M
           pids: 128
     healthcheck:
       # Le worker touche /tmp/heartbeat a chaque tour : le conteneur est sain
@@ -31,9 +48,72 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-    # 'docker stop' laisse 10 s avant le SIGKILL. Le worker s'arrete a la fin du
-    # cycle en cours : si un cycle peut durer plus longtemps, augmenter ici.
+    # 'docker stop' laisse 10 s avant le SIGKILL. Le worker s'arrete a la fin de
+    # l'etape en cours ; chaque etape est bornee (ADR-0012).
     stop_grace_period: 30s
+
+  db:
+    # PostgreSQL + PostGIS DEDIES a amtgo, sur le reseau interne uniquement.
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    networks:
+      - internal
+    environment:
+      POSTGRES_DB: amtgo
+      POSTGRES_USER: amtgo
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      TZ: Europe/Paris
+    secrets:
+      - db_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+          pids: 256
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U amtgo -d amtgo"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    stop_grace_period: 30s
+
+  cli:
+    # Conteneur jetable : `sudo appctl run cli <commande>`. Tests et CLI amtgo
+    # tournent ici, jamais sur l'hote. Le code est monte en lecture seule par
+    # dessus l'installation editable de l'image : pas de rebuild pour tester.
+    image: amtgo-worker
+    profiles: ["cli"]
+    networks:
+      - internal
+    environment:
+      <<: *app-env
+      HOME: /tmp
+    secrets:
+      - db_password
+    volumes:
+      - state:/state
+      - ./src:/app/src:ro
+      - ./tests:/app/tests:ro
+      - ./configs:/app/configs:ro
+      - ./docs:/app/docs:ro
+      - ./mkdocs.yml:/app/mkdocs.yml:ro
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./scripts:/app/scripts:ro
+    working_dir: /app
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
+          pids: 128
+    command: ["amtgo", "--help"]
 
 networks:
   internal:
@@ -43,3 +123,9 @@ networks:
 volumes:
   state:
     name: amtgo_state
+  pgdata:
+    name: amtgo_pgdata
+
+secrets:
+  db_password:
+    file: /etc/app-secrets/amtgo/db_password

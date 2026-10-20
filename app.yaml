@@ -1,10 +1,14 @@
 # Politique d'exposition de l'application. Volontairement minimal :
 # tout le reste (images, ports, volumes) vit dans compose.yaml.
 #
-# Un worker ne repond a personne : 'none' est sa place naturelle, et appctl
-# refusera un routeur Traefik ou un reseau edge tant qu'il y reste.
+# Aucun service ne repond a personne : 'none' partout, et appctl refusera un
+# routeur Traefik ou un reseau edge tant qu'on y reste. Le service 'cli'
+# (profil cli, jetable) n'est pas declare ici : appctl ne le compte pas parmi
+# les services de l'application.
 name: amtgo
 
 services:
   worker:
+    exposure: none
+  db:
     exposure: none

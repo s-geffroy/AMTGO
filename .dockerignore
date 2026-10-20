@@ -1,0 +1,14 @@
+.git
+spec
+site
+docs
+notebooks
+.env
+.autostart
+*.log
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.hypothesis

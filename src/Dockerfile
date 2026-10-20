@@ -1,15 +1,44 @@
-FROM python:3.13-alpine
+# Contexte de build : la racine du projet (voir compose.yaml et ADR-0001).
+# Debian slim et non Alpine : shapely, pyproj et h3 publient des wheels
+# manylinux, pas musl (ADR-0002).
+FROM python:3.12-slim
+
+COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /usr/local/bin/uv
+
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    PATH=/opt/venv/bin:$PATH \
+    PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
-COPY worker.py /app/worker.py
+
+# Dependances d'abord, depuis le lockfile : la couche reste en cache tant que
+# pyproject.toml et uv.lock ne bougent pas.
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --all-groups --no-install-project
+
+COPY src ./src
+COPY configs ./configs
+COPY tests ./tests
+COPY mkdocs.yml ./
+# Les fichiers arrivent avec le mode de l'hote : les rendre lisibles par 'app'.
+RUN chmod -R a+rX /app
+# Installation editable : le service 'cli' monte ./src en lecture seule par
+# dessus, et les tests voient le code courant sans rebuild.
+RUN uv sync --frozen --all-groups
+
+# Version du code, reportee dans chaque RunManifest (code_commit).
+ARG GIT_COMMIT=unknown
+ENV AMTGO_CODE_COMMIT=$GIT_COMMIT
 
 # Utilisateur non-root : rien n'oblige ce conteneur a tourner en root.
 # /state est cree ICI, et possede par 'app' : Docker initialise un volume nomme
 # vide avec le proprietaire et les droits du repertoire de l'image. Sans ca, le
 # volume arriverait en root:root et le worker ne pourrait pas y ecrire.
-RUN adduser -D -u 10001 app && mkdir -p /state && chown -R app:app /app /state
+RUN useradd --uid 10001 --create-home app && mkdir -p /state && chown -R app:app /state
 USER app
 
 # Aucun EXPOSE : ce conteneur n'ouvre rien.
 # -u : sortie non bufferisee, sinon les logs n'apparaissent que par blocs.
-CMD ["python3", "-u", "/app/worker.py"]
+CMD ["python3", "-u", "/app/src/worker.py"]
