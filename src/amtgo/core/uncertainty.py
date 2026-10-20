@@ -52,7 +52,9 @@ class UncertainValue(BaseModel):
                 raise ValueError(f"{name} non fini")
         if self.lower is not None and self.upper is not None and self.lower > self.upper:
             raise ValueError("lower > upper")
-        if self.mean is not None:
+        if self.mean is not None and self.distribution_type is not DistributionType.EMPIRICAL:
+            # Pour des tirages, [lower, upper] est un intervalle de QUANTILES : la moyenne d'une
+            # loi très asymétrique peut légitimement en sortir. Contrainte réservée aux autres lois.
             # Tolérance relative : moyenne et quantiles flottants peuvent différer d'un ULP.
             tol = _REL_TOL * max(1.0, abs(self.mean))
             if self.lower is not None and self.mean < self.lower - tol:

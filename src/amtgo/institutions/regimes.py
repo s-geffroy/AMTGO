@@ -60,6 +60,9 @@ class ConstitutionalRegime(BaseModel):
     defence_rules: dict[str, Any]
     market_rules: dict[str, Any]
     resource_rules: dict[str, Any]
+    # Gabarit de frontière entre États sous ce régime (σ par dimension, PROVISOIRE) : un marché
+    # commun abaisse σ^E et σ^M, une défense commune σ^S, etc. (01 §5).
+    border_template: dict[str, float]
 
     @property
     def content_hash(self) -> str:
