@@ -56,3 +56,7 @@ class ForbiddenSourceRole(AMTGOError):
 
 class StageInterrupted(AMTGOError):
     """Arrêt demandé (SIGTERM) au milieu d'une étape : elle sera rejouée, ce n'est pas un échec."""
+
+
+class NormativeViolation(AMTGOError):
+    """Un invariant normatif serait violé (prompt §86) : déplacement forcé, plan de coercition…"""

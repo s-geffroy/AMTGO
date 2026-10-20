@@ -1,0 +1,21 @@
+# Scenario S1 : aucun deplacement induit (prompt §35). Valeurs PROVISOIRES, horizon 10 ans.
+# Un intervalle reduit a un point est une hypothese de maintien, reportee comme telle.
+scenario_id: s1_baseline
+version: "0.1.0"
+description: Tendances prolongees, aucun deplacement induit par une reforme.
+mobility_regime: S1
+horizon_years: 10
+population: {annual_growth: {lo: 0.02, hi: 0.03}}
+climate:
+  modelled: true
+  pathways:                       # multiplicateur du cout des services a l'horizon
+    moderate: {lo: 1.00, hi: 1.03}
+    high: {lo: 1.03, hi: 1.10}
+urbanization: {service_cost_multiplier: {lo: 0.97, hi: 1.00}}
+economy: {annual_fiscal_base_growth: {lo: 0.0, hi: 0.03}}
+migration:
+  exogenous_annual_net_rate: {lo: -0.002, hi: 0.002}
+  forced_migration: 0.0           # garde-fou : toujours 0
+  reform_induced_relocation: 0.0  # garde-fou S1 : toujours 0
+infrastructure: {market_access_multiplier: {lo: 1.0, hi: 1.05}}
+security: {security_cost_multiplier: {lo: 0.9, hi: 1.2}}

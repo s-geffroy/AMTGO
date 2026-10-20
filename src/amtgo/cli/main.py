@@ -16,12 +16,14 @@ source_app = typer.Typer(no_args_is_help=True, help="Registre de sources.")
 ingest_app = typer.Typer(no_args_is_help=True, help="Ingestion.")
 export_app = typer.Typer(no_args_is_help=True, help="Exports (passent tous par le privacy guard).")
 validate_app = typer.Typer(no_args_is_help=True, help="Validation : mondes synthétiques, red-team.")
+scenario_app = typer.Typer(no_args_is_help=True, help="Scénarios (S1, S2A, S2C diagnostic agrégé).")
 app.add_typer(run_app, name="run")
 app.add_typer(db_app, name="db")
 app.add_typer(source_app, name="source")
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(export_app, name="export")
 app.add_typer(validate_app, name="validate")
+app.add_typer(scenario_app, name="scenario")
 
 
 def _resolve(path: Path) -> Path:
@@ -96,6 +98,28 @@ def source_validate(paths: list[Path] = typer.Argument(None)) -> None:  # noqa: 
         raise typer.Exit(1)
 
 
+@scenario_app.command("validate")
+def scenario_validate(paths: list[Path] = typer.Argument(None)) -> None:  # noqa: B008
+    """Valide des scénarios et leurs garde-fous (par défaut : tout configs/scenarios/)."""
+    from amtgo.config.loader import load_model
+    from amtgo.errors import AMTGOError
+    from amtgo.scenarios.model import Scenario
+
+    targets = paths or sorted((get_settings().configs_dir / "scenarios").glob("*.yaml"))
+    failed = 0
+    for p in targets:
+        try:
+            sc = load_model(Scenario, _resolve(p))
+            climate = ",".join(sorted(sc.climate.pathways)) if sc.climate.modelled else "climat non modélisé"
+            typer.echo(f"OK   {sc.scenario_id} {sc.version} {sc.mobility_regime.value} {sc.horizon_years} ans "
+                       f"{climate}")
+        except AMTGOError as exc:
+            failed += 1
+            typer.echo(f"ECHEC {p}: {exc}", err=True)
+    if failed:
+        raise typer.Exit(1)
+
+
 @ingest_app.command("run")
 def ingest_run(manifest: Path, role: list[str], out: Path = Path("/tmp/amtgo-ingest")) -> None:
     """Ingère une source hors run (exploration) ; un run reste la voie reproductible."""
@@ -131,16 +155,20 @@ def export_report(run_id: str, out: Path) -> None:
 
 @validate_app.command("worlds")
 def validate_worlds(out: Path | None = None) -> None:
-    """Évalue les mondes A–F et vérifie leurs propriétés D/F/I (code de sortie ≠ 0 si l'une échoue)."""
+    """Évalue les mondes A–F et V et vérifie leurs propriétés (code de sortie ≠ 0 si l'une échoue)."""
     from amtgo.config.loader import load_model
+    from amtgo.institutions.regimes import RegimeId, load_regime
     from amtgo.manifests.normative import NormativeManifest
-    from amtgo.validation.worlds_report import checks, evaluate_all, render
+    from amtgo.validation.worlds_report import all_checks, render
 
-    nm = load_model(NormativeManifest, get_settings().configs_dir / "normative" / "default.yaml")
-    text = render(nm.rights, nm.connection_weights.as_channels())
+    cfg = get_settings().configs_dir
+    nm = load_model(NormativeManifest, cfg / "normative" / "default.yaml")
+    regimes = {r.value: load_regime(cfg, r.value) for r in RegimeId}
+    weights = nm.connection_weights.as_channels()
+    text = render(nm.rights, weights, regimes, nm.viability)
     if out is not None:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(text, encoding="utf-8")
     typer.echo(text)
-    if not all(ok for _, ok, _ in checks(evaluate_all(nm.rights, nm.connection_weights.as_channels()))):
+    if not all(ok for _, ok, _ in all_checks(nm.rights, weights, regimes, nm.viability)):
         raise typer.Exit(1)

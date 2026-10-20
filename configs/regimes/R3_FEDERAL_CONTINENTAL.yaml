@@ -1,11 +1,12 @@
-# Spec 14 §5. Ce regime est un SCENARIO, pas la doctrine du modele.
+# Spec 14 §5. Un scenario, pas la doctrine du modele. Valeurs PROVISOIRES (ADR-0018).
 regime_id: R3_FEDERAL_CONTINENTAL
 name: Federal Continental
-version: "0.1.0"
-description: Citoyennete commune forte, defense strategique commune, fiscalite partagee.
-mobility_rules: {free_movement: full, common_citizenship: strong}
-fiscal_transfer_rules: {equalization: shared_taxation}
-defence_rules: {defence: common_strategic}
-market_rules: {common_market: complete}
-resource_rules: {resources: large_common_infrastructure}
-border_template: {P: 0.6, C: 0.2, E: 0.05, M: 0.05, R: 0.3, S: 0.2}  # PROVISOIRE
+version: "0.2.0"
+description: Citoyennete commune forte, defense strategique commune, fiscalite partagee, grandes infrastructures communes.
+mobility_rules: {free_movement: 0.95, cross_border_recognition: true}
+fiscal_transfer_rules: {equalization_rate: 0.7, pooled_revenue_share: 0.2}
+defence_rules: {common_defence_share: 0.8, security_coordination: true}
+market_rules: {market_integration: 0.95, constitutional_arbitration: true}
+resource_rules: {shared_resource_share: 0.7}
+infrastructure_rules: {common_infrastructure_share: 0.6}
+declared_border: {P: 0.6, C: 0.2}

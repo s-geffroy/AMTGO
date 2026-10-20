@@ -1,0 +1,20 @@
+# Scenario S1 de stress : stagnation, climat defavorable, securite couteuse. PROVISOIRE.
+scenario_id: s1_stress
+version: "0.1.0"
+description: Stagnation economique, trajectoires climatiques defavorables, couts de securite eleves ; aucun deplacement induit.
+mobility_regime: S1
+horizon_years: 10
+population: {annual_growth: {lo: 0.025, hi: 0.035}}
+climate:
+  modelled: true
+  pathways:
+    high: {lo: 1.05, hi: 1.12}
+    very_high: {lo: 1.10, hi: 1.20}
+urbanization: {service_cost_multiplier: {lo: 0.98, hi: 1.02}}
+economy: {annual_fiscal_base_growth: {lo: -0.01, hi: 0.0}}
+migration:
+  exogenous_annual_net_rate: {lo: -0.004, hi: 0.0}
+  forced_migration: 0.0
+  reform_induced_relocation: 0.0
+infrastructure: {market_access_multiplier: {lo: 1.0, hi: 1.0}}
+security: {security_cost_multiplier: {lo: 1.2, hi: 1.6}}

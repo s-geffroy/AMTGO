@@ -1,11 +1,12 @@
-# Spec 14 §3.
+# Spec 14 §3. Valeurs PROVISOIRES. E, M, R, S derives des regles (ADR-0018).
 regime_id: R1_COMMON_MARKET
 name: Common Market
-version: "0.1.0"
+version: "0.2.0"
 description: Libre circulation forte et marche commun ; defense nationale, transferts limites.
-mobility_rules: {free_movement: strong, cross_border_recognition: true}
-fiscal_transfer_rules: {equalization: limited}
-defence_rules: {defence: national}
-market_rules: {common_market: strong}
-resource_rules: {resources: national}
-border_template: {P: 1.0, C: 0.4, E: 0.2, M: 0.1, R: 0.8, S: 0.9}  # PROVISOIRE
+mobility_rules: {free_movement: 0.9, cross_border_recognition: true}
+fiscal_transfer_rules: {equalization_rate: 0.1, pooled_revenue_share: 0.0}
+defence_rules: {common_defence_share: 0.1, security_coordination: false}
+market_rules: {market_integration: 0.8, constitutional_arbitration: false}
+resource_rules: {shared_resource_share: 0.2}
+infrastructure_rules: {common_infrastructure_share: 0.1}
+declared_border: {P: 1.0, C: 0.4}

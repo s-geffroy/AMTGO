@@ -1,0 +1,17 @@
+# Scenario S2C : diagnostic AGREGE de dependance a la coercition (prompt §37, 06 §8).
+# Aucune projection de population, aucun plan : ni qui, ni ou, ni vers ou, ni comment.
+scenario_id: s2c_diagnostic
+version: "0.1.0"
+description: Diagnostic agrege de la part d'un benefice apparent qui supposerait des deplacements.
+mobility_regime: S2C
+horizon_years: 10
+population: {annual_growth: {lo: 0.02, hi: 0.03}}
+climate: {modelled: false}
+urbanization: {service_cost_multiplier: {lo: 1.0, hi: 1.0}}
+economy: {annual_fiscal_base_growth: {lo: 0.0, hi: 0.03}}
+migration:
+  exogenous_annual_net_rate: {lo: 0.0, hi: 0.0}
+  forced_migration: 0.0
+  reform_induced_relocation: 0.0
+infrastructure: {market_access_multiplier: {lo: 1.0, hi: 1.0}}
+security: {security_cost_multiplier: {lo: 1.0, hi: 1.0}}

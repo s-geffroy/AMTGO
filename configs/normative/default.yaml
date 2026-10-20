@@ -50,6 +50,10 @@ connection_weights:  # kappa_c de J_conn (02 §11), PROVISOIRES : poids egaux
   civic: 1.0
   identity: 1.0
 
+viability:  # 02 §14 : couverture du panier de services, jamais un seuil de taille
+  service_coverage_min: 1.0        # PROVISOIRE : recettes nettes = cout du panier de reference
+  shortfall_probability_max: 0.1   # PROVISOIRE
+
 consent:
   model_may_infer_final_consent: false  # invariant, prompt §59
 

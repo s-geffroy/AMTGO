@@ -1,11 +1,12 @@
-# Spec 14 §4.
+# Spec 14 §4. Valeurs PROVISOIRES. E, M, R, S derives des regles (ADR-0018).
 regime_id: R2_CONFEDERAL
 name: Confederation
-version: "0.1.0"
+version: "0.2.0"
 description: Marche commun, mobilite, arbitrage constitutionnel, coordination securite, transferts.
-mobility_rules: {free_movement: strong}
-fiscal_transfer_rules: {equalization: mechanism}
-defence_rules: {defence: coordinated}
-market_rules: {common_market: strong, constitutional_arbitration: true}
-resource_rules: {resources: partially_common}
-border_template: {P: 0.9, C: 0.3, E: 0.1, M: 0.1, R: 0.5, S: 0.5}  # PROVISOIRE
+mobility_rules: {free_movement: 0.9, cross_border_recognition: true}
+fiscal_transfer_rules: {equalization_rate: 0.4, pooled_revenue_share: 0.05}
+defence_rules: {common_defence_share: 0.5, security_coordination: true}
+market_rules: {market_integration: 0.9, constitutional_arbitration: true}
+resource_rules: {shared_resource_share: 0.5}
+infrastructure_rules: {common_infrastructure_share: 0.3}
+declared_border: {P: 0.9, C: 0.3}

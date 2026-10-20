@@ -19,8 +19,10 @@ from amtgo.core.provenance import ProvenanceRecord
 from amtgo.data.observations import Observation
 from amtgo.data.sources import Source, SourceManifest
 from amtgo.geo.mesh import Mesh
+from amtgo.institutions.regimes import ConstitutionalRegime
 from amtgo.manifests.run import RunManifest
 from amtgo.ontology.model import Ontology, OntologyCrosswalk
+from amtgo.scenarios.model import Scenario
 
 if TYPE_CHECKING:
     from amtgo.measurement.fields import LatentFieldMeta
@@ -39,6 +41,8 @@ class Repository(Protocol):
                             rows: list[dict[str, Any]]) -> None: ...
     def record_measurement_freeze(self, run_id: uuid.UUID, freeze_hash: str) -> None: ...
     def record_ontologies(self, ontologies: Sequence[Ontology], crosswalks: Sequence[OntologyCrosswalk]) -> None: ...
+    def record_regimes_scenarios(self, regimes: Sequence[ConstitutionalRegime],
+                                 scenarios: Sequence[Scenario]) -> None: ...
 
 
 class NullRepository:
@@ -67,6 +71,10 @@ class NullRepository:
         pass
 
     def record_ontologies(self, ontologies: Sequence[Ontology], crosswalks: Sequence[OntologyCrosswalk]) -> None:
+        pass
+
+    def record_regimes_scenarios(self, regimes: Sequence[ConstitutionalRegime],
+                                 scenarios: Sequence[Scenario]) -> None:
         pass
 
 
@@ -105,7 +113,8 @@ class PostgresRepository:
                 "normative_hash": manifest.normative_manifest_hash,
                 "regime": manifest.constitutional_regime.regime_id.value,
                 "mesh_set": json.dumps([m.model_dump(mode="json") for m in manifest.mesh_set]),
-                "scenario_set": json.dumps(list(manifest.scenario_set)),
+                "scenario_set": json.dumps([{"scenario_id": sc.scenario_id, "content_hash": sc.content_hash}
+                                            for sc in manifest.scenario_set]),
                 "solver": json.dumps(manifest.solver),
                 "created_at": manifest.created_at,
             })
@@ -284,3 +293,33 @@ class PostgresRepository:
                         "to": cw.target_ontology, "sc": row.source_concept, "tc": t, "p": p,
                         "conc": row.concentration, "ev": json.dumps({"evidence": row.evidence})}
                        for row in cw.rows for t, p in row.targets.items()])
+
+    def record_regimes_scenarios(self, regimes: Sequence[ConstitutionalRegime],
+                                 scenarios: Sequence[Scenario]) -> None:
+        with self.engine.begin() as cx:
+            for r in regimes:
+                cx.execute(text("""
+                    INSERT INTO constitutional_regimes (regime_id, content_hash, name, version,
+                        mobility_rules, fiscal_transfer_rules, defence_rules, market_rules, resource_rules,
+                        infrastructure_rules, declared_border)
+                    VALUES (:id, :h, :name, :v, CAST(:mob AS jsonb), CAST(:fis AS jsonb), CAST(:def AS jsonb),
+                        CAST(:mkt AS jsonb), CAST(:res AS jsonb), CAST(:inf AS jsonb), CAST(:bor AS jsonb))
+                    ON CONFLICT DO NOTHING
+                """), {"id": r.regime_id.value, "h": r.content_hash, "name": r.name, "v": r.version,
+                       "mob": r.mobility_rules.model_dump_json(), "fis": r.fiscal_transfer_rules.model_dump_json(),
+                       "def": r.defence_rules.model_dump_json(), "mkt": r.market_rules.model_dump_json(),
+                       "res": r.resource_rules.model_dump_json(), "inf": r.infrastructure_rules.model_dump_json(),
+                       "bor": r.declared_border.model_dump_json()})
+            for sc in scenarios:
+                cx.execute(text("""
+                    INSERT INTO scenarios (scenario_id, content_hash, version, mobility_regime, horizon_years,
+                        population, climate, urbanization, economy, migration, infrastructure, security)
+                    VALUES (:id, :h, :v, :mr, :hz, CAST(:pop AS jsonb), CAST(:cli AS jsonb), CAST(:urb AS jsonb),
+                        CAST(:eco AS jsonb), CAST(:mig AS jsonb), CAST(:inf AS jsonb), CAST(:sec AS jsonb))
+                    ON CONFLICT DO NOTHING
+                """), {"id": sc.scenario_id, "h": sc.content_hash, "v": sc.version,
+                       "mr": sc.mobility_regime.value, "hz": sc.horizon_years,
+                       "pop": sc.population.model_dump_json(), "cli": sc.climate.model_dump_json(),
+                       "urb": sc.urbanization.model_dump_json(), "eco": sc.economy.model_dump_json(),
+                       "mig": sc.migration.model_dump_json(), "inf": sc.infrastructure.model_dump_json(),
+                       "sec": sc.security.model_dump_json()})

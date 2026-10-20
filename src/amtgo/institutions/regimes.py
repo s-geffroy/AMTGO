@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from amtgo.config.loader import load_model
 from amtgo.errors import ConfigurationError
@@ -46,23 +46,85 @@ def normalize_regime_id(name: str) -> RegimeId:
     raise ConfigurationError(f"régime constitutionnel inconnu : {name!r}")
 
 
-class ConstitutionalRegime(BaseModel):
-    """Schéma 10 §16. Les règles restent des mappings déclaratifs à ce stade (M6 les typera)."""
-
+class _Strict(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+_Unit = Annotated[float, Field(ge=0.0, le=1.0)]
+
+
+class MobilityRules(_Strict):
+    free_movement: _Unit  # 1 : libre circulation complète entre États
+    cross_border_recognition: bool = False
+
+
+class FiscalTransferRules(_Strict):
+    # Part de l'écart de capacité fiscale par habitant (sous la moyenne de l'union) comblée.
+    equalization_rate: _Unit
+    # Part des recettes mise en commun et redistribuée par habitant (fiscalité partagée).
+    pooled_revenue_share: _Unit = 0.0
+
+
+class DefenceRules(_Strict):
+    # Part du coût fixe de sécurité mutualisée au niveau de l'union.
+    common_defence_share: _Unit
+    security_coordination: bool = False
+
+
+class MarketRules(_Strict):
+    market_integration: _Unit  # 1 : marché commun complet
+    constitutional_arbitration: bool = False
+
+
+class ResourceRules(_Strict):
+    shared_resource_share: _Unit
+
+
+class InfrastructureRules(_Strict):
+    common_infrastructure_share: _Unit
+
+
+class DeclaredBorder(_Strict):
+    """Dimensions de frontière non dérivables des règles : politique et culturelle (PROVISOIRES)."""
+
+    P: _Unit
+    C: _Unit
+
+
+class ConstitutionalRegime(_Strict):
+    """Schéma 10 §16, règles typées (M6, ADR-0018).
+
+    Les dimensions E, M, R, S de la frontière entre États **dérivent** des règles
+    (σ^M = 1 − libre circulation, etc.) : un régime ne peut pas déclarer un marché
+    commun complet et une frontière économique forte. P et C sont déclarées.
+    ``infrastructure_rules`` étend le schéma 10 §16 : 02 §14 rend la viabilité
+    dépendante de l'infrastructure sous le régime.
+    """
 
     regime_id: RegimeId
     name: str
     version: str
     description: str
-    mobility_rules: dict[str, Any]
-    fiscal_transfer_rules: dict[str, Any]
-    defence_rules: dict[str, Any]
-    market_rules: dict[str, Any]
-    resource_rules: dict[str, Any]
-    # Gabarit de frontière entre États sous ce régime (σ par dimension, PROVISOIRE) : un marché
-    # commun abaisse σ^E et σ^M, une défense commune σ^S, etc. (01 §5).
-    border_template: dict[str, float]
+    mobility_rules: MobilityRules
+    fiscal_transfer_rules: FiscalTransferRules
+    defence_rules: DefenceRules
+    market_rules: MarketRules
+    resource_rules: ResourceRules
+    infrastructure_rules: InfrastructureRules
+    declared_border: DeclaredBorder
+
+    @property
+    def border_template(self) -> dict[str, float]:
+        """Gabarit σ entre deux États sous ce régime (dimensions de ``BorderDim``)."""
+        # Arrondi : 1 − 0,9 doit valoir 0,1, pas 0,09999999999999998 (empreintes stables).
+        return {
+            "P": self.declared_border.P,
+            "C": self.declared_border.C,
+            "E": round(1.0 - self.market_rules.market_integration, 12),
+            "M": round(1.0 - self.mobility_rules.free_movement, 12),
+            "R": round(1.0 - self.resource_rules.shared_resource_share, 12),
+            "S": round(1.0 - self.defence_rules.common_defence_share, 12),
+        }
 
     @property
     def content_hash(self) -> str:

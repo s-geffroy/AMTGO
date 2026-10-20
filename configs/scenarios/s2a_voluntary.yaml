@@ -1,0 +1,22 @@
+# Scenario S2A : mobilite volontaire uniquement (prompt §36). La reponse volontaire a une
+# reforme est un effet causal (M7) : sans reference, CAUSAL_EFFECT_UNKNOWN, jamais nulle.
+scenario_id: s2a_voluntary
+version: "0.1.0"
+description: Tendances de s1_baseline ; mobilite volontaire seulement, reponse a la reforme non identifiee.
+mobility_regime: S2A
+horizon_years: 10
+population: {annual_growth: {lo: 0.02, hi: 0.03}}
+climate:
+  modelled: true
+  pathways:
+    moderate: {lo: 1.00, hi: 1.03}
+    high: {lo: 1.03, hi: 1.10}
+urbanization: {service_cost_multiplier: {lo: 0.97, hi: 1.00}}
+economy: {annual_fiscal_base_growth: {lo: 0.0, hi: 0.03}}
+migration:
+  exogenous_annual_net_rate: {lo: -0.002, hi: 0.002}
+  forced_migration: 0.0
+  reform_induced_relocation: 0.0
+  voluntary_response: null        # bibliotheque causale (M7) absente
+infrastructure: {market_access_multiplier: {lo: 1.0, hi: 1.05}}
+security: {security_cost_multiplier: {lo: 0.9, hi: 1.2}}

@@ -58,6 +58,18 @@ class RobustnessWeights(_Strict):
     lambda_var: float = Field(ge=0.0)
 
 
+class ViabilityThresholds(_Strict):
+    """Couverture minimale du panier de services (02 §14) : choix normatif, pas un seuil de taille.
+
+    Viable sous (régime, scénario) si P(couverture < τ) ≤ ε ; non viable si
+    P(couverture ≥ τ) ≤ ε ; incertain sinon. Il n'existe aucun seuil universel de
+    population, de surface ou d'autarcie (01 §8) : le schéma n'en accepte pas.
+    """
+
+    service_coverage_min: float = Field(gt=0.0)  # τ_V
+    shortfall_probability_max: float = Field(gt=0.0, lt=0.5)  # ε_V
+
+
 class OptimizationRules(_Strict):
     reification_penalty_enabled: bool
     state_count_penalty_enabled: bool = False
@@ -118,6 +130,7 @@ class NormativeManifest(_Strict):
     robustness: RobustnessWeights
     optimization: OptimizationRules
     connection_weights: ConnectionWeights
+    viability: ViabilityThresholds
     consent: ConsentRules
     privacy: PrivacyRules
 

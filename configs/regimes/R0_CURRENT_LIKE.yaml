@@ -1,11 +1,13 @@
-# Spec 14 §2. Contenu qualitatif : les parametres quantitatifs arrivent en M6.
+# Spec 14 §2. Valeurs PROVISOIRES (ordres de grandeur declares, non estimes).
+# Les dimensions E, M, R, S de la frontiere entre Etats derivent des regles (ADR-0018).
 regime_id: R0_CURRENT_LIKE
 name: Current-like
-version: "0.1.0"
-description: Comparaison realiste proche du statu quo institutionnel.
-mobility_rules: {free_movement: variable}
-fiscal_transfer_rules: {equalization: weak}
-defence_rules: {defence: national}
-market_rules: {common_market: partial}
-resource_rules: {resources: national}
-border_template: {P: 1.0, C: 0.5, E: 0.7, M: 0.7, R: 0.9, S: 1.0}  # PROVISOIRE
+version: "0.2.0"
+description: Souverainetes fortes, mobilite variable, perequation faible, defense nationale.
+mobility_rules: {free_movement: 0.3, cross_border_recognition: false}
+fiscal_transfer_rules: {equalization_rate: 0.0, pooled_revenue_share: 0.0}
+defence_rules: {common_defence_share: 0.0, security_coordination: false}
+market_rules: {market_integration: 0.3, constitutional_arbitration: false}
+resource_rules: {shared_resource_share: 0.1}
+infrastructure_rules: {common_infrastructure_share: 0.0}
+declared_border: {P: 1.0, C: 0.5}
