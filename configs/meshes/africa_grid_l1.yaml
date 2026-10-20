@@ -1,0 +1,6 @@
+# Grille LAEA continentale, 200 km de cote. N'est pas une proposition.
+mesh_id: africa_grid_l1
+family: grid_laea
+resolution: 1
+grid_base_km: 400
+extent: {kind: source_union, source_id: natural_earth_admin0, variable_id: admin0_polygon}

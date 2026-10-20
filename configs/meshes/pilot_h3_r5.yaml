@@ -1,0 +1,4 @@
+mesh_id: pilot_h3_r5
+family: h3
+resolution: 5
+extent: {kind: bbox, bbox: [-25.0, -26.0, -21.0, -22.0]}

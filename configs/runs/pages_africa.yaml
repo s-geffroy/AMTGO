@@ -1,0 +1,16 @@
+# Run qui produit les couches de la carte publique : pays actuels et maillages
+# d'analyse continentaux. Aucun decoupage n'est produit.
+name: pages_africa
+description: >
+  Fond de carte public : pays actuels (Natural Earth, de facto) et maillages
+  d'analyse H3 r3 et grille LAEA 200 km. Ces maillages ne sont pas des propositions.
+region: africa
+map_mode: R
+constitutional_regime: R0_CURRENT_LIKE
+normative_manifest: normative/default.yaml
+sources:
+  - {manifest: sources/natural_earth_admin0.yaml, roles: [basemap_display, analysis_extent], redistribute: true}
+mesh_set:
+  - meshes/africa_h3_r3.yaml
+  - meshes/africa_grid_l1.yaml
+seeds: [0]

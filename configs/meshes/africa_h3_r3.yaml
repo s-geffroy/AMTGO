@@ -1,0 +1,5 @@
+# Maillage d'ANALYSE continental grossier (~12 400 km2 par cellule). N'est pas une proposition.
+mesh_id: africa_h3_r3
+family: h3
+resolution: 3
+extent: {kind: source_union, source_id: natural_earth_admin0, variable_id: admin0_polygon}

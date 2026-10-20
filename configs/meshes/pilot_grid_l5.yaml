@@ -1,0 +1,6 @@
+# Grille carree LAEA, 400 km / 2^5 = 12.5 km de cote.
+mesh_id: pilot_grid_l5
+family: grid_laea
+resolution: 5
+grid_base_km: 400
+extent: {kind: bbox, bbox: [-25.0, -26.0, -21.0, -22.0]}
