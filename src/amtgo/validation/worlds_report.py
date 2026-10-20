@@ -1,4 +1,4 @@
-"""Rapport des mondes synthétiques A–F : propriétés D/F/I vérifiées (publiable, catégories fictives)."""
+"""Rapport des mondes synthétiques A–F (D/F/I) et V (viabilité) : publiable, catégories fictives."""
 
 from __future__ import annotations
 
@@ -7,8 +7,10 @@ from typing import Any
 from amtgo.core.channels import FragChannel, IntegChannel
 from amtgo.domination.engine import domination
 from amtgo.fragmentation.engine import fragmentation
+from amtgo.institutions.regimes import ConstitutionalRegime
 from amtgo.integration.engine import integration
-from amtgo.manifests.normative import RightsThresholds
+from amtgo.manifests.normative import RightsThresholds, ViabilityThresholds
+from amtgo.validation import viability_worlds as V
 from amtgo.validation import worlds as W
 
 
@@ -66,12 +68,20 @@ def checks(r: dict[str, Any]) -> list[tuple[str, bool, str]]:
     ]
 
 
-def render(rights: RightsThresholds, weights: dict[IntegChannel, float]) -> str:
-    r = evaluate_all(rights, weights)
-    lines = ["# Mondes synthétiques A–F (D/F/I)\n",
-             "> Mondes **fictifs** à vérité connue (prompt §56). Ils vérifient les composantes D/F/I "
-             "que l'optimiseur utilisera (M10) ; ils ne produisent aucune recommandation.\n",
+def all_checks(rights: RightsThresholds, weights: dict[IntegChannel, float],
+               regimes: dict[str, ConstitutionalRegime], viability: ViabilityThresholds,
+               observed: str = "R0_CURRENT_LIKE") -> list[tuple[str, bool, str]]:
+    """Propriétés des mondes A–F (D/F/I) et du monde V (viabilité contextuelle, M6)."""
+    return checks(evaluate_all(rights, weights)) + V.checks(V.evaluate(regimes, observed, viability), observed)
+
+
+def render(rights: RightsThresholds, weights: dict[IntegChannel, float],
+           regimes: dict[str, ConstitutionalRegime], viability: ViabilityThresholds) -> str:
+    lines = ["# Mondes synthétiques A–F et V\n",
+             "> Mondes **fictifs** à vérité connue (prompt §56). A–F vérifient les composantes D/F/I, "
+             "V la viabilité contextuelle, que l'optimiseur utilisera (M10) ; ils ne produisent aucune "
+             "recommandation.\n",
              "| propriété attendue | vérifiée | valeurs |", "|---|---|---|"]
-    for text, ok, vals in checks(r):
+    for text, ok, vals in all_checks(rights, weights, regimes, viability):
         lines.append(f"| {text} | {'oui' if ok else '**NON**'} | {vals} |")
     return "\n".join(lines) + "\n"

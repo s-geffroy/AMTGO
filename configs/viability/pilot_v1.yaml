@@ -1,0 +1,20 @@
+# Viabilite contextuelle (M6). Parametres de MODELE, PROVISOIRES.
+model_id: viability_pilot
+version: "0.1.0"
+description: >
+  Couverture du panier de services des Etats du statu quo declare, sous chaque
+  regime de la sensibilite et chaque scenario S1/S2A du run.
+fiscal_source: synthetic_fiscal
+revenue_variable: fiscal_revenue_admin
+cost_variable: service_cost_admin
+observed_regime: R0_CURRENT_LIKE   # HYPOTHESE : comptes observes sous le regime courant
+regime_sensitivity: [R0_CURRENT_LIKE, R1_COMMON_MARKET, R2_CONFEDERAL, R3_FEDERAL_CONTINENTAL]
+level: state
+sovereign_overhead:                 # couts fixes annuels par Etat, unites fictives
+  administration: {lo: 1.0e7, hi: 2.0e7}
+  security: {lo: 2.0e7, hi: 4.0e7}
+exploratory:                        # NON CAUSAUX (I7), bornes incluant l'effet nul
+  market_access_elasticity: {lo: 0.0, hi: 0.3}
+  infrastructure_cost_reduction: {lo: 0.0, hi: 0.2}
+  source: hypothese exploratoire (grade I7), non causale ; remplacee par la bibliotheque causale (M7)
+union_closure: l'union qui transfere et mutualise est la region analysee (aucun echange hors region)

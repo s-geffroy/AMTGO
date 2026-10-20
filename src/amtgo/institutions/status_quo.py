@@ -92,26 +92,36 @@ def _border(spec: dict[str, float] | str, regime: ConstitutionalRegime) -> Borde
         raise ConfigurationError(f"vecteur de frontière invalide : {exc}") from exc
 
 
+def assign_cells_to_polygons(mesh: Mesh, polygons: list[Observation]) -> tuple[np.ndarray, list[str]]:
+    """Affecte chaque cellule (par son centre) au polygone qui le contient, sinon au plus proche.
+
+    Retourne l'indice de polygone par cellule et les codes, triés par ``admin_code``.
+    """
+    obs = sorted(polygons, key=lambda o: o.admin_code or "")
+    geoms = [to_equal_area(g) for o in obs if (g := o.geometry()) is not None]
+    if not geoms or len(geoms) != len(obs):
+        raise TopologyError("affectation : polygones absents ou sans géométrie")
+    tree = STRtree(geoms)
+    assign = np.full(len(mesh.cells), -1, dtype=int)
+    for k, c in enumerate(mesh.cells.values()):
+        pt = to_equal_area(c.geometry).centroid
+        hits = tree.query(pt, predicate="within")
+        if len(hits) == 0:
+            hits = [int(tree.nearest(pt))]
+        assign[k] = int(min(hits))
+    return assign, [str(o.admin_code) for o in obs]
+
+
 def build_partition(spec: StatusQuoSpec, mesh: Mesh, regime: ConstitutionalRegime,
                     polygons: dict[str, list[Observation]]) -> Partition:
     """Affecte chaque cellule (par son centre) aux juridictions de chaque niveau."""
     ids = list(mesh.cells)
-    centres = [to_equal_area(mesh.cells[c].geometry).centroid for c in ids]
     assignments: dict[str, tuple[np.ndarray, list[str]]] = {}
     for lv in reversed(spec.levels):  # local d'abord : les regroupements en dépendent
         if lv.from_source is not None:
-            obs = sorted(polygons.get(lv.from_source, []), key=lambda o: o.admin_code or "")
-            if not obs:
+            if not polygons.get(lv.from_source):
                 raise ConfigurationError(f"niveau {lv.name} : aucun polygone de {lv.from_source}")
-            geoms = [to_equal_area(g) for o in obs if (g := o.geometry()) is not None]
-            tree = STRtree(geoms)
-            assign = np.full(len(ids), -1, dtype=int)
-            for k, pt in enumerate(centres):
-                hits = tree.query(pt, predicate="within")
-                if len(hits) == 0:
-                    hits = [int(tree.nearest(pt))]
-                assign[k] = int(min(hits))
-            assignments[lv.name] = (assign, [str(o.admin_code) for o in obs])
+            assignments[lv.name] = assign_cells_to_polygons(mesh, polygons[lv.from_source])
         else:
             assert lv.group_of is not None
             child_assign, child_names = assignments[lv.group_of]

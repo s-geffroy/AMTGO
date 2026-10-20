@@ -2,8 +2,9 @@
 
 ``instrument: survey`` produit des comptes de zones d'énumération géomasquées
 (UNCERTAIN_POINT) ; ``instrument: census`` produit des totaux de districts
-(ADMIN). Aucune catégorie identitaire avant M4/M5. La vérité du monde n'est
-jamais écrite dans les observations : seuls les instruments le sont.
+(ADMIN) ; ``instrument: fiscal`` des comptes de districts (M6). Aucune catégorie
+identitaire avant M4/M5. La vérité du monde n'est jamais écrite dans les
+observations : seuls les instruments le sont.
 """
 
 from __future__ import annotations
@@ -19,10 +20,12 @@ from amtgo.data.observations import Observation
 from amtgo.data.sources import ResourceRef, SourceManifest
 from amtgo.data.synthetic_world import (
     CensusDesign,
+    FiscalDesign,
     SurveyDesign,
     SyntheticWorld,
     group_layer,
     simulate_census,
+    simulate_fiscal,
     simulate_historical_map,
     simulate_identity_counts,
     simulate_survey,
@@ -34,6 +37,8 @@ VARIABLE_EA_COUNT = "population_count_ea"
 VARIABLE_DISTRICT_TOTAL = "population_total_admin"
 VARIABLE_IDENTITY_COUNTS = "identity_self_counts"
 VARIABLE_HISTORICAL_LABEL = "identity_historical_label"
+VARIABLE_FISCAL_REVENUE = "fiscal_revenue_admin"
+VARIABLE_SERVICE_COST = "service_cost_admin"
 
 
 def world_of(manifest: SourceManifest) -> SyntheticWorld:
@@ -118,9 +123,22 @@ class SyntheticAdapter:
                     attributes={"synthetic": True, "world_hash": world.world_hash, "label": b.label},
                     **common,
                 )
+        elif instrument == "fiscal":
+            design_f = FiscalDesign.from_params(p.get("fiscal", {}))
+            for fd in simulate_fiscal(world, design_f):
+                for var, mean, sd in ((VARIABLE_FISCAL_REVENUE, fd.revenue, fd.revenue_sd),
+                                      (VARIABLE_SERVICE_COST, fd.service_cost, fd.service_cost_sd)):
+                    yield Observation(
+                        id=Observation.make_id(src, var, fd.key, valid_from),
+                        variable_id=var, support_type=SupportType.ADMIN,
+                        geometry_wkt=fd.polygon.wkt, admin_code=fd.key,
+                        value=UncertainValue(mean=mean, std=sd, distribution_type=DistributionType.NORMAL),
+                        attributes={"synthetic": True, "world_hash": world.world_hash},
+                        **common,
+                    )
         else:
             raise ConfigurationError(
-                f"synthetic : instrument inconnu {instrument!r} (survey | census | historical_map)")
+                f"synthetic : instrument inconnu {instrument!r} (survey | census | historical_map | fiscal)")
 
     def _identity(self, manifest: SourceManifest, world: SyntheticWorld, eas: list[Any],
                   common: dict[str, Any], valid_from: datetime) -> Iterator[Observation]:

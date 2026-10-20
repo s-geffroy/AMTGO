@@ -296,3 +296,70 @@ def simulate_historical_map(world: SyntheticWorld, layer: GroupLayer, blocks_x: 
                         for e in ext}
             out.append(HistoricalBlock(f"h-{i:02d}-{j:02d}", poly, max(ext, key=lambda e: ext_mass[e])))
     return out
+
+
+# --- Comptes fiscaux FICTIFS (M6) ---------------------------------------------------
+#
+# Recettes propres et coût d'un panier de services de référence, par district.
+# Vérité analytique : la base fiscale par habitant croît avec la densité
+# (agglomération), le coût des services par habitant décroît avec elle (économies
+# de densité). Unités monétaires fictives.
+
+
+@dataclass(frozen=True)
+class FiscalDesign:
+    districts_x: int
+    districts_y: int
+    relative_error: float
+    revenue_base_pc: float
+    revenue_agglomeration_pc: float
+    revenue_half_density: float  # hab./km²
+    cost_base_pc: float
+    cost_sparsity_pc: float
+    cost_reference_density: float  # hab./km²
+
+    @classmethod
+    def from_params(cls, p: dict[str, Any]) -> FiscalDesign:
+        return cls(_num(p, "districts_x", int), _num(p, "districts_y", int), _num(p, "relative_error"),
+                   _num(p, "revenue_base_pc"), _num(p, "revenue_agglomeration_pc"), _num(p, "revenue_half_density"),
+                   _num(p, "cost_base_pc"), _num(p, "cost_sparsity_pc"), _num(p, "cost_reference_density"))
+
+    def revenue_pc(self, density: np.ndarray) -> np.ndarray:
+        return self.revenue_base_pc + self.revenue_agglomeration_pc * density / (density + self.revenue_half_density)
+
+    def cost_pc(self, density: np.ndarray) -> np.ndarray:
+        return self.cost_base_pc + self.cost_sparsity_pc * self.cost_reference_density / (
+            density + self.cost_reference_density)
+
+
+@dataclass(frozen=True)
+class FiscalDistrict:
+    key: str
+    polygon: Polygon  # EPSG:4326
+    revenue: float
+    revenue_sd: float
+    service_cost: float
+    service_cost_sd: float
+
+
+def simulate_fiscal(world: SyntheticWorld, design: FiscalDesign) -> list[FiscalDistrict]:
+    rng = np.random.default_rng([world.seed, 6])
+    minx, miny, maxx, maxy = world.bbox
+    dx = (maxx - minx) / design.districts_x
+    dy = (maxy - miny) / design.districts_y
+    pts, da = world.quadrature
+    dens = world.density(pts)
+    out = []
+    for i in range(design.districts_x):
+        for j in range(design.districts_y):
+            poly = box(minx + i * dx, miny + j * dy, minx + (i + 1) * dx, miny + (j + 1) * dy)
+            mask = shapely.contains_xy(to_equal_area(poly), pts[:, 0], pts[:, 1])
+            d = dens[mask]
+            rev = float((d * design.revenue_pc(d)).sum() * da)
+            cost = float((d * design.cost_pc(d)).sum() * da)
+            e = design.relative_error
+            rev_r = max(0.0, rev + rng.normal(0.0, e * rev))
+            cost_r = max(0.0, cost + rng.normal(0.0, e * cost))
+            out.append(FiscalDistrict(f"d-{i:02d}-{j:02d}", poly, round(rev_r, 1), round(e * rev_r, 1),
+                                      round(cost_r, 1), round(e * cost_r, 1)))
+    return out
