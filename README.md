@@ -59,3 +59,13 @@ Compose Secrets. Jamais dans le dépôt, le `.env` ou les logs.
 Le corpus V1.0-RC1 est lu depuis `spec/` (local, **non versionné**, car le dépôt
 est public). Ses empreintes sha256 figurent dans
 `docs/IMPLEMENTATION_ASSESSMENT.md`.
+
+## Licence
+
+Double licence :
+
+- **code** (`src/`, `tests/`, `scripts/`, `configs/`, workflows) : [Apache-2.0](LICENSE) ;
+- **documentation, rapports et données dérivées publiées** (`docs/`, rapports de
+  run, couches de la carte) : [CC BY 4.0](LICENSE-docs).
+
+Natural Earth reste dans le domaine public. Voir [NOTICE](NOTICE).

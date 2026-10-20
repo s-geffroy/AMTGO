@@ -49,3 +49,10 @@ actuels et les maillages d'analyse, et sa couche de candidats affiche
 - [Évaluation d'implémentation](IMPLEMENTATION_ASSESSMENT.md) — compréhension, incohérences tranchées, risques.
 - [Architecture](architecture.md) et [décisions](decisions/index.md).
 - [Rapports de milestone](milestones/M0_REPORT.md) et [runs synthétiques](runs/index.md).
+
+## Licence
+
+Cette documentation, les rapports de run et les couches de la carte sont publiés
+sous [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.fr). Le code est sous
+[Apache-2.0](https://github.com/s-geffroy/AMTGO/blob/main/LICENSE). Le fond de
+carte Natural Earth est dans le domaine public.

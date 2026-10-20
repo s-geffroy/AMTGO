@@ -4,6 +4,7 @@ site_url: https://s-geffroy.github.io/AMTGO/
 repo_url: https://github.com/s-geffroy/AMTGO
 repo_name: s-geffroy/AMTGO
 edit_uri: ""
+copyright: "© 2026 Sylvain Geffroy — documentation CC BY 4.0, code Apache-2.0 · fond de carte Natural Earth (domaine public)"
 docs_dir: docs
 strict: true
 

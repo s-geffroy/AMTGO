@@ -120,6 +120,8 @@ def export_pages_map(run_dir: Path, out: Path) -> dict[str, Any]:
         "manifest_hash": manifest.manifest_hash,
         "outputs_hash": outputs["outputs_hash"],
         "code_version": manifest.code_version,
+        # Couches derivees publiees sous CC BY 4.0 ; Natural Earth reste du domaine public.
+        "license": "CC-BY-4.0",
         "attribution": [{"name": ne.manifest.name, "release": ne.manifest.release,
                          "license": ne.manifest.license.license_id, "citation": ne.manifest.citation}],
         "layers": layers,

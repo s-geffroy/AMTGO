@@ -1,0 +1,18 @@
+AMTGO — African Multilayer Territorial Geometry Optimization
+Copyright 2026 Sylvain Geffroy
+
+Double licence :
+
+- Code (src/, tests/, scripts/, configs/, workflows, fichiers de build) :
+  Apache License 2.0 — voir LICENSE.
+- Documentation, rapports et donnees derivees publiees (docs/, rapports de run,
+  couches de la carte publique) : Creative Commons Attribution 4.0
+  International (CC BY 4.0) — voir LICENSE-docs.
+
+Donnees tierces :
+
+- Natural Earth (naturalearthdata.com), v5.1.2 : domaine public. Utilise pour le
+  fond de carte des pays actuels ; non relicencie par ce projet.
+  "Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com."
+
+Le corpus de specification AMTGO V1.0-RC1 n'est pas distribue avec ce depot.
