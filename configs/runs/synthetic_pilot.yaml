@@ -1,14 +1,16 @@
-# Run de reference M0-M7 sur le monde synthetique : ingestion, deux familles de maillage x deux
+# Run de reference M0-M8 sur le monde synthetique : ingestion, deux familles de maillage x deux
 # resolutions, mesure, composition sous deux ontologies, D/F/I du statu quo, scenarios, viabilite
-# contextuelle sous quatre regimes, diagnostic S2C, bibliotheque causale estimee et gelee, rapport.
+# contextuelle sous quatre regimes, diagnostic S2C, bibliotheque causale estimee et gelee,
+# candidats territoriaux (unites analytiques) et leur stabilite multi-echelle, rapport.
 name: synthetic_pilot
 description: >
-  Pilote synthetique M0-M7. Exerce le registre de sources, l'ingestion des
+  Pilote synthetique M0-M8. Exerce le registre de sources, l'ingestion des
   instruments, les maillages H3 et grille LAEA a deux resolutions, la fusion de
   mesure et sa validation, la composition sous deux ontologies fictives concurrentes
   (parts seulement, jamais d'etiquette), D/F/I du statu quo declare, et sa
   viabilite contextuelle sous chaque regime et chaque scenario, avec une
-  bibliotheque causale estimee sur des panels fictifs, validee et gelee. Aucune
+  bibliotheque causale estimee sur des panels fictifs, validee et gelee, et des
+  candidats territoriaux generes (unites analytiques, non evaluees). Aucune
   recommandation.
 region: synthetic_south_atlantic
 map_mode: R
@@ -26,6 +28,7 @@ composition_model: composition/self_id_v1.yaml
 dfi_model: dfi/pilot_v1.yaml
 viability_model: viability/pilot_v1.yaml
 causal_library: causal/library_pilot.yaml
+candidate_model: candidates/pilot_v1.yaml
 scenario_set:
   - scenarios/s1_baseline.yaml
   - scenarios/s1_stress.yaml

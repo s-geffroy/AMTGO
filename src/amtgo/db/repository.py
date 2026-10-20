@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from sqlalchemy import Engine, text
 
+from amtgo.candidates.model import TerritoryCandidate
 from amtgo.causal.model import CausalEffect
 from amtgo.core.provenance import ProvenanceRecord
 from amtgo.data.observations import Observation
@@ -45,6 +46,8 @@ class Repository(Protocol):
     def record_regimes_scenarios(self, regimes: Sequence[ConstitutionalRegime],
                                  scenarios: Sequence[Scenario]) -> None: ...
     def record_causal_library(self, run_id: uuid.UUID, effects: Sequence[CausalEffect], freeze_hash: str) -> None: ...
+    def record_candidates(self, run_id: uuid.UUID, mesh: Mesh, candidates: Sequence[TerritoryCandidate],
+                          assignments: dict[str, Any]) -> None: ...
 
 
 class NullRepository:
@@ -80,6 +83,10 @@ class NullRepository:
         pass
 
     def record_causal_library(self, run_id: uuid.UUID, effects: Sequence[CausalEffect], freeze_hash: str) -> None:
+        pass
+
+    def record_candidates(self, run_id: uuid.UUID, mesh: Mesh, candidates: Sequence[TerritoryCandidate],
+                          assignments: dict[str, Any]) -> None:
         pass
 
 
@@ -357,3 +364,37 @@ class PostgresRepository:
             cx.execute(text("UPDATE run_manifests SET causal_library_hash = :h WHERE run_id = :r "
                             "AND (causal_library_hash IS NULL OR causal_library_hash = :h)"),
                        {"h": freeze_hash, "r": run_id})
+
+    def record_candidates(self, run_id: uuid.UUID, mesh: Mesh, candidates: Sequence[TerritoryCandidate],
+                          assignments: dict[str, Any]) -> None:
+        from shapely import make_valid
+        from shapely.geometry import MultiPolygon
+        from shapely.ops import unary_union
+
+        from amtgo.geo.families import polygonal_part
+        from amtgo.utils.canonical import stable_uuid
+
+        geoms = [c.geometry for c in mesh.cells.values()]
+        rows = []
+        for cand in candidates:
+            if cand.duplicate_of is not None:
+                continue  # même géométrie qu'un candidat déjà enregistré
+            assign = assignments[cand.candidate_id]
+            for label in range(cand.n_states):
+                union = polygonal_part(make_valid(unary_union([g for g, a in zip(geoms, assign, strict=True)
+                                                               if a == label])))
+                if union is None:
+                    continue
+                multi = union if isinstance(union, MultiPolygon) else MultiPolygon([union])
+                rows.append({"tid": stable_uuid("territory", [cand.candidate_id, label]), "cid": cand.candidate_id,
+                             "r": run_id, "m": mesh.mesh_id, "lv": cand.level, "lb": label, "g": multi.wkt,
+                             "meth": cand.method, "fam": cand.family.value,
+                             "seed": json.dumps(cand.params, sort_keys=True)})
+        with self.engine.begin() as cx:
+            for batch in _batches(rows):
+                cx.execute(text("""
+                    INSERT INTO territory_candidates (territory_id, candidate_id, run_id, mesh_id, level, label,
+                        geometry, generation_method, family, seed, active)
+                    VALUES (:tid, :cid, :r, :m, :lv, :lb, ST_GeomFromText(:g, 4326), :meth, :fam, :seed, false)
+                    ON CONFLICT (territory_id) DO NOTHING
+                """), batch)

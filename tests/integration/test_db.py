@@ -28,7 +28,7 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
     from amtgo.runs.state import RunStatus
 
     upgrade(db_settings)
-    assert current_revision(db_settings) == "0008"
+    assert current_revision(db_settings) == "0009"
     repo = make_repository(db_settings)
     manifest, _ = submit(db_settings.configs_dir / "runs/synthetic_pilot.yaml", db_settings)
     state = run_to_completion(db_settings, repo, str(manifest.run_id))
@@ -68,6 +68,9 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
         assert count("SELECT count(*) FROM causal_freezes WHERE run_id = :r") == 5
         assert count("SELECT count(*) FROM run_manifests WHERE run_id = :r "
                      "AND causal_library_hash LIKE 'sha256:%'") == 1
+        # M8 : territoires candidats enregistrés, valides, jamais actifs.
+        assert count("SELECT count(*) FROM territory_candidates WHERE run_id = :r") > 0
+        assert count("SELECT count(*) FROM territory_candidates WHERE run_id = :r AND active") == 0
 
     # Rejouer toutes les écritures ne duplique rien.
     from amtgo.data.ingestion import read_observations

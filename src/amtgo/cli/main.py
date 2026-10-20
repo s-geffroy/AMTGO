@@ -17,6 +17,7 @@ ingest_app = typer.Typer(no_args_is_help=True, help="Ingestion.")
 export_app = typer.Typer(no_args_is_help=True, help="Exports (passent tous par le privacy guard).")
 validate_app = typer.Typer(no_args_is_help=True, help="Validation : mondes synthétiques, red-team.")
 scenario_app = typer.Typer(no_args_is_help=True, help="Scénarios (S1, S2A, S2C diagnostic agrégé).")
+candidates_app = typer.Typer(no_args_is_help=True, help="Candidats territoriaux (unités analytiques).")
 causal_app = typer.Typer(no_args_is_help=True, help="Bibliothèque causale : validation, lecture d'un gel.")
 app.add_typer(run_app, name="run")
 app.add_typer(db_app, name="db")
@@ -26,6 +27,7 @@ app.add_typer(export_app, name="export")
 app.add_typer(validate_app, name="validate")
 app.add_typer(scenario_app, name="scenario")
 app.add_typer(causal_app, name="causal")
+app.add_typer(candidates_app, name="candidates")
 
 
 def _resolve(path: Path) -> Path:
@@ -161,6 +163,23 @@ def causal_show(run_id: str) -> None:
         typer.echo(f"  {e.effect_key:45s} {e.design.value:18s} {e.grade.value} {e.transport_status.value}")
     if not ok:
         raise typer.Exit(1)
+
+
+@candidates_app.command("list")
+def candidates_list(run_id: str) -> None:
+    """Liste les variantes de candidats d'un run et leur stabilité (aucune géométrie affichée)."""
+    import json
+
+    from amtgo.runs.queue import runs_dir
+
+    e = json.loads((runs_dir(get_settings()) / run_id / "artifacts" / "candidate_ensemble.json").read_text())
+    typer.echo(f"statut de recommandation : {e['recommendation_status']} — {e['note']}")
+    for v in e["variants"].values():
+        s = "—" if v["s_scale"] is None else f"{v['s_scale']:.2f}"
+        typer.echo(f"  {v['family']:26s} {json.dumps(v['params']):22s} États {list(v['n_states_by_mesh'].values())}"
+                   f" S_scale {s}")
+    for fam, why in e["unavailable_families"].items():
+        typer.echo(f"  {fam:26s} NOT_AVAILABLE : {why}")
 
 
 @ingest_app.command("run")

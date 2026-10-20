@@ -19,6 +19,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from amtgo.candidates.model import CandidateManifest
 from amtgo.causal.library import CausalLibraryManifest
 from amtgo.config.loader import load_model
 from amtgo.core.enums import MapMode
@@ -73,6 +74,7 @@ class RunRequest(BaseModel):
     dfi_model: str | None = None
     viability_model: str | None = None
     causal_library: str | None = None
+    candidate_model: str | None = None
     ontology_set: tuple[str, ...] = ()
     scenario_set: tuple[str, ...] = ()
     seeds: tuple[int, ...] = (0,)
@@ -114,6 +116,7 @@ class RunManifest(BaseModel):
     observed_regime: ConstitutionalRegime | None = None
     regime_sensitivity: tuple[ConstitutionalRegime, ...] = ()
     causal_library: CausalLibraryManifest | None = None
+    candidate_model: CandidateManifest | None = None
     # Couches non encore disponibles : explicitement nulles, jamais inventées.
     solver: dict[str, Any] | None = None
     seeds: tuple[int, ...]
@@ -235,6 +238,16 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         raise ConfigurationError(f"effets causaux référencés absents de la bibliothèque du run : {missing} "
                                  "(un effet n'est jamais un coefficient en dur, prompt §33)")
 
+    candidates = None
+    if request.candidate_model:
+        candidates = load_model(CandidateManifest, configs_dir / request.candidate_model)
+        if status_quo is None or measurement is None:
+            raise ConfigurationError("les candidats exigent la population (M3) et un statu quo déclaré (baselines)")
+        if candidates.level not in {lv.name for lv in status_quo.levels}:
+            raise ConfigurationError(f"candidats : niveau {candidates.level!r} absent du statu quo")
+        if candidates.reference_mesh not in ids:
+            raise ConfigurationError(f"candidats : maillage de référence {candidates.reference_mesh} hors mesh_set")
+
     body: dict[str, Any] = {
         "code_commit": code_commit(),
         "code_version": code_version(),
@@ -256,6 +269,7 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         "observed_regime": observed,
         "regime_sensitivity": sensitivity,
         "causal_library": causal,
+        "candidate_model": candidates,
         "seeds": request.seeds,
     }
     draft = RunManifest(run_id=uuid.UUID(int=0), manifest_hash="", created_at=utcnow(), **body)

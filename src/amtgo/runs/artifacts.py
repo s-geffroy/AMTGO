@@ -79,3 +79,12 @@ def write_json(run_dir: Path, name: str, payload: Any) -> None:
 
 def read_json(run_dir: Path, name: str) -> Any:
     return json.loads((run_dir / name).read_text(encoding="utf-8"))
+
+
+def write_bytes(run_dir: Path, name: str, data: bytes) -> None:
+    """Écriture atomique d'un artefact binaire (tmp puis rename) : une étape interrompue ne laisse rien."""
+    path = run_dir / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".part")
+    tmp.write_bytes(data)
+    tmp.replace(path)

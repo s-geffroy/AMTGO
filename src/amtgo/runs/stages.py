@@ -28,6 +28,7 @@ from amtgo.geo.support import allocate_point_masses
 from amtgo.manifests.run import RunManifest, verify_manifest
 from amtgo.runs import (
     artifacts,
+    candidate_stages,
     causal_stages,
     composition_stages,
     dfi_stages,
@@ -81,6 +82,9 @@ def plan_steps(manifest: RunManifest) -> list[str]:
         if manifest.viability_model is not None:
             steps += [f"viability:{m.mesh_id}" for m in manifest.mesh_set]
             steps += ["viability_ensemble"]
+        if manifest.candidate_model is not None:
+            steps += [f"candidates:{m.mesh_id}" for m in manifest.mesh_set]
+            steps += ["candidate_ensemble"]
     else:
         steps += _causal_steps(manifest)
     if any(sc.diagnostic_only for sc in manifest.scenario_set):
@@ -271,6 +275,11 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
         computability = measurement["computability"]
     s2c = (artifacts.read_json(ctx.run_dir, "artifacts/s2c_diagnostic.json")
            if any(sc.diagnostic_only for sc in ctx.manifest.scenario_set) else None)
+    cand = None
+    if ctx.manifest.candidate_model is not None:
+        cand = {"ensemble": artifacts.read_json(ctx.run_dir, "artifacts/candidate_ensemble.json"),
+                "per_mesh": {d.mesh_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/candidates.json")
+                             for d in ctx.manifest.mesh_set}}
     causal = None
     if ctx.manifest.causal_library is not None:
         causal = {**causal_stages.library_summary(ctx),
@@ -281,6 +290,9 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
         "multiscale": multiscale,
         "measurement": None if measurement is None else measurement["outputs"],
         "s2c": None if s2c is None else {k: v["status"] for k, v in sorted(s2c.items())},
+        "candidates": None if cand is None else {
+            k: {"s_scale": None if v["s_scale"] is None else _round_sig(v["s_scale"], 4),
+                "n_states": v["n_states_by_mesh"]} for k, v in sorted(cand["ensemble"]["variants"].items())},
         "causal": None if causal is None else {
             "freeze_hash": causal["freeze_hash"], "gate_c": causal["validation"]["gate_c"],
             "status": {k: v["status"] for k, v in sorted(causal["effects"].items())}},
@@ -293,7 +305,7 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
     artifacts.write_json(ctx.run_dir, "outputs.json", outputs)
     text = render_report(ctx.manifest, sources, meshes, multiscale, status, computability,
                          outputs["outputs_hash"], artifacts.read_provenance(ctx.run_dir), measurement, s2c,
-                         causal)
+                         causal, cand)
     from amtgo.runs.state import write_json_atomic
 
     write_json_atomic(ctx.run_dir / "report.md", text)
@@ -319,6 +331,8 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "viability": viability_stages.viability,
     "viability_ensemble": viability_stages.viability_ensemble,
     "s2c_diagnostic": viability_stages.s2c_diagnostic,
+    "candidates": candidate_stages.candidates,
+    "candidate_ensemble": candidate_stages.candidate_ensemble,
     "report": report,
 }
 

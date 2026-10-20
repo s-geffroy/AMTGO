@@ -100,6 +100,20 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
         effects = json.loads((d / "fields" / mid / "viability.json").read_text())["effects"]
         assert {v["status"] for v in effects.values()} == {"EXPLORATORY_ONLY"}
     assert "Gate C : PASSED" in report and "CAUSAL_EFFECT_UNKNOWN" in report
+    # M8 : baselines toujours présentes, candidats contigus, stabilité multi-échelle, rien de recommandé.
+    for mid in ms["meshes"]:
+        cands = json.loads((d / "fields" / mid / "candidates.json").read_text())
+        families = {c["family"] for c in cands["candidates"]}
+        assert {"STATUS_QUO", "NO_TERRITORIAL_CHANGE", "INSTITUTIONAL_ONLY_REFORM"} <= families
+        assert all(c["contiguous"] for c in cands["candidates"])
+        assert set(cands["unavailable_families"]) == {"HISTORICAL", "LANGUAGE", "MOBILITY"}
+    ce = json.loads((d / "artifacts" / "candidate_ensemble.json").read_text())
+    assert ce["recommendation_status"] == "NOT_IDENTIFIABLE"
+    sq = next(v for v in ce["variants"].values() if v["family"] == "STATUS_QUO")
+    assert sq["s_scale"] >= 0.8  # le statu quo suit des districts : stable entre maillages
+    assert {v["n_states_by_mesh"]["pilot_grid_l4"] for v in ce["variants"].values()
+            if v["family"] == "GEOGRAPHIC"} == {1, 2, 3, 4}
+    assert "Candidate generation" in report and "non évalués" in report
     freeze = json.loads((d / "measurement_freeze.json").read_text())
     assert set(freeze["compositions"]) == set(ms["meshes"])
     assert "Parts seulement" in report

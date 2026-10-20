@@ -28,6 +28,7 @@ def render_report(
     measurement: dict[str, Any] | None = None,
     s2c: dict[str, Any] | None = None,
     causal: dict[str, Any] | None = None,
+    candidates: dict[str, Any] | None = None,
 ) -> str:
     req = manifest.request
     L: list[str] = []
@@ -146,16 +147,34 @@ def render_report(
     else:
         _viability_section(a, manifest, via)
 
+    a("## Candidate generation\n")
+    if candidates is None:
+        a("_Aucun générateur de candidats dans ce run._\n")
+    else:
+        _candidate_section(a, manifest, candidates)
+
     a("## Causal support\n")
     if causal is None:
         a("`CAUSAL_EFFECT_UNKNOWN` — aucune bibliothèque causale dans ce run.\n")
     else:
         _causal_section(a, manifest, causal)
     a("## Pareto summary\n")
-    a("Aucun archive de Pareto : aucun candidat n'a été généré (M8–M10). Baselines prévues : "
-      "STATUS_QUO, NO_TERRITORIAL_CHANGE, INSTITUTIONAL_ONLY_REFORM.\n")
+    if candidates is None:
+        a("Aucune archive de Pareto : aucun candidat n'a été généré. Baselines prévues : "
+          "STATUS_QUO, NO_TERRITORIAL_CHANGE, INSTITUTIONAL_ONLY_REFORM.\n")
+    else:
+        a("Aucune archive de Pareto : les candidats sont générés mais **non évalués** (composeur M9, "
+          "optimiseur M10). Les trois baselines sont présentes.\n")
     a("## Stability summary\n")
-    a(_NA.format(m="M8+") + "\n")
+    if candidates is None:
+        a(_NA.format(m="M8+") + "\n")
+    else:
+        e = candidates["ensemble"]
+        n = len(e["variants"])
+        stable = sum(1 for v in e["variants"].values() if v["stable"])
+        a(f"{stable} variante(s) sur {n} atteignent S^scale ≥ τ_scale = {e['scale_min']} (distance TRANSFER "
+          f"entre maillages, grille `{e['reference_mesh']}`). La stabilité est nécessaire, jamais suffisante : "
+          "elle ne dit rien de la valeur d'un candidat.\n")
     a("## Privacy status\n")
     worst = max((rs.manifest.privacy_class for rs in manifest.data_manifest), key=lambda c: c.rank)
     a(f"Classe la plus restrictive parmi les sources : **{worst.value}**. Ce rapport ne contient "
@@ -458,3 +477,28 @@ def _causal_section(a: Any, manifest: RunManifest, causal: dict[str, Any]) -> No
     a("")
     a(f"**Gate C : {val['gate_c']}** — tout effet admis passe chaque test exécuté (région exclue, placebo, "
       "contrôle négatif, vérité synthétique). Aucune affirmation causale sans grade (A5).\n")
+
+
+def _candidate_section(a: Any, manifest: RunManifest, cand: dict[str, Any]) -> None:
+    cm = manifest.candidate_model
+    assert cm is not None
+    e = cand["ensemble"]
+    a(f"Générateur `{cm.generator_id}` v{cm.version}. Les candidats sont des **unités analytiques**, non "
+      "évaluées, jamais des propositions. Ils sont fondés sur la population gelée et la géographie seulement "
+      "(aucune part de groupe), et ne sont pas publiés.\n")
+    a("| famille | paramètres | États par maillage | S^scale | stable | contigu partout |")
+    a("|---|---|---|---|---|---|")
+    for v in e["variants"].values():
+        params = ", ".join(f"{k}={x}" for k, x in v["params"].items()) or "—"
+        states = ", ".join(str(x) for x in v["n_states_by_mesh"].values())
+        s = "—" if v["s_scale"] is None else f"{v['s_scale']:.2f}"
+        stable = "—" if v["stable"] is None else ("oui" if v["stable"] else "**non**")
+        contiguous = "oui" if v["contiguous_everywhere"] else "non"
+        a(f"| {v['family']} | {params} | {states} | {s} | {stable} | {contiguous} |")
+    a("")
+    for fam, why in e["unavailable_families"].items():
+        a(f"- {fam} : **NOT_AVAILABLE** — {why}.")
+    a("")
+    a("Baselines : STATUS_QUO (rien ne change), NO_TERRITORIAL_CHANGE (seule l'application des droits peut "
+      "varier), INSTITUTIONAL_ONLY_REFORM (compétences recomposées à géométrie fixe, M9). Le nombre d'États est "
+      "balayé, jamais pénalisé ; une union (1 État) fait partie du balayage.\n")

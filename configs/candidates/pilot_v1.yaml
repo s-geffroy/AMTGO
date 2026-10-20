@@ -1,0 +1,14 @@
+# Generateur de candidats (M8). Parametres de MODELE, PROVISOIRES.
+# Les candidats sont des UNITES ANALYTIQUES (09 §15), jamais des propositions.
+generator_id: candidates_pilot
+version: "0.1.0"
+description: >
+  Baselines (statu quo, aucun changement territorial, reforme institutionnelle seule)
+  et familles territoriales fondees sur la population et la geographie seulement.
+level: state
+reference_mesh: pilot_grid_l5     # grille de reference de la distance entre partitions
+state_counts: [1, 2, 3, 4]        # balayage : le nombre d'Etats est une sortie, jamais penalise
+restarts: 8                       # multi-depart des k-means
+community_resolutions: [0.3, 1.0, 3.0]
+network_kernel_length_km: 10.0    # meme noyau de liens que D/F/I (cache partage)
+network_kernel_cutoff: 3.0

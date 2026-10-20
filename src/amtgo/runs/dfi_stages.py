@@ -104,6 +104,19 @@ def network_kernel(mesh: Mesh, length_km: float, cutoff: float) -> sparse.csr_ma
     return sparse.csr_matrix((vals, (rows, cols)), shape=(n, n))
 
 
+def cached_kernel(ctx: StageContext, mesh: Mesh, length_km: float, cutoff: float) -> sparse.csr_matrix:
+    """Noyau de liens du maillage, calculé une fois par (L, coupure) et conservé dans le run."""
+    name = f"fields/{mesh.mesh_id}/network_kernel__L{length_km:g}_c{cutoff:g}.npz"
+    path = ctx.run_dir / name
+    if path.exists():
+        return sparse.load_npz(io.BytesIO(path.read_bytes())).tocsr()
+    kernel = network_kernel(mesh, length_km, cutoff)
+    buf = io.BytesIO()
+    sparse.save_npz(buf, kernel)
+    artifacts.write_bytes(ctx.run_dir, name, buf.getvalue())
+    return kernel
+
+
 def _composition(ctx: StageContext, mesh_id: str, ontology_id: str) -> tuple[np.ndarray, list[str]]:
     data = np.load(io.BytesIO((ctx.run_dir / "fields" / mesh_id / f"composition__{ontology_id}.npz").read_bytes()))
     return data["samples"].astype(np.float64), [str(c) for c in data["categories"]]
@@ -137,7 +150,7 @@ def dfi(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
     mesh = artifacts.read_mesh(ctx.run_dir, mesh_id)
     partition = status_quo_partition(ctx, mesh)
     institutions = build_institutions(sq, partition)
-    kernel = network_kernel(mesh, m.network_kernel_length_km, m.network_kernel_cutoff)
+    kernel = cached_kernel(ctx, mesh, m.network_kernel_length_km, m.network_kernel_cutoff)
     population = fields_mod.read_field(ctx.run_dir, mesh_id)[2].astype(np.float64)  # (S, N)
     weights = ctx.manifest.normative_manifest.connection_weights.as_channels()
     rights = ctx.manifest.normative_manifest.rights
