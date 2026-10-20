@@ -1,0 +1,14 @@
+# Crosswalk FICTIF auto-identification -> classification externe historique.
+# Probabiliste (prompt §17) : une part de chaque categorie n'est pas attribuee
+# (__unmapped__) faute de preuve. Concentration moderee : preuve faible.
+crosswalk_id: synth_self_to_ext_hist
+version: "0.1.0"
+source_ontology: synth_self_id
+target_ontology: synth_ext_hist
+description: Correspondance documentee par recoupement fictif de l'enquete et de la carte.
+evidence_status: M
+rows:
+  - {source_concept: alpha, targets: {ext_a: 0.9, ext_b: 0.05, __unmapped__: 0.05}, concentration: 40, evidence: recoupement fictif}
+  - {source_concept: beta, targets: {ext_a: 0.8, ext_c: 0.1, __unmapped__: 0.1}, concentration: 40, evidence: recoupement fictif}
+  - {source_concept: gamma, targets: {ext_b: 0.9, __unmapped__: 0.1}, concentration: 40, evidence: recoupement fictif}
+  - {source_concept: delta, targets: {ext_c: 0.85, ext_b: 0.05, __unmapped__: 0.1}, concentration: 40, evidence: recoupement fictif}

@@ -1,0 +1,20 @@
+# Ontologie FICTIVE externe et historique : elle regroupe alpha et beta sous un
+# meme nom, comme le faisaient les classifications coloniales. Statut H.
+ontology_id: synth_ext_hist
+version: "0.1.0"
+name: Classification externe historique (monde synthetique)
+dimension: ethnocultural
+kind: historical
+description: Classification attribuee de l'exterieur par une carte ethnographique fictive.
+evidence_status: H
+source_ids: [synthetic_historical_map]
+historical_context:
+  author: AMTGO (fiction pedagogique)
+  purpose: simuler une classification exterieure qui regroupe des categories auto-declarees
+  method: regroupement par un observateur exterieur
+  colonial_context: fiction ; reproduit le schema des classifications coloniales
+  ontology: synth_ext_hist
+concepts:
+  - {concept_id: ext_a, source_label: "A", definition: regroupement externe A, external_label: true}
+  - {concept_id: ext_b, source_label: "B", definition: regroupement externe B, external_label: true}
+  - {concept_id: ext_c, source_label: "C", definition: regroupement externe C, external_label: true}

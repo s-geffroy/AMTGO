@@ -1,0 +1,15 @@
+# Ontologie FICTIVE d'auto-identification du monde synthetique. Les categories
+# sont des lettres grecques sans rapport avec aucun groupe reel.
+ontology_id: synth_self_id
+version: "0.1.0"
+name: Auto-identification (monde synthetique)
+dimension: ethnocultural
+kind: self_identification
+description: Categories declarees par les repondants de l'enquete synthetique.
+evidence_status: D
+source_ids: [synthetic_survey]
+concepts:
+  - {concept_id: alpha, source_label: alpha, definition: categorie fictive alpha, self_identified: true}
+  - {concept_id: beta, source_label: beta, definition: categorie fictive beta, self_identified: true}
+  - {concept_id: gamma, source_label: gamma, definition: categorie fictive gamma, self_identified: true}
+  - {concept_id: delta, source_label: delta, definition: categorie fictive delta, self_identified: true}
