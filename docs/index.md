@@ -38,12 +38,15 @@ pas un échec.
 | M2 | maillages H3 et grille équivalente, opérations multi-échelles | fait |
 | M3 | modèles de mesure, champs latents, incertitude, validation, gel | fait |
 | M4 | ontologies concurrentes, crosswalks probabilistes, composition en ensemble | fait |
-| M5+ | domination / fragmentation / intégration, régimes, causalité, candidats, optimiseur | à venir |
+| M5 | domination / fragmentation / intégration, mondes A–F, statu quo évalué | fait |
+| M6+ | scénarios, régimes, causalité, candidats, optimiseur | à venir |
 
 La mesure de population du pilote synthétique est validée contre la vérité :
 non identifiée à la maille de la cellule, identifiée à 100 km. La composition
 fictive est mesurée sous deux ontologies concurrentes — parts seulement, jamais
-d'étiquette — et sa dépendance à l'ontologie est quantifiée. À ce stade,
+d'étiquette — et sa dépendance à l'ontologie est quantifiée. Domination,
+fragmentation et intégration sont évaluées pour le statu quo déclaré, et
+vérifiées sur les mondes A–F. À ce stade,
 **aucun découpage n'existe** : la [carte](carte.md) montre les pays
 actuels et les maillages d'analyse, et sa couche de candidats affiche
 *NOT_IDENTIFIABLE*.

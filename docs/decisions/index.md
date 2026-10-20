@@ -20,3 +20,4 @@ Chaque ambiguïté ou incohérence de la spécification tranchée pendant l'impl
 | [ADR-0014](ADR-0014-monde-synthetique.md) | Monde synthétique à vérité connue | accepté |
 | [ADR-0015](ADR-0015-ressources-calcul.md) | Ressources de calcul : threads BLAS et SciPy | accepté |
 | [ADR-0016](ADR-0016-ontologies-composition.md) | Ontologies concurrentes et mesure de composition (M4) | accepté |
+| [ADR-0017](ADR-0017-dfi.md) | Domination, fragmentation, intégration (M5) | accepté |

@@ -18,6 +18,7 @@ MEASUREMENT MODELS     amtgo.measurement           M3  ✔  vraisemblances, log-
 ONTOLOGY ENSEMBLE      amtgo.ontology              M4  ✔  ontologies, crosswalks Dirichlet, composition, S^ontology
 LATENT STATE FIELDS    amtgo.measurement.fields    M3  ✔  statut MODEL, tirages, calculabilité ; measurement_freeze
 CAUSAL LIBRARY—FROZEN  amtgo.causal                M7
+D/F/I                  amtgo.domination / fragmentation / integration   M5  ✔  statu quo, mondes A–F
 CONSTITUTIONAL REGIME  amtgo.institutions.regimes  M0 (config) / M6
 SCENARIO ENSEMBLE      amtgo.scenarios             M6
 CANDIDATE GENERATION   amtgo.candidates            M8
@@ -64,3 +65,5 @@ interne), `cli` (jetable : tests, CLI). Aucun service n'est exposé.
 | aucun crosswalk entre dimensions (ethnoculturelle, nationale, territoriale…) | `OntologyCrosswalk.check_against` |
 | champs de groupe au minimum CONTROLLED, jamais exportés | `composition_stages`, `privacy.guard` |
 | aucune valeur de donnée dans les logs d'erreur | `runs.queue.safe_error` |
+| fragmentation = liens coupés, jamais présence ; canal territorial seulement avec attachement | `fragmentation.engine`, test red-team |
+| canal sans données = UNKNOWN, D_real non observé = UNKNOWN | moteurs D/F/I |

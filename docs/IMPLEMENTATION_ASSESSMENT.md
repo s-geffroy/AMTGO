@@ -67,6 +67,7 @@ absent et déclaré comme tel dans chaque rapport de run.
 | 14 | Validation de la mesure sans vérité terrain | [ADR-0014](decisions/ADR-0014-monde-synthetique.md) |
 | 15 | Performances sous quota CPU | [ADR-0015](decisions/ADR-0015-ressources-calcul.md) |
 | 16 | Ontologies concurrentes, crosswalks, composition et vie privée de groupe | [ADR-0016](decisions/ADR-0016-ontologies-composition.md) |
+| 17 | D/F/I : normalisation de J_conn, présence ≠ fragmentation, discrétisation des noyaux | [ADR-0017](decisions/ADR-0017-dfi.md) |
 
 Autres points relevés, sans décision nécessaire à ce stade :
 
