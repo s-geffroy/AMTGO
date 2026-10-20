@@ -21,7 +21,10 @@ from amtgo.data.synthetic_world import (
     CensusDesign,
     SurveyDesign,
     SyntheticWorld,
+    group_layer,
     simulate_census,
+    simulate_historical_map,
+    simulate_identity_counts,
     simulate_survey,
 )
 from amtgo.errors import ConfigurationError
@@ -29,6 +32,8 @@ from amtgo.utils.canonical import canonical_json, content_hash
 
 VARIABLE_EA_COUNT = "population_count_ea"
 VARIABLE_DISTRICT_TOTAL = "population_total_admin"
+VARIABLE_IDENTITY_COUNTS = "identity_self_counts"
+VARIABLE_HISTORICAL_LABEL = "identity_historical_label"
 
 
 def world_of(manifest: SourceManifest) -> SyntheticWorld:
@@ -72,7 +77,9 @@ class SyntheticAdapter:
 
         if instrument == "survey":
             design = SurveyDesign.from_params(p.get("survey", {}))
-            for ea in simulate_survey(world, design):
+            eas = simulate_survey(world, design)
+            yield from self._identity(manifest, world, eas, common, valid_from)
+            for ea in eas:
                 lon, lat = ea.released_lonlat
                 yield Observation(
                     id=Observation.make_id(src, VARIABLE_EA_COUNT, ea.key, valid_from),
@@ -96,5 +103,46 @@ class SyntheticAdapter:
                     attributes={"synthetic": True, "world_hash": world.world_hash},
                     **common,
                 )
+        elif instrument == "historical_map":
+            layer = group_layer(p["world"])
+            hp = p.get("historical_map", {})
+            if layer is None or "lumping" not in hp:
+                raise ConfigurationError("historical_map : couche 'groups' et 'lumping' requis")
+            blocks = simulate_historical_map(world, layer, int(hp.get("blocks_x", 3)),
+                                             int(hp.get("blocks_y", 3)), dict(hp["lumping"]))
+            for b in blocks:
+                yield Observation(
+                    id=Observation.make_id(src, VARIABLE_HISTORICAL_LABEL, b.key, valid_from),
+                    variable_id=VARIABLE_HISTORICAL_LABEL, support_type=SupportType.POLYGON,
+                    ontology_id=str(hp["ontology_id"]), geometry_wkt=b.polygon.wkt,
+                    attributes={"synthetic": True, "world_hash": world.world_hash, "label": b.label},
+                    **common,
+                )
         else:
-            raise ConfigurationError(f"synthetic : instrument inconnu {instrument!r} (survey | census)")
+            raise ConfigurationError(
+                f"synthetic : instrument inconnu {instrument!r} (survey | census | historical_map)")
+
+    def _identity(self, manifest: SourceManifest, world: SyntheticWorld, eas: list[Any],
+                  common: dict[str, Any], valid_from: datetime) -> Iterator[Observation]:
+        """Réponses d'auto-identification par EA, si le manifeste en déclare (M4)."""
+        p = manifest.retrieval.parameters
+        ident = p.get("survey", {}).get("identity")
+        layer = group_layer(p["world"])
+        if not ident or layer is None:
+            return
+        respondents = int(ident["respondents"])
+        counts = simulate_identity_counts(world, layer, eas, respondents)
+        src = str(manifest.source_uuid)
+        displacement = float(p["survey"]["displacement_km"])
+        for ea, c in zip(eas, counts, strict=True):
+            lon, lat = ea.released_lonlat
+            yield Observation(
+                id=Observation.make_id(src, VARIABLE_IDENTITY_COUNTS, ea.key, valid_from),
+                variable_id=VARIABLE_IDENTITY_COUNTS, support_type=SupportType.UNCERTAIN_POINT,
+                ontology_id=str(ident["ontology_id"]), geometry_wkt=f"POINT ({lon:.6f} {lat:.6f})",
+                displacement_km=displacement, value=UncertainValue.exact(float(respondents)),
+                # Poids de plan : population représentée par l'EA (EA tirées uniformément en surface).
+                attributes={"synthetic": True, "world_hash": world.world_hash, "counts": c,
+                            "design_weight": float(max(ea.count, 0))},
+                **common,
+            )

@@ -2,8 +2,8 @@
 source_id: synthetic_census
 name: Monde synthetique - recensement (totaux de districts)
 provider: AMTGO (genere)
-release: "0.2.0"
-citation: "AMTGO synthetic world v0.2.0, instrument census (genere, aucune donnee reelle)."
+release: "0.3.0"
+citation: "AMTGO synthetic world v0.3.0, instrument census (genere, aucune donnee reelle)."
 license:
   license_id: synthetic-no-restriction
   name: Donnees synthetiques generees par AMTGO
@@ -15,7 +15,7 @@ data_zone: OPEN_CORE
 privacy_class: PUBLIC
 roles:
   allowed: [population_measurement, multiscale_validation]
-  forbidden: [real_world_inference]
+  forbidden: [real_world_inference, group_territory_inference]
 method: Totaux exhaustifs par district, erreur relative gaussienne.
 temporal_start: 2025-01-01
 temporal_end: 2025-12-31
@@ -41,6 +41,11 @@ retrieval:
       town_peak_density: [50.0, 800.0]
       town_scale_km: [3.0, 15.0]
       quadrature_km: 2.0
+      groups:
+        categories: [alpha, beta, gamma, delta]
+        background_weights: [0.25, 0.25, 0.25, 0.25]
+        town_concentration: 8.0
+        town_anchor_weight: 0.7
     census:
       districts_x: 4
       districts_y: 4

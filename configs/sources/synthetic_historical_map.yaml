@@ -1,0 +1,61 @@
+# Instrument SYNTHETIQUE "carte historique" : une etiquette par bloc, selon une
+# classification exterieure qui regroupe des categories. Reproduit volontairement
+# le defaut des cartes ethnographiques anciennes (01 §29). Statut H.
+source_id: synthetic_historical_map
+name: Monde synthetique - carte ethnographique historique (fictive)
+provider: AMTGO (genere)
+release: "0.3.0"
+citation: "AMTGO synthetic world v0.3.0, instrument historical_map (genere, aucune donnee reelle)."
+license:
+  license_id: synthetic-no-restriction
+  name: Donnees synthetiques generees par AMTGO
+  redistribution: true
+  commercial_use: true
+  attribution_required: false
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [ontology_validation]
+  forbidden: [real_world_inference, population_measurement, group_territory_inference]
+method: Etiquette unique par bloc (categorie exterieure la plus representee).
+temporal_start: 2025-01-01
+temporal_end: 2025-12-31
+default_evidence_status: H
+historical_context:
+  author: AMTGO (fiction pedagogique)
+  purpose: simuler une carte ethnographique ancienne pour en mesurer la compression
+  method: une etiquette par bloc, classification exterieure par regroupement
+  colonial_context: fiction ; reproduit le schema des cartes coloniales d'attribution
+  ontology: synth_ext_hist
+quality:
+  source_reliability: 1.0
+  spatial_precision: 0.4
+  temporal_precision: 1.0
+  construct_validity: 0.3
+  representativeness: 1.0
+  license_usability: 1.0
+  privacy_usability: 1.0
+retrieval:
+  kind: synthetic
+  adapter: synthetic
+  parameters:
+    instrument: historical_map
+    world:
+      seed: 20251020
+      bbox: [-25.0, -26.0, -21.0, -22.0]
+      background_density: 5.0
+      n_towns: 25
+      town_peak_density: [50.0, 800.0]
+      town_scale_km: [3.0, 15.0]
+      quadrature_km: 2.0
+      groups:
+        categories: [alpha, beta, gamma, delta]
+        background_weights: [0.25, 0.25, 0.25, 0.25]
+        town_concentration: 8.0
+        town_anchor_weight: 0.7
+    historical_map:
+      ontology_id: synth_ext_hist
+      blocks_x: 3
+      blocks_y: 3
+      lumping: {alpha: ext_a, beta: ext_a, gamma: ext_b, delta: ext_c}

@@ -49,6 +49,7 @@ class SyntheticWorld:
     town_peak_density: tuple[float, float]  # hab./km², bornes du tirage
     town_scale_km: tuple[float, float]  # écart-type spatial, bornes du tirage
     quadrature_km: float  # pas de la quadrature de vérité
+    groups_hash: str = ""  # empreinte de la couche de groupes (M4), incluse dans world_hash
 
     @classmethod
     def from_params(cls, p: dict[str, Any]) -> SyntheticWorld:
@@ -65,6 +66,7 @@ class SyntheticWorld:
             background_density=_num(p, "background_density"), n_towns=_num(p, "n_towns", int),
             town_peak_density=peak, town_scale_km=scale,
             quadrature_km=_num(p, "quadrature_km"),
+            groups_hash=content_hash(p["groups"]) if "groups" in p else "",
         )
 
     @property
@@ -195,4 +197,102 @@ def simulate_census(world: SyntheticWorld, design: CensusDesign) -> list[Distric
             reported = max(0.0, truth + rng.normal(0.0, sd))
             out.append(District(f"d-{i:02d}-{j:02d}", poly, round(reported, 1),
                                 round(design.relative_error * reported, 1)))
+    return out
+
+
+# --- Couche identitaire FICTIVE (M4) ------------------------------------------------
+#
+# Catégories abstraites (alpha, beta…) sans rapport avec aucun groupe réel. Chaque
+# bourg a une composition tirée autour d'un groupe d'ancrage ; le fond a une
+# composition mêlée. La composition vraie en un point est la moyenne des
+# compositions pondérée par les densités qui s'y superposent.
+
+
+@dataclass(frozen=True)
+class GroupLayer:
+    categories: tuple[str, ...]
+    background_weights: tuple[float, ...]
+    town_concentration: float  # concentration de Dirichlet autour du groupe d'ancrage
+    town_anchor_weight: float  # poids du groupe d'ancrage dans la moyenne de Dirichlet
+
+    @classmethod
+    def from_params(cls, p: dict[str, Any]) -> GroupLayer:
+        try:
+            cats = tuple(str(c) for c in p["categories"])
+            bg = tuple(float(w) for w in p["background_weights"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ConfigurationError(f"monde synthétique : couche de groupes invalide ({exc})") from exc
+        if len(cats) != len(bg) or len(cats) < 2:
+            raise ConfigurationError("monde synthétique : categories et background_weights incohérents")
+        return cls(cats, bg, _num(p, "town_concentration"), _num(p, "town_anchor_weight"))
+
+
+def group_layer(world_params: dict[str, Any]) -> GroupLayer | None:
+    return GroupLayer.from_params(world_params["groups"]) if "groups" in world_params else None
+
+
+def town_compositions(world: SyntheticWorld, layer: GroupLayer) -> np.ndarray:
+    """(n_towns, K) : composition de chaque bourg."""
+    rng = np.random.default_rng([world.seed, 4])
+    k = len(layer.categories)
+    out = np.zeros((world.n_towns, k))
+    for t in range(world.n_towns):
+        anchor = rng.integers(k)
+        mean = np.full(k, (1.0 - layer.town_anchor_weight) / (k - 1))
+        mean[anchor] = layer.town_anchor_weight
+        out[t] = rng.dirichlet(mean * layer.town_concentration)
+    return out
+
+
+def composition(world: SyntheticWorld, layer: GroupLayer, xy: np.ndarray) -> np.ndarray:
+    """(n, K) : composition vraie aux points ``xy`` (m, LAEA)."""
+    bg = np.array(layer.background_weights) / sum(layer.background_weights)
+    comp = np.outer(np.full(len(xy), world.background_density), bg)
+    tc = town_compositions(world, layer)
+    for (tx, ty, peak, s), c in zip(world.towns, tc, strict=True):
+        r2 = (xy[:, 0] - tx) ** 2 + (xy[:, 1] - ty) ** 2
+        comp += np.outer(peak * np.exp(-r2 / (2.0 * s * s)), c)
+    return np.asarray(comp / comp.sum(axis=1, keepdims=True))
+
+
+def simulate_identity_counts(world: SyntheticWorld, layer: GroupLayer, eas: list[EnumerationArea],
+                             respondents: int) -> list[dict[str, int]]:
+    """Auto-identification de ``respondents`` personnes par EA, à la position VRAIE de l'EA."""
+    rng = np.random.default_rng([world.seed, 5])
+    xy = np.array([ea.true_xy for ea in eas])
+    comp = composition(world, layer, xy)
+    return [dict(zip(layer.categories, (int(v) for v in rng.multinomial(respondents, comp[k])), strict=True))
+            for k in range(len(eas))]
+
+
+@dataclass(frozen=True)
+class HistoricalBlock:
+    key: str
+    polygon: Polygon  # EPSG:4326
+    label: str  # UN seul concept par bloc : la carte historique comprime la diversité
+
+
+def simulate_historical_map(world: SyntheticWorld, layer: GroupLayer, blocks_x: int, blocks_y: int,
+                            lumping: dict[str, str]) -> list[HistoricalBlock]:
+    """Carte « historique » : chaque bloc porte la catégorie externe la plus représentée.
+
+    C'est délibérément le défaut des cartes ethnographiques anciennes (01 §29) : une
+    étiquette par zone, selon une classification extérieure qui regroupe des
+    catégories. Elle sert à mesurer cette compression, jamais de vérité.
+    """
+    minx, miny, maxx, maxy = world.bbox
+    dx, dy = (maxx - minx) / blocks_x, (maxy - miny) / blocks_y
+    pts, da = world.quadrature
+    dens = world.density(pts)
+    comp = composition(world, layer, pts)
+    ext = sorted(set(lumping.values()))
+    out = []
+    for i in range(blocks_x):
+        for j in range(blocks_y):
+            poly = box(minx + i * dx, miny + j * dy, minx + (i + 1) * dx, miny + (j + 1) * dy)
+            mask = shapely.contains_xy(to_equal_area(poly), pts[:, 0], pts[:, 1])
+            mass = (dens[mask, None] * comp[mask]).sum(axis=0) * da
+            ext_mass = {e: sum(m for c, m in zip(layer.categories, mass, strict=True) if lumping[c] == e)
+                        for e in ext}
+            out.append(HistoricalBlock(f"h-{i:02d}-{j:02d}", poly, max(ext, key=lambda e: ext_mass[e])))
     return out
