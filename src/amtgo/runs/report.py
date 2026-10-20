@@ -26,6 +26,7 @@ def render_report(
     outputs_hash: str,
     provenance: list[ProvenanceRecord],
     measurement: dict[str, Any] | None = None,
+    s2c: dict[str, Any] | None = None,
 ) -> str:
     req = manifest.request
     L: list[str] = []
@@ -76,9 +77,19 @@ def render_report(
     a("## Constitutional regime\n")
     a(f"`{r.regime_id.value}` — {r.name} v{r.version}. {r.description} "
       "Toute conclusion de ce run est conditionnelle à ce régime.\n")
+    a(f"Règles : libre circulation {r.mobility_rules.free_movement:.2f}, intégration du marché "
+      f"{r.market_rules.market_integration:.2f}, péréquation {r.fiscal_transfer_rules.equalization_rate:.2f}, "
+      f"recettes mises en commun {r.fiscal_transfer_rules.pooled_revenue_share:.2f}, défense mutualisée "
+      f"{r.defence_rules.common_defence_share:.2f}, infrastructures communes "
+      f"{r.infrastructure_rules.common_infrastructure_share:.2f} (valeurs provisoires). Frontière entre États "
+      "σ = " + ", ".join(f"{k} {v:.2f}" for k, v in r.border_template.items())
+      + " (E, M, R, S dérivées des règles).\n")
 
     a("## Scenario set\n")
-    a(_NA.format(m="M6") + "\n")
+    if not manifest.scenario_set:
+        a("_Aucun scénario dans ce run : aucune conclusion de viabilité n'est possible (prompt §29)._\n")
+    else:
+        _scenario_section(a, manifest, s2c)
     a("## Ontology set\n")
     comp_ = None if measurement is None else measurement.get("composition")
     if not manifest.ontology_set:
@@ -126,6 +137,13 @@ def render_report(
         a(_NA.format(m="M5") + "\n")
     else:
         _dfi_section(a, manifest, dfi)
+    a("## Contextual viability\n")
+    via = None if measurement is None else measurement.get("viability")
+    if via is None:
+        a("_Aucun modèle de viabilité dans ce run. Aucune viabilité n'est jamais énoncée hors "
+          "(régime, scénario)._\n")
+    else:
+        _viability_section(a, manifest, via)
 
     a("## Causal support\n")
     a("`CAUSAL_EFFECT_UNKNOWN` — bibliothèque causale non construite (M7).\n")
@@ -159,6 +177,17 @@ def render_report(
               f"`{manifest.constitutional_regime.regime_id.value}` (scénario, non doctrine)"]
     unknown = ["tout effet causal (`CAUSAL_EFFECT_UNKNOWN`)", "toute ontologie identitaire (M4)",
                "toute configuration territoriale préférable"]
+    if manifest.viability_model is not None:
+        vm = manifest.viability_model
+        infer.append("couverture du panier de services des juridictions du statu quo, par (régime, scénario)")
+        assume += [f"comptes fiscaux observés sous `{vm.observed_regime}`", vm.union_closure,
+                   "coûts fixes de souveraineté déclarés (provisoires)",
+                   "scénarios : axes uniformes sur la région, intervalles déclarés"]
+        unknown += ["élasticité de la base fiscale à l'accès au marché et effet des infrastructures "
+                    "communes (bornes exploratoires I7, non causales)",
+                    "réponse de mobilité volontaire à une réforme (S2A : CAUSAL_EFFECT_UNKNOWN)"]
+    if any(not sc.climate.modelled for sc in manifest.scenario_set):
+        unknown.append("climat dans les scénarios où il n'est pas modélisé")
     if manifest.dfi_model is not None:
         infer.append("D/F/I du statu quo déclaré (statut MODEL)")
         assume += ["qualité des contacts intergroupes uniforme (non mesurée)",
@@ -325,3 +354,57 @@ def _dfi_section(a: Any, manifest: RunManifest, dfi: dict[str, Any]) -> None:
     rri = next(iter(first["ontologies"].values()))["reification"]
     a(f"Risque de réification du statu quo par rapport à lui-même : {rri['status']} "
       "(Δ d'alignement nul par construction ; les bornes sont exploratoires, non causales).\n")
+
+
+def _scenario_section(a: Any, manifest: RunManifest, s2c: dict[str, Any] | None) -> None:
+    a("| scénario | mobilité | horizon | climat | axes maintenus | garde-fous |")
+    a("|---|---|---|---|---|---|")
+    for sc in manifest.scenario_set:
+        climate = (", ".join(sorted(sc.climate.pathways)) if sc.climate.modelled else "**non modélisé**")
+        guards = {"S1": "aucun déplacement induit", "S2A": "volontaire seulement ; réponse CAUSAL_EFFECT_UNKNOWN"
+                  if sc.migration.voluntary_response is None else "volontaire seulement",
+                  "S2C": "diagnostic agrégé uniquement"}[sc.mobility_regime.value]
+        a(f"| `{sc.scenario_id}` v{sc.version} | {sc.mobility_regime.value} | {sc.horizon_years} ans | {climate} | "
+          f"{', '.join(sc.held_axes()) or '—'} | {guards} |")
+    a("")
+    a("Déplacement forcé et relocalisation induite par une réforme : **0**, vérifiés au chargement et à "
+      "l'exécution (prompt §35). Un axe maintenu est une hypothèse de scénario, déclarée.\n")
+    if s2c:
+        for sid, d in s2c.items():
+            a(f"S2C `{sid}` : **{d['status']}** — {d['reason']}. Sorties possibles : agrégats seulement "
+              f"({', '.join(d['outputs_allowed'])}). Jamais : {', '.join(d['outputs_forbidden'])}.\n")
+
+
+def _viability_section(a: Any, manifest: RunManifest, via: dict[str, Any]) -> None:
+    vm = manifest.viability_model
+    assert vm is not None
+    e = via["ensemble"]
+    first = next(iter(via["per_mesh"].values()))
+    th = first["thresholds"]
+    a(f"Couverture du panier de services des juridictions de niveau `{vm.level}` du statu quo : "
+      f"viable si P(couverture < {th['service_coverage_min']}) ≤ {th['shortfall_probability_max']}. "
+      "Aucun seuil de taille, de surface ni d'autarcie. Chaque statut ne vaut que sous son régime et son scénario.\n")
+    regimes = e["regimes"]
+    a("| scénario | territoire | " + " | ".join(f"`{r}`" for r in regimes) + " | dépend du régime |")
+    a("|---|---|" + "---|" * len(regimes) + "---|")
+    for sid, by_t in e["status_by_scenario_territory_regime"].items():
+        for t, by_r in by_t.items():
+            a(f"| `{sid}` | {t} | " + " | ".join(by_r[r] for r in regimes)
+              + f" | {'**oui**' if e['regime_dependent'][sid][t] else 'non'} |")
+    a("")
+    mid = next(iter(via["per_mesh"]))
+    a(f"Détail sur `{mid}` (couverture moyenne et intervalle à 90 %, transferts nets en part du coût des services) :\n")
+    for by_r in first["assessments"].values():
+        for by_t in by_r.values():
+            for a_ in by_t.values():
+                a(f"- {a_['statement']}")
+    a("")
+    a(f"**S^scale (viabilité) = {e['s_scale_viability']:.2f}** "
+      "(1 − écart maximal de P(couverture < τ) entre maillages).")
+    if e["exploratory_dependent"]:
+        a(f"{len(e['exploratory_dependent'])} statut(s) changent entre les bornes des coefficients exploratoires "
+          "(non causaux) : ils ne sont pas des conclusions.")
+    if any(v for by_t in e["regime_dependent"].values() for v in by_t.values()):
+        a("La viabilité d'au moins un territoire **dépend du régime constitutionnel** : toute analyse de "
+          "souveraineté doit annoncer le régime (spec 14 §6, 05 §19).")
+    a("")

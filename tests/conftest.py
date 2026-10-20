@@ -30,8 +30,10 @@ def configs_dir(tmp_path: Path) -> Path:
     shutil.copytree(CONFIGS, dst)
     pilot = yaml.safe_load((dst / "runs" / "synthetic_pilot.yaml").read_text())
     light = dict(pilot, name="light", mesh_set=["meshes/pilot_grid_l4.yaml"])
-    for key in ("measurement_model", "composition_model", "ontology_set", "dfi_model"):
+    for key in ("measurement_model", "composition_model", "ontology_set", "dfi_model", "viability_model",
+                "scenario_set"):
         light.pop(key)
+    light["sources"] = [s for s in pilot["sources"] if "viability_inputs" not in s["roles"]]
     (dst / "runs" / "light.yaml").write_text(yaml.safe_dump(light))
     (dst / "runs" / "light_measure.yaml").write_text(
         yaml.safe_dump(dict(pilot, name="light_measure", mesh_set=["meshes/pilot_grid_l4.yaml"])))

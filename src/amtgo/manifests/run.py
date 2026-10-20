@@ -29,9 +29,11 @@ from amtgo.institutions.regimes import ConstitutionalRegime, load_regime
 from amtgo.institutions.status_quo import StatusQuoSpec
 from amtgo.manifests.dfi import DFIManifest
 from amtgo.manifests.normative import NormativeManifest
+from amtgo.manifests.viability import ViabilityManifest
 from amtgo.measurement.composition import CompositionManifest
 from amtgo.measurement.manifest import MeasurementManifest
 from amtgo.ontology.model import Ontology, OntologyCrosswalk
+from amtgo.scenarios.model import Scenario
 from amtgo.utils.canonical import content_hash, stable_uuid
 from amtgo.utils.code_version import code_commit, code_version
 
@@ -39,6 +41,8 @@ from amtgo.utils.code_version import code_commit, code_version
 ROLE_ANALYSIS_EXTENT = "analysis_extent"
 # Rôle requis pour qu'une source fournisse les polygones du statu quo institutionnel.
 ROLE_STATUS_QUO = "status_quo_geometry"
+# Rôle requis pour qu'une source fournisse les comptes fiscaux de la viabilité (M6).
+ROLE_VIABILITY = "viability_inputs"
 
 
 class SourceUse(BaseModel):
@@ -63,6 +67,7 @@ class RunRequest(BaseModel):
     measurement_model: str | None = None
     composition_model: str | None = None
     dfi_model: str | None = None
+    viability_model: str | None = None
     ontology_set: tuple[str, ...] = ()
     scenario_set: tuple[str, ...] = ()
     seeds: tuple[int, ...] = (0,)
@@ -99,9 +104,12 @@ class RunManifest(BaseModel):
     crosswalks: tuple[OntologyCrosswalk, ...] = ()
     dfi_model: DFIManifest | None = None
     status_quo: StatusQuoSpec | None = None
+    scenario_set: tuple[Scenario, ...] = ()
+    viability_model: ViabilityManifest | None = None
+    observed_regime: ConstitutionalRegime | None = None
+    regime_sensitivity: tuple[ConstitutionalRegime, ...] = ()
     # Couches non encore disponibles : explicitement nulles, jamais inventées.
     causal_library: dict[str, Any] | None = None
-    scenario_set: tuple[str, ...] = ()
     solver: dict[str, Any] | None = None
     seeds: tuple[int, ...]
 
@@ -121,8 +129,6 @@ def manifest_body_hash(manifest: RunManifest) -> str:
 def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
     if request.map_mode is MapMode.C_DEEP:
         raise ConfigurationError("Map-C-Deep : branche de recherche séparée, non implémentée (prompt §77)")
-    if request.scenario_set:
-        raise ConfigurationError("scénarios (M6) pas encore disponibles")
     if not request.mesh_set:
         raise ConfigurationError("au moins un maillage est requis")
 
@@ -182,6 +188,28 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
                 raise ConfigurationError(
                     f"statu quo : la source {lv.from_source} doit être déclarée avec le rôle {ROLE_STATUS_QUO!r}")
 
+    scenarios = tuple(load_model(Scenario, configs_dir / p) for p in request.scenario_set)
+    if len({sc.scenario_id for sc in scenarios}) != len(scenarios):
+        raise ConfigurationError("scenario_id dupliqué dans scenario_set")
+    viability = observed = None
+    sensitivity: tuple[ConstitutionalRegime, ...] = ()
+    if request.viability_model:
+        viability = load_model(ViabilityManifest, configs_dir / request.viability_model)
+        if status_quo is None or measurement is None:
+            raise ConfigurationError("la viabilité exige la population (M3) et un statu quo déclaré (modèle D/F/I)")
+        if viability.level not in {lv.name for lv in status_quo.levels}:
+            raise ConfigurationError(f"viabilité : niveau {viability.level!r} absent du statu quo")
+        if not any(not sc.diagnostic_only for sc in scenarios):
+            raise ConfigurationError("la viabilité est conditionnelle à un scénario S1 ou S2A (prompt §29)")
+        fiscal = next((s for s in sources if s.manifest.source_id == viability.fiscal_source), None)
+        if fiscal is None or ROLE_VIABILITY not in fiscal.use.roles:
+            raise ConfigurationError(
+                f"viabilité : la source {viability.fiscal_source} doit être déclarée avec le rôle {ROLE_VIABILITY!r}")
+        observed = load_regime(configs_dir, viability.observed_regime)
+        sensitivity = tuple(load_regime(configs_dir, r) for r in viability.regime_sensitivity)
+        if len({r.regime_id for r in sensitivity}) != len(sensitivity):
+            raise ConfigurationError("régime dupliqué dans regime_sensitivity")
+
     body: dict[str, Any] = {
         "code_commit": code_commit(),
         "code_version": code_version(),
@@ -198,6 +226,10 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         "crosswalks": crosswalks,
         "dfi_model": dfi,
         "status_quo": status_quo,
+        "scenario_set": scenarios,
+        "viability_model": viability,
+        "observed_regime": observed,
+        "regime_sensitivity": sensitivity,
         "seeds": request.seeds,
     }
     draft = RunManifest(run_id=uuid.UUID(int=0), manifest_hash="", created_at=utcnow(), **body)

@@ -28,7 +28,7 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
     from amtgo.runs.state import RunStatus
 
     upgrade(db_settings)
-    assert current_revision(db_settings) == "0006"
+    assert current_revision(db_settings) == "0007"
     repo = make_repository(db_settings)
     manifest, _ = submit(db_settings.configs_dir / "runs/synthetic_pilot.yaml", db_settings)
     state = run_to_completion(db_settings, repo, str(manifest.run_id))
@@ -61,6 +61,9 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
         assert count("SELECT count(*) FROM ontology_crosswalk WHERE :r IS NOT NULL") > 0
         assert count("SELECT count(*) FROM information_schema.tables "
                      "WHERE table_name ILIKE '%ethnic%' AND :r IS NOT NULL") == 0
+        # M6 : régimes de la sensibilité et scénarios enregistrés, garde-fous en contraintes.
+        assert count("SELECT count(DISTINCT regime_id) FROM constitutional_regimes WHERE :r IS NOT NULL") == 4
+        assert count("SELECT count(DISTINCT scenario_id) FROM scenarios WHERE :r IS NOT NULL") == 4
 
     # Rejouer toutes les écritures ne duplique rien.
     from amtgo.data.ingestion import read_observations
@@ -86,3 +89,10 @@ def test_check_constraints(db_settings: Settings) -> None:
             INSERT INTO mesh_definitions (mesh_id, definition_hash, family, resolution, definition,
                 cells_hash, cell_count)
             VALUES ('x', 'h', 'hexagonal_magic', 1, '{}', 'h', 1)"""))
+    with pytest.raises(IntegrityError), engine.begin() as cx:
+        # Un scénario portant un déplacement forcé ne peut pas être enregistré (prompt §86).
+        cx.execute(text("""
+            INSERT INTO scenarios (scenario_id, content_hash, version, mobility_regime, horizon_years,
+                population, climate, urbanization, economy, migration, infrastructure, security)
+            VALUES ('x', 'sha256:x', '1', 'S1', 10, '{}', '{}', '{}', '{}',
+                '{"forced_migration": 1000, "reform_induced_relocation": 0}', '{}', '{}')"""))

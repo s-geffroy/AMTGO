@@ -71,6 +71,23 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
     ens = json.loads((d / "artifacts" / "dfi_ensemble.json").read_text())
     assert 0.0 <= ens["s_ontology_dfi"] <= 1.0 and 0.0 <= ens["s_scale_dfi"] <= 1.0
     assert "Domination, fragmentation, integration" in report
+    # M6 : viabilité conditionnelle (régime, scénario), garde-fous, S2C agrégé seulement.
+    for mid in ms["meshes"]:
+        via = json.loads((d / "fields" / mid / "viability.json").read_text())
+        assert set(via["assessments"]) == {"s1_baseline", "s1_stress", "s2a_voluntary"}  # jamais S2C
+        for g in via["guards"].values():
+            assert g["forced_migration"] == 0.0 and g["reform_induced_relocation"] == 0.0
+        assert via["guards"]["s2a_voluntary"]["voluntary_response"] == "CAUSAL_EFFECT_UNKNOWN"
+        for by_r in via["assessments"].values():
+            assert set(by_r) == {"R0_CURRENT_LIKE", "R1_COMMON_MARKET", "R2_CONFEDERAL", "R3_FEDERAL_CONTINENTAL"}
+            for rid, by_t in by_r.items():
+                for a in by_t.values():
+                    assert rid in a["statement"] and "scénario" in a["statement"]
+    vens = json.loads((d / "artifacts" / "viability_ensemble.json").read_text())
+    assert 0.0 <= vens["s_scale_viability"] <= 1.0
+    s2c = json.loads((d / "artifacts" / "s2c_diagnostic.json").read_text())
+    assert s2c["s2c_diagnostic"]["status"] == "NOT_APPLICABLE"
+    assert "Contextual viability" in report and "Non disponible à ce stade (milestone M6)" not in report
     freeze = json.loads((d / "measurement_freeze.json").read_text())
     assert set(freeze["compositions"]) == set(ms["meshes"])
     assert "Parts seulement" in report

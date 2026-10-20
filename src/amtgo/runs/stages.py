@@ -26,7 +26,7 @@ from amtgo.geo.multiscale import area_weighted_transfer, coverage_ratio
 from amtgo.geo.ops import create_base_mesh
 from amtgo.geo.support import allocate_point_masses
 from amtgo.manifests.run import RunManifest, verify_manifest
-from amtgo.runs import artifacts, composition_stages, dfi_stages, measure_stages
+from amtgo.runs import artifacts, composition_stages, dfi_stages, measure_stages, viability_stages
 from amtgo.runs.report import render_report
 
 
@@ -62,6 +62,11 @@ def plan_steps(manifest: RunManifest) -> list[str]:
         if manifest.dfi_model is not None:
             steps += [f"dfi:{m.mesh_id}" for m in manifest.mesh_set]
             steps += ["dfi_ensemble"]
+        if manifest.viability_model is not None:
+            steps += [f"viability:{m.mesh_id}" for m in manifest.mesh_set]
+            steps += ["viability_ensemble"]
+    if any(sc.diagnostic_only for sc in manifest.scenario_set):
+        steps += ["s2c_diagnostic"]
     steps += ["report"]
     return steps
 
@@ -77,6 +82,9 @@ def validate_sources(ctx: StageContext, _: str) -> dict[str, Any]:
         s.manifest.require_license(redistribute=s.use.redistribute, commercial=False)
     ctx.repo.record_run(ctx.manifest)
     ctx.repo.record_ontologies(ctx.manifest.ontology_set, ctx.manifest.crosswalks)
+    regimes = {r.content_hash: r for r in (ctx.manifest.constitutional_regime, ctx.manifest.observed_regime,
+                                           *ctx.manifest.regime_sensitivity) if r is not None}
+    ctx.repo.record_regimes_scenarios(list(regimes.values()), ctx.manifest.scenario_set)
     return {"count": len(ctx.manifest.data_manifest)}
 
 
@@ -180,6 +188,10 @@ def _round_sig(x: float, digits: int = 6) -> float:
     return float(f"{x:.{digits}g}")
 
 
+def _viability_output(a: dict[str, Any]) -> list[Any]:
+    return [a["status"], None if a["coverage"] is None else _round_sig(a["coverage"]["mean"], 4)]
+
+
 def _measurement_summary(ctx: StageContext) -> dict[str, Any]:
     from amtgo.measurement.fields import read_field
 
@@ -204,6 +216,11 @@ def _measurement_summary(ctx: StageContext) -> dict[str, Any]:
         dfi = {"per_mesh": {d.mesh_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/dfi.json")
                             for d in ctx.manifest.mesh_set},
                "ensemble": artifacts.read_json(ctx.run_dir, "artifacts/dfi_ensemble.json")}
+    viability = None
+    if ctx.manifest.viability_model is not None:
+        viability = {"per_mesh": {d.mesh_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/viability.json")
+                                  for d in ctx.manifest.mesh_set},
+                     "ensemble": artifacts.read_json(ctx.run_dir, "artifacts/viability_ensemble.json")}
     freeze = artifacts.read_json(ctx.run_dir, "measurement_freeze.json")
     outputs = {
         "freeze_hash": freeze["freeze_hash"],
@@ -214,9 +231,13 @@ def _measurement_summary(ctx: StageContext) -> dict[str, Any]:
         "dfi": None if dfi is None else {
             k: {o: {kk: _round_sig(vv, 4) for kk, vv in x["headline"].items()} for o, x in v["ontologies"].items()}
             for k, v in sorted(dfi["per_mesh"].items())},
+        "viability": None if viability is None else {
+            k: {sid: {rid: {t: _viability_output(a) for t, a in by_t.items()} for rid, by_t in by_r.items()}
+                for sid, by_r in v["assessments"].items()}
+            for k, v in sorted(viability["per_mesh"].items())},
     }
-    return {"per_mesh": per_mesh, "comparison": comparison, "freeze": freeze,
-            "computability": worst, "outputs": outputs, "composition": composition, "dfi": dfi}
+    return {"per_mesh": per_mesh, "comparison": comparison, "freeze": freeze, "computability": worst,
+            "outputs": outputs, "composition": composition, "dfi": dfi, "viability": viability}
 
 
 def report(ctx: StageContext, _: str) -> dict[str, Any]:
@@ -230,11 +251,14 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
     measurement = _measurement_summary(ctx) if ctx.manifest.measurement_model else None
     if measurement is not None:
         computability = measurement["computability"]
+    s2c = (artifacts.read_json(ctx.run_dir, "artifacts/s2c_diagnostic.json")
+           if any(sc.diagnostic_only for sc in ctx.manifest.scenario_set) else None)
     outputs = {
         "observations": {k: v["observations_hash"] for k, v in sorted(sources.items())},
         "meshes": {k: v["cells_hash"] for k, v in sorted(meshes.items())},
         "multiscale": multiscale,
         "measurement": None if measurement is None else measurement["outputs"],
+        "s2c": None if s2c is None else {k: v["status"] for k, v in sorted(s2c.items())},
         "recommendation_status": status.value,
         "computability_class": computability.value,
     }
@@ -243,7 +267,7 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
     outputs["outputs_hash"] = content_hash(outputs)
     artifacts.write_json(ctx.run_dir, "outputs.json", outputs)
     text = render_report(ctx.manifest, sources, meshes, multiscale, status, computability,
-                         outputs["outputs_hash"], artifacts.read_provenance(ctx.run_dir), measurement)
+                         outputs["outputs_hash"], artifacts.read_provenance(ctx.run_dir), measurement, s2c)
     from amtgo.runs.state import write_json_atomic
 
     write_json_atomic(ctx.run_dir / "report.md", text)
@@ -263,6 +287,9 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "measurement_freeze": measure_stages.measurement_freeze,
     "dfi": dfi_stages.dfi,
     "dfi_ensemble": dfi_stages.dfi_ensemble,
+    "viability": viability_stages.viability,
+    "viability_ensemble": viability_stages.viability_ensemble,
+    "s2c_diagnostic": viability_stages.s2c_diagnostic,
     "report": report,
 }
 

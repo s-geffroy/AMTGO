@@ -28,6 +28,7 @@ from amtgo.errors import ConfigurationError
 from amtgo.fragmentation.engine import fragmentation
 from amtgo.geo.crs import to_equal_area
 from amtgo.geo.mesh import Mesh
+from amtgo.geo.partition import Partition
 from amtgo.identity.reification import alignment
 from amtgo.identity.state import BoundedSalienceResponse, SocialState
 from amtgo.institutions.status_quo import build_institutions, build_partition
@@ -113,19 +114,27 @@ def _summary(uv: Any) -> dict[str, float] | None:
     return {"mean": float(uv.mean), "lower": float(uv.lower), "upper": float(uv.upper)}
 
 
-def dfi(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
-    m = ctx.manifest.dfi_model
+def status_quo_partition(ctx: StageContext, mesh: Mesh) -> Partition:
+    """Partition du statu quo déclaré sur ``mesh``, frontière entre États selon le régime du run."""
     sq = ctx.manifest.status_quo
-    if m is None or sq is None:
-        raise ConfigurationError("aucun modèle D/F/I dans ce run")
-    mesh = artifacts.read_mesh(ctx.run_dir, mesh_id)
+    if sq is None:
+        raise ConfigurationError("aucun statu quo déclaré dans ce run")
     polygons: dict[str, list[Any]] = {}
     for lv in sq.levels:
         if lv.from_source:
             polygons[lv.from_source] = [o for o in read_observations(ctx.observations_path(lv.from_source))
                                         if o.variable_id == lv.variable_id and o.support_type in
                                         (SupportType.ADMIN, SupportType.POLYGON)]
-    partition = build_partition(sq, mesh, ctx.manifest.constitutional_regime, polygons)
+    return build_partition(sq, mesh, ctx.manifest.constitutional_regime, polygons)
+
+
+def dfi(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
+    m = ctx.manifest.dfi_model
+    sq = ctx.manifest.status_quo
+    if m is None or sq is None:
+        raise ConfigurationError("aucun modèle D/F/I dans ce run")
+    mesh = artifacts.read_mesh(ctx.run_dir, mesh_id)
+    partition = status_quo_partition(ctx, mesh)
     institutions = build_institutions(sq, partition)
     kernel = network_kernel(mesh, m.network_kernel_length_km, m.network_kernel_cutoff)
     population = fields_mod.read_field(ctx.run_dir, mesh_id)[2].astype(np.float64)  # (S, N)
