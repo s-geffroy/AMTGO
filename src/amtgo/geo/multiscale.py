@@ -138,6 +138,12 @@ def _transfer(joint: dict[tuple[str, str], float], total: float) -> float:
     return max(0.0, min(1.0, 1.0 - matched / total))
 
 
+def transfer_distance(joint: dict[tuple[str, str], float]) -> float:
+    """Distance TRANSFER à partir d'une table jointe d'aires (étiquettes a × étiquettes b)."""
+    total = sum(joint.values())
+    return math.nan if total == 0 else _transfer(joint, total)
+
+
 def partition_distance(
     labels_a: dict[str, str],
     mesh_a: Mesh,
@@ -175,4 +181,5 @@ __all__ = [
     "area_weighted_transfer",
     "coverage_ratio",
     "partition_distance",
+    "transfer_distance",
 ]
