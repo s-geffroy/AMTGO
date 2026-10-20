@@ -51,6 +51,17 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
     for mid, v in cmp_["reference_scale_information"].items():
         cell = json.loads((d / "fields" / mid / "field.json").read_text())["median_information_ratio"]
         assert v["median"] > cell
+    # M4 : composition sous deux ontologies — propriétés qualitatives (ADR-0010).
+    for mid in ms["meshes"]:
+        c = json.loads((d / "fields" / mid / "composition.json").read_text())
+        assert c["privacy_class"] in ("CONTROLLED", "SENSITIVE", "PROHIBITED")
+        assert c["calibration"]["reference_coverage"] >= 0.8
+        assert 0.0 <= c["ontology_stability"]["s_ontology"] <= 1.0
+        # Une carte à étiquette unique ne représente qu'une partie de la population du bloc.
+        assert c["historical_label_check"]["synth_ext_hist"]["mean_label_share"] < 0.8
+    freeze = json.loads((d / "measurement_freeze.json").read_text())
+    assert set(freeze["compositions"]) == set(ms["meshes"])
+    assert "Parts seulement" in report
     assert (d / "measurement_freeze.json").exists()
     assert len(list((d / "provenance").glob("*.json"))) >= 12
 

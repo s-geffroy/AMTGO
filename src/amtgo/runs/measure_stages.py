@@ -148,7 +148,12 @@ def measurement_freeze(ctx: StageContext, _: str) -> dict[str, Any]:
             raise ProvenanceError(f"champ {d.mesh_id} produit par un autre modèle de mesure")
         entries[d.mesh_id] = {"field_id": fmeta["field_id"], "cells_hash": fmeta["cells_hash"],
                               "samples_hash": fmeta["samples_hash"]}
-    freeze = {"measurement_model": m.content_hash, "fields": entries}
+    compositions = {}
+    if ctx.manifest.composition_model is not None:
+        compositions = {
+            d.mesh_id: content_hash(artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/composition.json"))
+            for d in ctx.manifest.mesh_set}
+    freeze = {"measurement_model": m.content_hash, "fields": entries, "compositions": compositions}
     freeze_hash = content_hash(freeze)
     artifacts.write_json(ctx.run_dir, "measurement_freeze.json", {**freeze, "freeze_hash": freeze_hash})
     record = ProvenanceRecord.create(

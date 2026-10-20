@@ -74,7 +74,9 @@ def main():
             # Un cycle qui echoue ne tue pas le worker : il rate son tour et
             # reessaie au suivant. Ce qui ne doit jamais etre avale, c'est le
             # message d'erreur.
-            log("worker.cycle", status="error", error=repr(exc))
+            from amtgo.runs.queue import safe_error
+
+            log("worker.cycle", status="error", error=safe_error(exc))
         HEARTBEAT.touch()
 
         # Sommeil fractionne : un SIGTERM ne doit pas attendre l'intervalle

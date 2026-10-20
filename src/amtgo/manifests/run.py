@@ -27,7 +27,9 @@ from amtgo.errors import ConfigurationError
 from amtgo.geo.mesh import MeshDefinition
 from amtgo.institutions.regimes import ConstitutionalRegime, load_regime
 from amtgo.manifests.normative import NormativeManifest
+from amtgo.measurement.composition import CompositionManifest
 from amtgo.measurement.manifest import MeasurementManifest
+from amtgo.ontology.model import Ontology, OntologyCrosswalk
 from amtgo.utils.canonical import content_hash, stable_uuid
 from amtgo.utils.code_version import code_commit, code_version
 
@@ -55,6 +57,7 @@ class RunRequest(BaseModel):
     sources: tuple[SourceUse, ...]
     mesh_set: tuple[str, ...]
     measurement_model: str | None = None
+    composition_model: str | None = None
     ontology_set: tuple[str, ...] = ()
     scenario_set: tuple[str, ...] = ()
     seeds: tuple[int, ...] = (0,)
@@ -86,8 +89,10 @@ class RunManifest(BaseModel):
     constitutional_regime_hash: str
     mesh_set: tuple[MeshDefinition, ...]
     measurement_model: MeasurementManifest | None = None
+    ontology_set: tuple[Ontology, ...] = ()
+    composition_model: CompositionManifest | None = None
+    crosswalks: tuple[OntologyCrosswalk, ...] = ()
     # Couches non encore disponibles : explicitement nulles, jamais inventées.
-    ontology_set: tuple[str, ...] = ()
     causal_library: dict[str, Any] | None = None
     scenario_set: tuple[str, ...] = ()
     solver: dict[str, Any] | None = None
@@ -109,8 +114,8 @@ def manifest_body_hash(manifest: RunManifest) -> str:
 def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
     if request.map_mode is MapMode.C_DEEP:
         raise ConfigurationError("Map-C-Deep : branche de recherche séparée, non implémentée (prompt §77)")
-    if request.ontology_set or request.scenario_set:
-        raise ConfigurationError("ontologies (M4) et scénarios (M6) pas encore disponibles")
+    if request.scenario_set:
+        raise ConfigurationError("scénarios (M6) pas encore disponibles")
     if not request.mesh_set:
         raise ConfigurationError("au moins un maillage est requis")
 
@@ -146,6 +151,17 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         measurement = load_model(MeasurementManifest, configs_dir / request.measurement_model)
         _check_measurement(measurement, sources)
 
+    ontologies = tuple(load_model(Ontology, configs_dir / p) for p in request.ontology_set)
+    if len({o.ontology_id for o in ontologies}) != len(ontologies):
+        raise ConfigurationError("ontologie dupliquée dans ontology_set")
+    composition = None
+    crosswalks: tuple[OntologyCrosswalk, ...] = ()
+    if request.composition_model:
+        if measurement is None:
+            raise ConfigurationError("la composition exige un modèle de mesure de population (M3)")
+        composition = load_model(CompositionManifest, configs_dir / request.composition_model)
+        crosswalks = _check_composition(composition, ontologies, sources, configs_dir)
+
     body: dict[str, Any] = {
         "code_commit": code_commit(),
         "code_version": code_version(),
@@ -157,6 +173,9 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         "constitutional_regime_hash": regime.content_hash,
         "mesh_set": meshes,
         "measurement_model": measurement,
+        "ontology_set": ontologies,
+        "composition_model": composition,
+        "crosswalks": crosswalks,
         "seeds": request.seeds,
     }
     draft = RunManifest(run_id=uuid.UUID(int=0), manifest_hash="", created_at=utcnow(), **body)
@@ -181,6 +200,29 @@ def _check_measurement(m: MeasurementManifest, sources: list[ResolvedSource]) ->
 
         if len({world_of(sm).world_hash for sm in synthetic}) > 1:
             raise ConfigurationError("sources synthétiques issues de mondes différents dans un même run")
+
+
+def _check_composition(m: CompositionManifest, ontologies: tuple[Ontology, ...],
+                       sources: list[ResolvedSource], configs_dir: Path) -> tuple[OntologyCrosswalk, ...]:
+    from amtgo.measurement.composition import ROLE_COMPOSITION, ROLE_ONTOLOGY_VALIDATION
+
+    by_id = {o.ontology_id: o for o in ontologies}
+    if m.observed_ontology not in by_id:
+        raise ConfigurationError(f"composition : ontologie observée {m.observed_ontology} absente d'ontology_set")
+    src = {s.manifest.source_id: s for s in sources}
+    if m.source_id not in src or ROLE_COMPOSITION not in src[m.source_id].use.roles:
+        raise ConfigurationError(f"composition : rôle {ROLE_COMPOSITION!r} non déclaré pour {m.source_id}")
+    for vs in m.validation_sources:
+        if vs.source_id not in src or ROLE_ONTOLOGY_VALIDATION not in src[vs.source_id].use.roles:
+            raise ConfigurationError(f"composition : rôle {ROLE_ONTOLOGY_VALIDATION!r} non déclaré pour {vs.source_id}")
+    crosswalks = []
+    for proj in m.projections:
+        if proj.ontology not in by_id:
+            raise ConfigurationError(f"composition : ontologie cible {proj.ontology} absente d'ontology_set")
+        cw = load_model(OntologyCrosswalk, configs_dir / proj.crosswalk)
+        cw.check_against(by_id[m.observed_ontology], by_id[proj.ontology])
+        crosswalks.append(cw)
+    return tuple(crosswalks)
 
 
 def verify_manifest(manifest: RunManifest) -> None:

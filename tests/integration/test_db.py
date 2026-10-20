@@ -28,7 +28,7 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
     from amtgo.runs.state import RunStatus
 
     upgrade(db_settings)
-    assert current_revision(db_settings) == "0005"
+    assert current_revision(db_settings) == "0006"
     repo = make_repository(db_settings)
     manifest, _ = submit(db_settings.configs_dir / "runs/synthetic_pilot.yaml", db_settings)
     state = run_to_completion(db_settings, repo, str(manifest.run_id))
@@ -40,8 +40,10 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
             return int(cx.execute(text(sql), {"r": manifest.run_id}).scalar_one())
 
         assert count("SELECT count(*) FROM run_manifests WHERE run_id = :r") == 1
-        n_obs = count("SELECT count(*) FROM observations o JOIN sources s USING (source_id) "
-                      "WHERE s.slug = 'synthetic_survey' AND :r IS NOT NULL")
+        survey = next(x.manifest for x in manifest.data_manifest if x.manifest.source_id == "synthetic_survey")
+        n_obs = int(cx.execute(text("SELECT count(*) FROM observations WHERE source_id = :s "
+                                    "AND variable_id = 'population_count_ea'"),
+                               {"s": survey.source_uuid}).scalar_one())
         assert n_obs == 300
         assert count("SELECT count(*) FROM provenance_records WHERE run_id = :r") >= 6
         assert count("SELECT count(*) FROM cells WHERE mesh_id = 'pilot_grid_l4' AND :r IS NOT NULL") > 0
@@ -54,6 +56,11 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
             "SELECT count(*) FROM cells WHERE mesh_id = 'pilot_grid_l4' AND :r IS NOT NULL")
         assert count("SELECT count(*) FROM latent_fields WHERE run_id = :r AND evidence_status <> 'M'") == 0
         assert count("SELECT count(*) FROM run_manifests WHERE run_id = :r AND measurement_hash LIKE 'sha256:%'") == 1
+        # M4 : registre des ontologies et des crosswalks, sans table « ethnicity ».
+        assert count("SELECT count(DISTINCT ontology_id) FROM ontologies WHERE :r IS NOT NULL") >= 2
+        assert count("SELECT count(*) FROM ontology_crosswalk WHERE :r IS NOT NULL") > 0
+        assert count("SELECT count(*) FROM information_schema.tables "
+                     "WHERE table_name ILIKE '%ethnic%' AND :r IS NOT NULL") == 0
 
     # Rejouer toutes les écritures ne duplique rien.
     from amtgo.data.ingestion import read_observations
@@ -62,8 +69,8 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
     path = runs_dir(db_settings) / str(manifest.run_id) / "artifacts" / "observations__synthetic_survey.parquet"
     repo.record_observations(read_observations(path))
     with engine.connect() as cx:
-        n = cx.execute(text("SELECT count(*) FROM observations o JOIN sources s USING (source_id) "
-                            "WHERE s.slug = 'synthetic_survey'")).scalar_one()
+        n = cx.execute(text("SELECT count(*) FROM observations WHERE source_id = :s "
+                            "AND variable_id = 'population_count_ea'"), {"s": survey.source_uuid}).scalar_one()
         assert n == 300
 
 

@@ -80,7 +80,20 @@ def render_report(
     a("## Scenario set\n")
     a(_NA.format(m="M6") + "\n")
     a("## Ontology set\n")
-    a(_NA.format(m="M4") + "\n")
+    comp_ = None if measurement is None else measurement.get("composition")
+    if not manifest.ontology_set:
+        a("_Aucune ontologie dans ce run._\n")
+    else:
+        a("| ontologie | dimension | type | statut de preuve | concepts |\n|---|---|---|---|---|")
+        for o in manifest.ontology_set:
+            a(f"| `{o.ontology_id}` v{o.version} | {o.dimension.value} | {o.kind.value} | "
+              f"{o.evidence_status.name} | {len(o.leaf_ids)} |")
+        a("")
+        for cw in manifest.crosswalks:
+            a(f"Crosswalk `{cw.crosswalk_id}` : `{cw.source_ontology}` → `{cw.target_ontology}`, "
+              f"statut {cw.evidence_status.name}, probabiliste (Dirichlet), masse non attribuée conservée.\n")
+        if comp_ is not None:
+            _composition_section(a, manifest, comp_)
 
     a("## Meshes and multi-scale checks\n")
     a("| maillage | famille | résolution | cellules | surface (km²) | couverture emprise "
@@ -118,6 +131,10 @@ def render_report(
     worst = max((rs.manifest.privacy_class for rs in manifest.data_manifest), key=lambda c: c.rank)
     a(f"Classe la plus restrictive parmi les sources : **{worst.value}**. Ce rapport ne contient "
       "que des comptes agrégés et des empreintes.\n")
+    if manifest.composition_model is not None:
+        a("Les champs de composition portent des attributs de groupe : classe **CONTROLLED** au "
+          "minimum, jamais exportés publiquement. Seuls des agrégats de domaine et des mesures "
+          "entre ontologies figurent ici ; aucune part par cellule.\n")
 
     a("## Recommendation status\n")
     a(f"**{status.value}**. Aucune frontière n'est proposée par ce run.\n")
@@ -135,6 +152,13 @@ def render_report(
               f"`{manifest.constitutional_regime.regime_id.value}` (scénario, non doctrine)"]
     unknown = ["tout effet causal (`CAUSAL_EFFECT_UNKNOWN`)", "toute ontologie identitaire (M4)",
                "toute configuration territoriale préférable"]
+    if manifest.composition_model is not None:
+        infer.append("parts de catégories par cellule sous chaque ontologie (statut MODEL)")
+        assume += ["indépendance a posteriori entre population et composition",
+                   "réponses d'une cellule comptées aux niveaux cellule et région (approximation)",
+                   "crosswalks entre ontologies (statut MODEL, preuve déclarée)"]
+        unknown = [u for u in unknown if "ontologie" not in u] + [
+            "la « bonne » ontologie : aucune n'est canonique"]
     if measurement is not None:
         infer.append("population par cellule (statut MODEL), avec intervalles et ratio d'information")
         assume += ["densité homogène à l'intérieur d'une cellule",
@@ -220,3 +244,37 @@ def _measurement_section(a: Any, manifest: RunManifest, m: dict[str, Any]) -> No
         a(f"**Comparaison entre maillages** (totaux des {cmp_['polygons']} cellules d'une grille de "
           f"référence de 100 km, indépendante des marges, reconstruits depuis chaque maillage) : "
           f"écart standardisé maximal **{cmp_['max_abs_z']:.2f}**.\n")
+
+
+def _composition_section(a: Any, manifest: RunManifest, comp: dict[str, Any]) -> None:
+    cm = manifest.composition_model
+    assert cm is not None
+    a(f"Composition : modèle `{cm.model_id}` v{cm.version}, dimension {cm.dimension.value}, "
+      f"observée sous `{cm.observed_ontology}`. **Parts seulement** : aucune étiquette, aucune "
+      "majorité, aucun « groupe de la cellule ».\n")
+    first = next(iter(comp["per_mesh"].values()))
+    if first["calibration"].get("status") == "done":
+        # Monde synthétique (vérité disponible) : catégories fictives, agrégats de domaine publiables.
+        a("Parts au niveau du domaine (premier maillage, monde synthétique) :\n")
+        for oid, v in first["ontologies"].items():
+            parts = ", ".join(f"{k} {100 * x['mean']:.1f} %" for k, x in v["domain_shares"].items())
+            a(f"- `{oid}` : {parts}")
+        a("")
+    else:
+        a("_Parts de groupes non reproduites : sources réelles, champs CONTROLLED._\n")
+    a("| maillage | S^ontology | calibration à 100 km (couverture) | erreur absolue moyenne | "
+      "part couverte par l'étiquette historique |")
+    a("|---|---|---|---|---|")
+    for mid, v in comp["per_mesh"].items():
+        c, h = v["calibration"], v["historical_label_check"]
+        cov = f"{100 * c['reference_coverage']:.1f} %" if c.get("status") == "done" else "n/d"
+        mae = f"{c['reference_mean_abs_error']:.3f}" if c.get("status") == "done" else "n/d"
+        lab = next((x for k, x in h.items() if isinstance(x, dict)), None) if h.get("status") == "done" else None
+        labs = f"{100 * lab['mean_label_share']:.0f} % (min {100 * lab['min_label_share']:.0f} %)" if lab else "n/d"
+        a(f"| {mid} | {v['ontology_stability']['s_ontology']:.2f} | {cov} | {mae} | {labs} |")
+    a("")
+    s = comp["ensemble"]["s_ontology"]
+    a(f"**S^ontology = {s:.2f}** (corrélation de rang du motif de diversité entre ontologies, "
+      "minimum sur les maillages). Toute conclusion portant sur des catégories est conditionnelle "
+      "à l'ontologie ; une carte historique à étiquette unique ne représente qu'une fraction de la "
+      "population de chaque bloc.\n")

@@ -26,7 +26,7 @@ from amtgo.geo.multiscale import area_weighted_transfer, coverage_ratio
 from amtgo.geo.ops import create_base_mesh
 from amtgo.geo.support import allocate_point_masses
 from amtgo.manifests.run import RunManifest, verify_manifest
-from amtgo.runs import artifacts, measure_stages
+from amtgo.runs import artifacts, composition_stages, measure_stages
 from amtgo.runs.report import render_report
 
 
@@ -54,7 +54,11 @@ def plan_steps(manifest: RunManifest) -> list[str]:
     if manifest.measurement_model is not None:
         steps += [f"measure:{m.mesh_id}" for m in manifest.mesh_set]
         steps += [f"validate_measurement:{m.mesh_id}" for m in manifest.mesh_set]
-        steps += ["compare_fields", "measurement_freeze"]
+        steps += ["compare_fields"]
+        if manifest.composition_model is not None:
+            steps += [f"measure_composition:{m.mesh_id}" for m in manifest.mesh_set]
+            steps += ["ontology_ensemble"]
+        steps += ["measurement_freeze"]
     steps += ["report"]
     return steps
 
@@ -69,6 +73,7 @@ def validate_sources(ctx: StageContext, _: str) -> dict[str, Any]:
             s.manifest.require_role(role)
         s.manifest.require_license(redistribute=s.use.redistribute, commercial=False)
     ctx.repo.record_run(ctx.manifest)
+    ctx.repo.record_ontologies(ctx.manifest.ontology_set, ctx.manifest.crosswalks)
     return {"count": len(ctx.manifest.data_manifest)}
 
 
@@ -136,7 +141,9 @@ def multiscale_check(ctx: StageContext, _: str) -> dict[str, Any]:
     point_obs = []
     for s in ctx.manifest.data_manifest:
         for o in read_observations(ctx.observations_path(s.manifest.source_id)):
-            if o.support_type in (SupportType.POINT, SupportType.UNCERTAIN_POINT) and o.value:
+            # Masses de population seulement : une réponse d'identité (ontology_id) n'est pas un compte.
+            if (o.support_type in (SupportType.POINT, SupportType.UNCERTAIN_POINT) and o.value
+                    and o.ontology_id is None):
                 point_obs.append(o)
     result: dict[str, Any] = {"meshes": {}, "transfers": []}
     allocations = {}
@@ -182,15 +189,23 @@ def _measurement_summary(ctx: StageContext) -> dict[str, Any]:
     classes = [ComputabilityClass(v["field"]["computability"]) for v in per_mesh.values()]
     worst = min(classes, key=lambda c: "DCBA".index(c.value)) if classes else ComputabilityClass.D
     comparison = artifacts.read_json(ctx.run_dir, "artifacts/fields_comparison.json")
+    composition = None
+    if ctx.manifest.composition_model is not None:
+        composition = {
+            "per_mesh": {d.mesh_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/composition.json")
+                         for d in ctx.manifest.mesh_set},
+            "ensemble": artifacts.read_json(ctx.run_dir, "artifacts/ontology_ensemble.json"),
+        }
     freeze = artifacts.read_json(ctx.run_dir, "measurement_freeze.json")
     outputs = {
         "freeze_hash": freeze["freeze_hash"],
         "totals": {k: {kk: _round_sig(vv) for kk, vv in v["field"]["total"].items()}
                    for k, v in sorted(per_mesh.items())},
         "computability": {k: v["field"]["computability"] for k, v in sorted(per_mesh.items())},
+        "s_ontology": None if composition is None else _round_sig(composition["ensemble"]["s_ontology"]),
     }
     return {"per_mesh": per_mesh, "comparison": comparison, "freeze": freeze,
-            "computability": worst, "outputs": outputs}
+            "computability": worst, "outputs": outputs, "composition": composition}
 
 
 def report(ctx: StageContext, _: str) -> dict[str, Any]:
@@ -232,6 +247,8 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "measure": measure_stages.measure,
     "validate_measurement": measure_stages.validate_measurement,
     "compare_fields": measure_stages.compare_fields,
+    "measure_composition": composition_stages.measure_composition,
+    "ontology_ensemble": composition_stages.ontology_ensemble,
     "measurement_freeze": measure_stages.measurement_freeze,
     "report": report,
 }

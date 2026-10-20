@@ -20,6 +20,7 @@ from amtgo.data.observations import Observation
 from amtgo.data.sources import Source, SourceManifest
 from amtgo.geo.mesh import Mesh
 from amtgo.manifests.run import RunManifest
+from amtgo.ontology.model import Ontology, OntologyCrosswalk
 
 if TYPE_CHECKING:
     from amtgo.measurement.fields import LatentFieldMeta
@@ -37,6 +38,7 @@ class Repository(Protocol):
     def record_latent_field(self, run_id: uuid.UUID, mesh: Mesh, meta: LatentFieldMeta,
                             rows: list[dict[str, Any]]) -> None: ...
     def record_measurement_freeze(self, run_id: uuid.UUID, freeze_hash: str) -> None: ...
+    def record_ontologies(self, ontologies: Sequence[Ontology], crosswalks: Sequence[OntologyCrosswalk]) -> None: ...
 
 
 class NullRepository:
@@ -62,6 +64,9 @@ class NullRepository:
         pass
 
     def record_measurement_freeze(self, run_id: uuid.UUID, freeze_hash: str) -> None:
+        pass
+
+    def record_ontologies(self, ontologies: Sequence[Ontology], crosswalks: Sequence[OntologyCrosswalk]) -> None:
         pass
 
 
@@ -247,3 +252,35 @@ class PostgresRepository:
             cx.execute(text("UPDATE run_manifests SET measurement_hash = :h WHERE run_id = :r "
                             "AND (measurement_hash IS NULL OR measurement_hash = :h)"),
                        {"h": freeze_hash, "r": run_id})
+
+    def record_ontologies(self, ontologies: Sequence[Ontology], crosswalks: Sequence[OntologyCrosswalk]) -> None:
+        with self.engine.begin() as cx:
+            for o in ontologies:
+                cx.execute(text("""
+                    INSERT INTO ontologies (ontology_id, content_hash, version, name, dimension, kind,
+                        evidence_status, definition)
+                    VALUES (:id, :h, :v, :name, :dim, :kind, CAST(:ev AS evidence_status), CAST(:d AS jsonb))
+                    ON CONFLICT DO NOTHING
+                """), {"id": o.ontology_id, "h": o.content_hash, "v": o.version, "name": o.name,
+                       "dim": o.dimension.value, "kind": o.kind.value, "ev": o.evidence_status.value,
+                       "d": o.model_dump_json()})
+                cx.execute(text("""
+                    INSERT INTO ontology_concepts (ontology_id, content_hash, concept_id, source_label,
+                        definition, parent_id, historical_period, self_identified, external_label)
+                    VALUES (:id, :h, :c, :label, :d, :parent,
+                        CASE WHEN CAST(:p0 AS date) IS NULL AND CAST(:p1 AS date) IS NULL THEN NULL
+                             ELSE daterange(CAST(:p0 AS date), CAST(:p1 AS date), '[]') END, :si, :el)
+                    ON CONFLICT DO NOTHING
+                """), [{"id": o.ontology_id, "h": o.content_hash, "c": c.concept_id, "label": c.source_label,
+                        "d": c.definition, "parent": c.parent_id, "p0": c.period_start, "p1": c.period_end,
+                        "si": c.self_identified, "el": c.external_label} for c in o.concepts])
+            for cw in crosswalks:
+                cx.execute(text("""
+                    INSERT INTO ontology_crosswalk (crosswalk_id, content_hash, source_ontology,
+                        target_ontology, source_concept, target_concept, probability, concentration, evidence)
+                    VALUES (:id, :h, :so, :to, :sc, :tc, :p, :conc, CAST(:ev AS jsonb))
+                    ON CONFLICT DO NOTHING
+                """), [{"id": cw.crosswalk_id, "h": cw.content_hash, "so": cw.source_ontology,
+                        "to": cw.target_ontology, "sc": row.source_concept, "tc": t, "p": p,
+                        "conc": row.concentration, "ev": json.dumps({"evidence": row.evidence})}
+                       for row in cw.rows for t, p in row.targets.items()])

@@ -136,9 +136,28 @@ def advance_one(
     return Advance(state.run_id, step.name, state.status, "done")
 
 
+# Longueur maximale d'un message d'erreur journalisé ou stocké dans l'état.
+MAX_ERROR_CHARS = 500
+
+
+def safe_error(exc: BaseException) -> str:
+    """Message d'erreur sans donnée : pas de paramètres SQL liés, longueur bornée.
+
+    Une erreur SQLAlchemy recopie toutes les valeurs liées (observations, comptes) :
+    elle ne doit jamais atteindre les logs ni l'état du run (CLAUDE.md, prompt §70).
+    """
+    from sqlalchemy.exc import StatementError
+
+    if isinstance(exc, StatementError) and exc.orig is not None:
+        text = f"{type(exc).__name__}: {type(exc.orig).__name__}: {str(exc.orig).splitlines()[0]}"
+    else:
+        text = f"{type(exc).__name__}: {exc}"
+    return text if len(text) <= MAX_ERROR_CHARS else text[: MAX_ERROR_CHARS - 1] + "…"
+
+
 def _fail(run_dir: Path, state: RunState, step: StepState, exc: BaseException, elapsed: float,
           *, deterministic: bool, settings: Settings) -> Advance:
-    message = f"{type(exc).__name__}: {exc}"
+    message = safe_error(exc)
     step.last_error = message
     step.duration_s = round(elapsed, 3)
     exhausted = step.attempts >= settings.max_stage_attempts
