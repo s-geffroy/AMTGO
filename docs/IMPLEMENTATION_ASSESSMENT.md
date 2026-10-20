@@ -63,6 +63,9 @@ absent et déclaré comme tel dans chaque rapport de run.
 | 10 | Les mondes synthétiques A–F encodent la conclusion attendue (risque de *teaching to the test*) | [ADR-0010](decisions/ADR-0010-mondes-synthetiques.md) |
 | 11 | Carte publique demandée vs doctrine (pas de « vraie carte », pas de ligne nette sans support) | [ADR-0011](decisions/ADR-0011-carte-publique.md) |
 | 12 | Batch scientifique vs worker périodique reprenable | [ADR-0012](decisions/ADR-0012-file-de-runs.md) |
+| 13 | Fusion 03 §27 : famille de lois, positivité, contraintes de somme, représentativité | [ADR-0013](decisions/ADR-0013-modele-de-mesure.md) |
+| 14 | Validation de la mesure sans vérité terrain | [ADR-0014](decisions/ADR-0014-monde-synthetique.md) |
+| 15 | Performances sous quota CPU | [ADR-0015](decisions/ADR-0015-ressources-calcul.md) |
 
 Autres points relevés, sans décision nécessaire à ce stade :
 
@@ -94,5 +97,5 @@ Autres points relevés, sans décision nécessaire à ce stade :
 | M0 | bootstrap : pyproject, CI, config, logs, migrations, manifestes, file de runs | **fait** |
 | M1 | registre de sources : modèle de source, licences, contrat d'ingestion, provenance | **fait** |
 | M2 | cœur spatial : cellules, deux familles de maillage, opérations multi-échelles | **fait** |
-| M3 | mesure : interface de likelihood, champs latents, fusion bayésienne simple, incertitude | après revue |
+| M3 | mesure : interface de likelihood, champs latents, fusion bayésienne simple, incertitude | **fait** |
 | M4 | ontologies : concepts, crosswalks probabilistes, exécution en ensemble | après revue |

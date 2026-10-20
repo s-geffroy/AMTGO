@@ -10,8 +10,8 @@ Documentation publique : <https://s-geffroy.github.io/AMTGO/>, avec l'évaluatio
 d'implémentation, les ADR, les rapports de milestone, les rapports de runs
 synthétiques et la carte.
 
-État actuel : **M0–M2** (bootstrap, registre de sources, cœur spatial). Aucun
-découpage n'est produit à ce stade.
+État actuel : **M0–M3** (bootstrap, registre de sources, cœur spatial, mesure).
+Aucun découpage n'est produit à ce stade.
 
 ## Sur le VPS
 

@@ -23,9 +23,12 @@ jamais remplies par un coefficient inventé :
 
 | écart | raison | quand |
 |---|---|---|
-| raffinement **adaptatif** du maillage (07 §7) | exige l'hétérogénéité des champs latents | M3 |
+| raffinement **adaptatif** du maillage (07 §7) | maillages à résolutions mêlées ; pas de besoin démontré au pilote | après profilage |
 | `compare_across_meshes` et $S_{scale}$ | exigent des partitions candidates ; la distance existe déjà | M8 |
-| missingness non aléatoire (03 §26) | modèle de sélection = modèle de mesure | M3 |
+| missingness non aléatoire (03 §26) | hypothèse MAR déclarée dans chaque rapport ; exige des covariables de sélection | M3+ |
+| corrélation spatiale a priori | prior indépendant : une cellule sans observation garde son prior | M3+ |
+| harmonisation temporelle | exclusion stricte hors période cible | M3+ |
+| invariance de mesure entre enquêtes (03 §28) | une seule enquête (synthétique) | avec sources réelles |
 | rasters (WorldPop, GHSL…) | rasterio différé (ADR-0002) | M3 |
 | stockage objet S3/MinIO | les fichiers de run sous `/state` suffisent au prototype | après profilage |
 | licence du projet | décision du porteur du projet | — |

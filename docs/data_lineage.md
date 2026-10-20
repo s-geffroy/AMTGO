@@ -13,6 +13,10 @@ manifest:<sha256 du SourceManifest>
    └─ ingest.fetch_validate ─► source:<uuid stable (source_id, release)>
           └─ ingest.normalize ─► observations:<sha256 du contenu>
                  └─ geo.create_base_mesh ─► mesh:<mesh_id>:<cells_hash>
+
+observations:* + mesh:* + measurement:<sha256 du MeasurementManifest>
+   └─ measurement.fuse ─► field:<field_id>            (statut MODEL)
+          └─ measurement.freeze ─► measurement_freeze:<sha256>
 ```
 
 Chaque `ProvenanceRecord` porte `input_ids`, `output_ids`, `code_version`,

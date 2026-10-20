@@ -14,9 +14,9 @@ NORMALIZATION          amtgo.data.observations     M1  ✔  valid time, support,
     ↓
 (maillages)            amtgo.geo                   M2  ✔  h3 + grid_laea, transferts, distance de partitions
     ↓
-MEASUREMENT MODELS     amtgo.measurement           M3
+MEASUREMENT MODELS     amtgo.measurement           M3  ✔  vraisemblances, log-normal + Laplace, marges, validation
 ONTOLOGY ENSEMBLE      amtgo.ontology              M4
-LATENT STATE FIELDS    amtgo.measurement           M3
+LATENT STATE FIELDS    amtgo.measurement.fields    M3  ✔  statut MODEL, tirages, calculabilité ; measurement_freeze
 CAUSAL LIBRARY—FROZEN  amtgo.causal                M7
 CONSTITUTIONAL REGIME  amtgo.institutions.regimes  M0 (config) / M6
 SCENARIO ENSEMBLE      amtgo.scenarios             M6

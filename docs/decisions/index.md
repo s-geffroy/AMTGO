@@ -16,3 +16,6 @@ Chaque ambiguïté ou incohérence de la spécification tranchée pendant l'impl
 | [ADR-0010](ADR-0010-mondes-synthetiques.md) | Mondes synthétiques : propriétés, pas valeurs | accepté |
 | [ADR-0011](ADR-0011-carte-publique.md) | Carte publique sur GitHub Pages | accepté |
 | [ADR-0012](ADR-0012-file-de-runs.md) | File de runs reprenable dans le worker | accepté |
+| [ADR-0013](ADR-0013-modele-de-mesure.md) | Modèle de mesure de la population (M3) | accepté |
+| [ADR-0014](ADR-0014-monde-synthetique.md) | Monde synthétique à vérité connue | accepté |
+| [ADR-0015](ADR-0015-ressources-calcul.md) | Ressources de calcul : threads BLAS et SciPy | accepté |

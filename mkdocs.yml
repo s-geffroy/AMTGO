@@ -50,4 +50,5 @@ nav:
       - M0 — Bootstrap: milestones/M0_REPORT.md
       - M1 — Registre de sources: milestones/M1_REPORT.md
       - M2 — Cœur spatial: milestones/M2_REPORT.md
+      - M3 — Cœur de mesure: milestones/M3_REPORT.md
   - Runs synthétiques: runs/index.md

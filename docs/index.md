@@ -36,11 +36,13 @@ pas un échec.
 | M0 | bootstrap : configuration, logs, migrations, manifestes, file de runs, CI | fait |
 | M1 | registre de sources, licences, ingestion, provenance | fait |
 | M2 | maillages H3 et grille équivalente, opérations multi-échelles | fait |
-| M3 | modèles de mesure, champs latents, incertitude | à venir |
+| M3 | modèles de mesure, champs latents, incertitude, validation, gel | fait |
 | M4 | ontologies concurrentes, crosswalks probabilistes | à venir |
 | M5+ | domination / fragmentation / intégration, régimes, causalité, candidats, optimiseur | à venir |
 
-À ce stade, **aucun découpage n'existe** : la [carte](carte.md) montre les pays
+La mesure de population du pilote synthétique est validée contre la vérité :
+non identifiée à la maille de la cellule, identifiée à 100 km. À ce stade,
+**aucun découpage n'existe** : la [carte](carte.md) montre les pays
 actuels et les maillages d'analyse, et sa couche de candidats affiche
 *NOT_IDENTIFIABLE*.
 
