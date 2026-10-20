@@ -13,5 +13,5 @@ déclare explicitement chaque couche non encore disponible.
 <div id="amtgo-runs" markdown="1">
 - [Pilote synthétique (M0–M5)](generated/synthetic_pilot.md)
 - [Fond de carte Afrique](generated/pages_africa.md)
-- [Mondes synthétiques A–F (D/F/I)](generated/worlds.md)
+- [Mondes synthétiques A–F (D/F/I) et V (viabilité)](generated/worlds.md)
 </div>

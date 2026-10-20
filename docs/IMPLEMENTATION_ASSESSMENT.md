@@ -90,9 +90,9 @@ Autres points relevés, sans décision nécessaire à ce stade :
 | Explosion combinatoire (ontologies × maillages × scénarios × régimes) | coûts | parallélisme seulement après profilage (§81) |
 | Mémoire du VPS (worker 768 Mo, base 512 Mo) | maillages fins impossibles | pilote régional d'abord ; résolution continentale grossière |
 | Réseau sortant des conteneurs | ingestion http impossible localement | sources épinglées par sha256, cache adressé par contenu, ingestion en CI |
-| Licence du projet non décidée | dépôt public sans licence | à trancher par le porteur du projet |
+| Licence du projet | dépôt public | tranché : code Apache-2.0, documentation et rapports CC BY 4.0 |
 
-## 5. Plan M0 → M4
+## 5. Plan et avancement
 
 | milestone | contenu | statut |
 |---|---|---|
@@ -101,3 +101,5 @@ Autres points relevés, sans décision nécessaire à ce stade :
 | M2 | cœur spatial : cellules, deux familles de maillage, opérations multi-échelles | **fait** |
 | M3 | mesure : interface de likelihood, champs latents, fusion bayésienne simple, incertitude | **fait** |
 | M4 | ontologies : concepts, crosswalks probabilistes, exécution en ensemble | **fait** |
+| M5 | domination, fragmentation, intégration ; mondes A–F | **fait** |
+| M6 | scénarios, régimes typés, viabilité contextuelle ; monde V | **fait** |

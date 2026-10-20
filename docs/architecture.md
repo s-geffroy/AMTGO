@@ -19,8 +19,8 @@ ONTOLOGY ENSEMBLE      amtgo.ontology              M4  ✔  ontologies, crosswal
 LATENT STATE FIELDS    amtgo.measurement.fields    M3  ✔  statut MODEL, tirages, calculabilité ; measurement_freeze
 CAUSAL LIBRARY—FROZEN  amtgo.causal                M7
 D/F/I                  amtgo.domination / fragmentation / integration   M5  ✔  statu quo, mondes A–F
-CONSTITUTIONAL REGIME  amtgo.institutions.regimes  M0 (config) / M6
-SCENARIO ENSEMBLE      amtgo.scenarios             M6
+CONSTITUTIONAL REGIME  amtgo.institutions.regimes  M6  ✔  règles typées, frontière E/M/R/S dérivée
+SCENARIO ENSEMBLE      amtgo.scenarios             M6  ✔  S1, S2A, S2C agrégé ; viabilité (institutions.viability)
 CANDIDATE GENERATION   amtgo.candidates            M8
 INSTITUTIONAL COMP.    amtgo.institutions          M9
 ROBUST OPTIMIZATION    amtgo.optimization          M10

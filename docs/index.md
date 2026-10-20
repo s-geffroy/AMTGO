@@ -39,14 +39,16 @@ pas un échec.
 | M3 | modèles de mesure, champs latents, incertitude, validation, gel | fait |
 | M4 | ontologies concurrentes, crosswalks probabilistes, composition en ensemble | fait |
 | M5 | domination / fragmentation / intégration, mondes A–F, statu quo évalué | fait |
-| M6+ | scénarios, régimes, causalité, candidats, optimiseur | à venir |
+| M6 | scénarios S1/S2A/S2C, régimes typés, viabilité contextuelle, monde V | fait |
+| M7+ | causalité, candidats, composeur, optimiseur | à venir |
 
 La mesure de population du pilote synthétique est validée contre la vérité :
 non identifiée à la maille de la cellule, identifiée à 100 km. La composition
 fictive est mesurée sous deux ontologies concurrentes — parts seulement, jamais
 d'étiquette — et sa dépendance à l'ontologie est quantifiée. Domination,
 fragmentation et intégration sont évaluées pour le statu quo déclaré, et
-vérifiées sur les mondes A–F. À ce stade,
+vérifiées sur les mondes A–F. Sa viabilité est évaluée sous chaque régime et
+chaque scénario — jamais hors contexte — et vérifiée sur le monde V. À ce stade,
 **aucun découpage n'existe** : la [carte](carte.md) montre les pays
 actuels et les maillages d'analyse, et sa couche de candidats affiche
 *NOT_IDENTIFIABLE*.
