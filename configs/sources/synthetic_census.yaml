@@ -14,7 +14,7 @@ access: open
 data_zone: OPEN_CORE
 privacy_class: PUBLIC
 roles:
-  allowed: [population_measurement, multiscale_validation, status_quo_geometry]
+  allowed: [population_measurement, multiscale_validation, status_quo_geometry, causal_transport_target]
   forbidden: [real_world_inference, group_territory_inference]
 method: Totaux exhaustifs par district, erreur relative gaussienne.
 temporal_start: 2025-01-01

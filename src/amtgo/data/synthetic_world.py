@@ -363,3 +363,104 @@ def simulate_fiscal(world: SyntheticWorld, design: FiscalDesign) -> list[FiscalD
             out.append(FiscalDistrict(f"d-{i:02d}-{j:02d}", poly, round(rev_r, 1), round(e * rev_r, 1),
                                       round(cost_r, 1), round(e * cost_r, 1)))
     return out
+
+
+# --- Panel de politique FICTIF (M7) -------------------------------------------------
+#
+# Une autre région du même monde synthétique (contexte SOURCE, distinct du pilote) :
+# des districts en grille observés chaque année, dont certains adoptent une réforme
+# fictive selon des cohortes. Effet vrai connu : rampe vers ``att`` en ``ramp`` ans.
+# ``adoption: endogenous`` : les districts adoptants suivent une tendance propre
+# avant l'adoption (adoption en réponse à un déclin) — les tendances parallèles sont
+# violées par construction, et l'estimation doit être rejetée.
+
+
+@dataclass(frozen=True)
+class PanelDesign:
+    bbox: tuple[float, float, float, float]
+    districts_x: int
+    districts_y: int
+    first_year: int
+    last_year: int
+    cohorts: tuple[int, ...]  # années d'adoption ; le reste des districts n'adopte jamais
+    att: float
+    ramp_years: int
+    noise_sd: float
+    adoption: str  # exogenous | endogenous
+    endogenous_pre_slope: float
+    density_log_mean: float
+    density_log_sd: float
+
+    @classmethod
+    def from_params(cls, p: dict[str, Any]) -> PanelDesign:
+        try:
+            bbox = tuple(float(v) for v in p["bbox"])
+            cohorts = tuple(int(c) for c in p["cohorts"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ConfigurationError(f"panel synthétique : paramètre invalide ({exc})") from exc
+        adoption = str(p.get("adoption", "exogenous"))
+        if adoption not in ("exogenous", "endogenous") or len(bbox) != 4:
+            raise ConfigurationError("panel synthétique : adoption exogenous|endogenous, bbox (4)")
+        return cls(bbox, _num(p, "districts_x", int), _num(p, "districts_y", int), _num(p, "first_year", int),
+                   _num(p, "last_year", int), cohorts, _num(p, "att"), _num(p, "ramp_years", int),
+                   _num(p, "noise_sd"), adoption, float(p.get("endogenous_pre_slope", 0.0)),
+                   _num(p, "density_log_mean"), _num(p, "density_log_sd"))
+
+    @property
+    def years(self) -> np.ndarray:
+        return np.arange(self.first_year, self.last_year + 1)
+
+    def true_effect(self, cohort: int, year: int) -> float:
+        if cohort < 0 or year < cohort:
+            return 0.0
+        return self.att * min(1.0, (year - cohort + 1) / self.ramp_years)
+
+
+@dataclass(frozen=True)
+class PanelDistrict:
+    key: str
+    polygon: Polygon  # EPSG:4326
+    cohort: int  # -1 : jamais traité
+    density: float
+    outcome: tuple[float, ...]  # par année
+    negative_control: tuple[float, ...]
+
+
+def simulate_panel(world: SyntheticWorld, design: PanelDesign) -> list[PanelDistrict]:
+    rng = np.random.default_rng([world.seed, 10, 1 if design.adoption == "endogenous" else 0])
+    minx, miny, maxx, maxy = design.bbox
+    nx, ny = design.districts_x, design.districts_y
+    dx, dy = (maxx - minx) / nx, (maxy - miny) / ny
+    n = nx * ny
+    years = design.years
+    groups = [*design.cohorts, -1]
+    cohort = np.array([groups[k % len(groups)] for k in rng.permutation(n)])
+    density = np.exp(rng.normal(design.density_log_mean, design.density_log_sd, n))
+    unit_fe = 0.5 + 0.05 * np.log(density) + rng.normal(0.0, 0.05, n)
+    year_fe = 0.01 * (years - years[0]) + rng.normal(0.0, 0.01, len(years))
+    nc_unit, nc_year = rng.normal(0.0, 0.05, n), rng.normal(0.0, 0.01, len(years))
+    out = []
+    for k in range(n):
+        i, j = divmod(k, ny)
+        poly = box(minx + i * dx, miny + j * dy, minx + (i + 1) * dx, miny + (j + 1) * dy)
+        g = int(cohort[k])
+        y = unit_fe[k] + year_fe + rng.normal(0.0, design.noise_sd, len(years))
+        y += np.array([design.true_effect(g, int(t)) for t in years])
+        if design.adoption == "endogenous" and g >= 0:
+            y += design.endogenous_pre_slope * np.minimum(years - g, 0)  # déclin avant l'adoption
+        z = nc_unit[k] + nc_year + rng.normal(0.0, design.noise_sd, len(years))
+        out.append(PanelDistrict(f"p-{i:02d}-{j:02d}", poly, g, round(float(density[k]), 3),
+                                 tuple(round(float(v), 6) for v in y), tuple(round(float(v), 6) for v in z)))
+    return out
+
+
+def panel_true_att(design: PanelDesign, cohorts: list[int]) -> float:
+    """ATT global vrai : moyenne des effets post (t ≥ g), pondérée par taille de cohorte (même estimand)."""
+    num = den = 0.0
+    for g in sorted({c for c in cohorts if c >= 0}):
+        size = sum(1 for c in cohorts if c == g)
+        for t in design.years:
+            if t >= g:
+                num += size * design.true_effect(g, int(t))
+                den += size
+    return num / den if den else 0.0

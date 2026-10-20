@@ -2,7 +2,8 @@
 
 ``instrument: survey`` produit des comptes de zones d'énumération géomasquées
 (UNCERTAIN_POINT) ; ``instrument: census`` produit des totaux de districts
-(ADMIN) ; ``instrument: fiscal`` des comptes de districts (M6). Aucune catégorie
+(ADMIN) ; ``instrument: fiscal`` des comptes de districts (M6) ;
+``instrument: policy_panel`` un panel de districts × années (M7). Aucune catégorie
 identitaire avant M4/M5. La vérité du monde n'est jamais écrite dans les
 observations : seuls les instruments le sont.
 """
@@ -21,6 +22,7 @@ from amtgo.data.sources import ResourceRef, SourceManifest
 from amtgo.data.synthetic_world import (
     CensusDesign,
     FiscalDesign,
+    PanelDesign,
     SurveyDesign,
     SyntheticWorld,
     group_layer,
@@ -28,6 +30,7 @@ from amtgo.data.synthetic_world import (
     simulate_fiscal,
     simulate_historical_map,
     simulate_identity_counts,
+    simulate_panel,
     simulate_survey,
 )
 from amtgo.errors import ConfigurationError
@@ -39,6 +42,8 @@ VARIABLE_IDENTITY_COUNTS = "identity_self_counts"
 VARIABLE_HISTORICAL_LABEL = "identity_historical_label"
 VARIABLE_FISCAL_REVENUE = "fiscal_revenue_admin"
 VARIABLE_SERVICE_COST = "service_cost_admin"
+VARIABLE_PANEL_OUTCOME = "policy_panel_outcome"
+VARIABLE_PANEL_NEGATIVE_CONTROL = "policy_panel_negative_control"
 
 
 def world_of(manifest: SourceManifest) -> SyntheticWorld:
@@ -136,9 +141,26 @@ class SyntheticAdapter:
                         attributes={"synthetic": True, "world_hash": world.world_hash},
                         **common,
                     )
+        elif instrument == "policy_panel":
+            design_p = PanelDesign.from_params(p.get("panel", {}))
+            for pd_ in simulate_panel(world, design_p):
+                for t, (y, z) in zip(design_p.years, zip(pd_.outcome, pd_.negative_control, strict=True),
+                                     strict=True):
+                    start = datetime(int(t), 1, 1, tzinfo=UTC)
+                    end = datetime(int(t), 12, 31, 23, 59, 59, tzinfo=UTC)
+                    for var, v in ((VARIABLE_PANEL_OUTCOME, y), (VARIABLE_PANEL_NEGATIVE_CONTROL, z)):
+                        yield Observation(
+                            id=Observation.make_id(src, var, pd_.key, start),
+                            variable_id=var, support_type=SupportType.ADMIN,
+                            geometry_wkt=pd_.polygon.wkt, admin_code=pd_.key,
+                            value=UncertainValue.exact(v),
+                            attributes={"synthetic": True, "world_hash": world.world_hash,
+                                        "treatment_cohort": pd_.cohort, "density": pd_.density},
+                            **{**common, "valid_from": start, "valid_until": end},
+                        )
         else:
-            raise ConfigurationError(
-                f"synthetic : instrument inconnu {instrument!r} (survey | census | historical_map | fiscal)")
+            raise ConfigurationError(f"synthetic : instrument inconnu {instrument!r} "
+                                     "(survey | census | historical_map | fiscal | policy_panel)")
 
     def _identity(self, manifest: SourceManifest, world: SyntheticWorld, eas: list[Any],
                   common: dict[str, Any], valid_from: datetime) -> Iterator[Observation]:

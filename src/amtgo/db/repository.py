@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from sqlalchemy import Engine, text
 
+from amtgo.causal.model import CausalEffect
 from amtgo.core.provenance import ProvenanceRecord
 from amtgo.data.observations import Observation
 from amtgo.data.sources import Source, SourceManifest
@@ -43,6 +44,7 @@ class Repository(Protocol):
     def record_ontologies(self, ontologies: Sequence[Ontology], crosswalks: Sequence[OntologyCrosswalk]) -> None: ...
     def record_regimes_scenarios(self, regimes: Sequence[ConstitutionalRegime],
                                  scenarios: Sequence[Scenario]) -> None: ...
+    def record_causal_library(self, run_id: uuid.UUID, effects: Sequence[CausalEffect], freeze_hash: str) -> None: ...
 
 
 class NullRepository:
@@ -75,6 +77,9 @@ class NullRepository:
 
     def record_regimes_scenarios(self, regimes: Sequence[ConstitutionalRegime],
                                  scenarios: Sequence[Scenario]) -> None:
+        pass
+
+    def record_causal_library(self, run_id: uuid.UUID, effects: Sequence[CausalEffect], freeze_hash: str) -> None:
         pass
 
 
@@ -323,3 +328,32 @@ class PostgresRepository:
                        "urb": sc.urbanization.model_dump_json(), "eco": sc.economy.model_dump_json(),
                        "mig": sc.migration.model_dump_json(), "inf": sc.infrastructure.model_dump_json(),
                        "sec": sc.security.model_dump_json()})
+
+    def record_causal_library(self, run_id: uuid.UUID, effects: Sequence[CausalEffect], freeze_hash: str) -> None:
+        with self.engine.begin() as cx:
+            for e in effects:
+                cx.execute(text("""
+                    INSERT INTO causal_effects (effect_id, content_hash, effect_key, treatment_definition,
+                        outcome_definition, estimand, source_context, target_context, design, identification_grade,
+                        effect_distribution, time_horizon, spillover_model, transportability, overlap_score,
+                        mechanism, diagnostics, frozen_release)
+                    VALUES (:id, :h, :k, CAST(:tr AS jsonb), CAST(:oc AS jsonb), :est, :sc, :tc, :d, :g,
+                        CAST(:dist AS jsonb), CAST(:hz AS jsonb), CAST(:sp AS jsonb), :tp, :ov, CAST(:mech AS jsonb),
+                        CAST(:diag AS jsonb), :rel)
+                    ON CONFLICT DO NOTHING
+                """), {"id": e.effect_id, "h": e.content_hash, "k": e.effect_key,
+                       "tr": e.treatment.model_dump_json(), "oc": e.outcome.model_dump_json(), "est": e.estimand,
+                       "sc": e.source_context, "tc": e.target_context, "d": e.design.value, "g": e.grade.value,
+                       "dist": e.effect.model_dump_json(exclude={"samples"}),
+                       "hz": json.dumps({"years": e.time_horizon_years}),
+                       "sp": json.dumps({"model": e.spillover_model}), "tp": e.transport_status.value,
+                       "ov": e.overlap, "mech": json.dumps({"description": e.mechanism}),
+                       "diag": json.dumps({"diagnostics": {k: v.value for k, v in e.diagnostics.items()},
+                                           "robustness": e.robustness}), "rel": freeze_hash})
+                cx.execute(text("""
+                    INSERT INTO causal_freezes (run_id, freeze_hash, effect_id, content_hash)
+                    VALUES (:r, :f, :id, :h) ON CONFLICT DO NOTHING
+                """), {"r": run_id, "f": freeze_hash, "id": e.effect_id, "h": e.content_hash})
+            cx.execute(text("UPDATE run_manifests SET causal_library_hash = :h WHERE run_id = :r "
+                            "AND (causal_library_hash IS NULL OR causal_library_hash = :h)"),
+                       {"h": freeze_hash, "r": run_id})

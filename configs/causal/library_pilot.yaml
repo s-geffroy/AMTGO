@@ -1,0 +1,77 @@
+# Bibliotheque causale du pilote synthetique (M7). Toutes les reformes sont FICTIVES.
+# Les effets declares sont des hypotheses d'expert (I7) : jamais des faits causaux.
+# Les effets estimes le sont dans le run, sur des panels synthetiques a verite connue.
+library_id: library_pilot
+version: "0.1.0"
+description: >
+  Hypotheses exploratoires reprises de M5-M6 (accès au marche, infrastructures
+  communes, saillance identitaire) et deux estimations DiD echelonnees sur des
+  panels fictifs : adoption exogene (doit etre admise) et endogene (doit etre rejetee).
+declared:
+  - effect_key: market_access_fiscal_elasticity
+    treatment: {component: market_access, definition: "acces au marche relatif (MA_k)", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: V, variable: own_revenue, unit: elasticite}
+    source_context: synthetic_south_atlantic
+    target_context: synthetic_south_atlantic
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.0, hi: 0.3}
+    time_horizon_years: 10
+    mechanism: l'acces au marche eleve la base fiscale (commerce, specialisation)
+    source: hypothese d'expert (monde synthetique), non causale
+  - effect_key: common_infrastructure_cost_reduction
+    treatment: {component: infrastructure, definition: "part d'infrastructures communes", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: V, variable: service_cost, unit: reduction relative}
+    source_context: synthetic_south_atlantic
+    target_context: synthetic_south_atlantic
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.0, hi: 0.2}
+    time_horizon_years: 10
+    mechanism: les infrastructures communes abaissent le cout unitaire des services
+    source: hypothese d'expert (monde synthetique), non causale
+  - effect_key: institutionalization_salience
+    treatment: {component: institutionalization, definition: "alignement institutions / groupes", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: salience, variable: political_salience, unit: variation par unite d'alignement}
+    source_context: synthetic_south_atlantic
+    target_context: synthetic_south_atlantic
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.0, hi: 0.5}
+    time_horizon_years: 10
+    mechanism: institutionnaliser une identite accroit sa saillance politique (04 §16)
+    source: hypothese exploratoire (grade I7), non causale
+estimations:
+  - effect_key: fiscal_decentralization_service_coverage
+    panel_source: synthetic_policy_panel
+    outcome_variable: policy_panel_outcome
+    negative_control_variable: policy_panel_negative_control
+    treatment: {component: fisc, definition: "reforme fictive A : decentralisation fiscale (binaire)", intensity_support: {lo: 1.0, hi: 1.0}}
+    outcome: {kind: V, variable: service_coverage_index, unit: indice}
+    source_context: synthetic_panel_region
+    target_context: synthetic_south_atlantic
+    mechanism: decision budgetaire rapprochee des usagers (fictif)
+    effect_modifiers: [density]
+    target_source: synthetic_census
+  - effect_key: language_rights_index_fictive
+    panel_source: synthetic_policy_panel_endogenous
+    outcome_variable: policy_panel_outcome
+    negative_control_variable: policy_panel_negative_control
+    treatment: {component: lang, definition: "reforme fictive B : droits linguistiques (binaire)", intensity_support: {lo: 1.0, hi: 1.0}}
+    outcome: {kind: D, variable: fictive_index, unit: indice}
+    source_context: synthetic_panel_region
+    target_context: synthetic_south_atlantic
+    mechanism: fictif ; adoption endogene par construction (doit etre rejetee)
+    effect_modifiers: [density]
+    target_source: synthetic_census
+transport:
+  identified_overlap: 0.9     # PROVISOIRE
+  partial_widening: 2.0       # PROVISOIRE
+novelty:
+  kappa: 1.0                  # PROVISOIRE : bornes x (1 + d_A)
+  max_distance: 0.5           # PROVISOIRE
+diagnostics:
+  alpha: 0.05
+  interval_level: 0.9
+  bootstrap_draws: 200
+  placebo_shift_years: 2
