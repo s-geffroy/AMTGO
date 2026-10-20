@@ -9,7 +9,13 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     PATH=/opt/venv/bin:$PATH \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1
+# Threads BLAS = quota CPU du conteneur (cpus: "1.0" dans compose.yaml). Le conteneur
+# voit tous les coeurs de l'hote : sans ce reglage, OpenBLAS lance un thread par coeur
+# qui s'attendent activement sur un seul CPU (x200 sur une resolution 300x300).
 
 WORKDIR /app
 
