@@ -20,5 +20,7 @@ for run in synthetic_pilot pages_africa; do
   fi
 done
 
+amtgo validate worlds --out "$work/docs/runs/generated/worlds.md" > /dev/null
+
 mkdocs build --strict --config-file "$work/mkdocs.yml" --site-dir "$(realpath -m "$out")"
 echo "site -> $out"

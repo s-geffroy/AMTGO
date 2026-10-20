@@ -8,3 +8,4 @@ fiscal_transfer_rules: {equalization: shared_taxation}
 defence_rules: {defence: common_strategic}
 market_rules: {common_market: complete}
 resource_rules: {resources: large_common_infrastructure}
+border_template: {P: 0.6, C: 0.2, E: 0.05, M: 0.05, R: 0.3, S: 0.2}  # PROVISOIRE

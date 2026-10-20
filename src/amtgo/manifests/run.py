@@ -26,6 +26,8 @@ from amtgo.data.sources import SourceManifest
 from amtgo.errors import ConfigurationError
 from amtgo.geo.mesh import MeshDefinition
 from amtgo.institutions.regimes import ConstitutionalRegime, load_regime
+from amtgo.institutions.status_quo import StatusQuoSpec
+from amtgo.manifests.dfi import DFIManifest
 from amtgo.manifests.normative import NormativeManifest
 from amtgo.measurement.composition import CompositionManifest
 from amtgo.measurement.manifest import MeasurementManifest
@@ -35,6 +37,8 @@ from amtgo.utils.code_version import code_commit, code_version
 
 # Rôle requis pour qu'une source serve d'emprise à un maillage.
 ROLE_ANALYSIS_EXTENT = "analysis_extent"
+# Rôle requis pour qu'une source fournisse les polygones du statu quo institutionnel.
+ROLE_STATUS_QUO = "status_quo_geometry"
 
 
 class SourceUse(BaseModel):
@@ -58,6 +62,7 @@ class RunRequest(BaseModel):
     mesh_set: tuple[str, ...]
     measurement_model: str | None = None
     composition_model: str | None = None
+    dfi_model: str | None = None
     ontology_set: tuple[str, ...] = ()
     scenario_set: tuple[str, ...] = ()
     seeds: tuple[int, ...] = (0,)
@@ -92,6 +97,8 @@ class RunManifest(BaseModel):
     ontology_set: tuple[Ontology, ...] = ()
     composition_model: CompositionManifest | None = None
     crosswalks: tuple[OntologyCrosswalk, ...] = ()
+    dfi_model: DFIManifest | None = None
+    status_quo: StatusQuoSpec | None = None
     # Couches non encore disponibles : explicitement nulles, jamais inventées.
     causal_library: dict[str, Any] | None = None
     scenario_set: tuple[str, ...] = ()
@@ -162,6 +169,19 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         composition = load_model(CompositionManifest, configs_dir / request.composition_model)
         crosswalks = _check_composition(composition, ontologies, sources, configs_dir)
 
+    dfi = status_quo = None
+    if request.dfi_model:
+        if composition is None:
+            raise ConfigurationError("D/F/I exige la composition (M4) et la population (M3) du run")
+        dfi = load_model(DFIManifest, configs_dir / request.dfi_model)
+        status_quo = load_model(StatusQuoSpec, configs_dir / dfi.status_quo)
+        by_id = {s.manifest.source_id: s for s in sources}
+        for lv in status_quo.levels:
+            if lv.from_source is not None and (
+                    lv.from_source not in by_id or ROLE_STATUS_QUO not in by_id[lv.from_source].use.roles):
+                raise ConfigurationError(
+                    f"statu quo : la source {lv.from_source} doit être déclarée avec le rôle {ROLE_STATUS_QUO!r}")
+
     body: dict[str, Any] = {
         "code_commit": code_commit(),
         "code_version": code_version(),
@@ -176,6 +196,8 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         "ontology_set": ontologies,
         "composition_model": composition,
         "crosswalks": crosswalks,
+        "dfi_model": dfi,
+        "status_quo": status_quo,
         "seeds": request.seeds,
     }
     draft = RunManifest(run_id=uuid.UUID(int=0), manifest_hash="", created_at=utcnow(), **body)

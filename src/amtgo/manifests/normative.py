@@ -12,7 +12,7 @@ la doctrine V1.0-RC1 :
 
 from __future__ import annotations
 
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -71,6 +71,23 @@ class OptimizationRules(_Strict):
         return self
 
 
+class ConnectionWeights(_Strict):
+    """κ_c du coût de rupture J_conn (02 §11) : poids normatifs des canaux d'intégration."""
+
+    spatial: float = Field(ge=0.0)
+    linguistic: float = Field(ge=0.0)
+    family: float = Field(ge=0.0)
+    social: float = Field(ge=0.0)
+    economic: float = Field(ge=0.0)
+    civic: float = Field(ge=0.0)
+    identity: float = Field(ge=0.0)
+
+    def as_channels(self) -> dict[Any, float]:
+        from amtgo.core.channels import IntegChannel
+
+        return {IntegChannel(k): v for k, v in self.model_dump().items()}
+
+
 class ConsentRules(_Strict):
     model_may_infer_final_consent: bool = False
 
@@ -100,6 +117,7 @@ class NormativeManifest(_Strict):
     stability: StabilityThresholds
     robustness: RobustnessWeights
     optimization: OptimizationRules
+    connection_weights: ConnectionWeights
     consent: ConsentRules
     privacy: PrivacyRules
 

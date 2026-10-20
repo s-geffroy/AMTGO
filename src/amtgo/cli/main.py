@@ -15,11 +15,13 @@ db_app = typer.Typer(no_args_is_help=True, help="Base dédiée : migrations.")
 source_app = typer.Typer(no_args_is_help=True, help="Registre de sources.")
 ingest_app = typer.Typer(no_args_is_help=True, help="Ingestion.")
 export_app = typer.Typer(no_args_is_help=True, help="Exports (passent tous par le privacy guard).")
+validate_app = typer.Typer(no_args_is_help=True, help="Validation : mondes synthétiques, red-team.")
 app.add_typer(run_app, name="run")
 app.add_typer(db_app, name="db")
 app.add_typer(source_app, name="source")
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(export_app, name="export")
+app.add_typer(validate_app, name="validate")
 
 
 def _resolve(path: Path) -> Path:
@@ -125,3 +127,20 @@ def export_report(run_id: str, out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
     typer.echo(f"rapport → {out}")
+
+
+@validate_app.command("worlds")
+def validate_worlds(out: Path | None = None) -> None:
+    """Évalue les mondes A–F et vérifie leurs propriétés D/F/I (code de sortie ≠ 0 si l'une échoue)."""
+    from amtgo.config.loader import load_model
+    from amtgo.manifests.normative import NormativeManifest
+    from amtgo.validation.worlds_report import checks, evaluate_all, render
+
+    nm = load_model(NormativeManifest, get_settings().configs_dir / "normative" / "default.yaml")
+    text = render(nm.rights, nm.connection_weights.as_channels())
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+    typer.echo(text)
+    if not all(ok for _, ok, _ in checks(evaluate_all(nm.rights, nm.connection_weights.as_channels()))):
+        raise typer.Exit(1)

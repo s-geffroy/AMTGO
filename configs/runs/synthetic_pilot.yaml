@@ -1,21 +1,23 @@
-# Run de reference M0-M4 sur le monde synthetique : ingestion de deux instruments,
-# deux familles de maillage x deux resolutions, mesure, composition sous deux ontologies, validation, gel, rapport.
+# Run de reference M0-M5 sur le monde synthetique : ingestion de deux instruments,
+# deux familles de maillage x deux resolutions, mesure, composition sous deux ontologies, D/F/I du statu quo, validation, gel, rapport.
 name: synthetic_pilot
 description: >
-  Pilote synthetique M0-M4. Exerce le registre de sources, l'ingestion de deux
+  Pilote synthetique M0-M5. Exerce le registre de sources, l'ingestion de deux
   instruments, les maillages H3 et grille LAEA a deux resolutions, la fusion de
   mesure et sa validation, la composition sous deux ontologies fictives concurrentes
-  (parts seulement, jamais d'etiquette). Aucune recommandation.
+  (parts seulement, jamais d'etiquette), et D/F/I du statu quo declare. Aucune
+  recommandation.
 region: synthetic_south_atlantic
 map_mode: R
 constitutional_regime: R1_COMMON_MARKET
 normative_manifest: normative/default.yaml
 sources:
   - {manifest: sources/synthetic_survey.yaml, roles: [population_measurement, multiscale_validation, composition_measurement], redistribute: true}
-  - {manifest: sources/synthetic_census.yaml, roles: [population_measurement, multiscale_validation], redistribute: true}
+  - {manifest: sources/synthetic_census.yaml, roles: [population_measurement, multiscale_validation, status_quo_geometry], redistribute: true}
   - {manifest: sources/synthetic_historical_map.yaml, roles: [ontology_validation], redistribute: true}
 measurement_model: measurement/population_v1.yaml
 composition_model: composition/self_id_v1.yaml
+dfi_model: dfi/pilot_v1.yaml
 ontology_set:
   - ontologies/synth_self_id.yaml
   - ontologies/synth_ext_hist.yaml

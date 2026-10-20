@@ -59,6 +59,18 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
         assert 0.0 <= c["ontology_stability"]["s_ontology"] <= 1.0
         # Une carte à étiquette unique ne représente qu'une partie de la population du bloc.
         assert c["historical_label_check"]["synth_ext_hist"]["mean_label_share"] < 0.8
+    # M5 : D/F/I du statu quo, CONTROLLED, canaux sans données UNKNOWN, D réalisé UNKNOWN.
+    for mid in ms["meshes"]:
+        dfi = json.loads((d / "fields" / mid / "dfi.json").read_text())
+        assert dfi["privacy_class"] == "CONTROLLED" and dfi["evidence_status"] == "M"
+        for o in dfi["ontologies"].values():
+            assert "mobility" in o["unknown_fragmentation_channels"]
+            assert "territorial" in o["unknown_fragmentation_channels"]
+            assert o["domination"]["realized_component"].startswith("UNKNOWN")
+            assert 0.0 <= o["integration"]["j_conn"]["mean"] <= 1.0
+    ens = json.loads((d / "artifacts" / "dfi_ensemble.json").read_text())
+    assert 0.0 <= ens["s_ontology_dfi"] <= 1.0 and 0.0 <= ens["s_scale_dfi"] <= 1.0
+    assert "Domination, fragmentation, integration" in report
     freeze = json.loads((d / "measurement_freeze.json").read_text())
     assert set(freeze["compositions"]) == set(ms["meshes"])
     assert "Parts seulement" in report

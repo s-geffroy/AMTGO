@@ -8,3 +8,4 @@ fiscal_transfer_rules: {equalization: weak}
 defence_rules: {defence: national}
 market_rules: {common_market: partial}
 resource_rules: {resources: national}
+border_template: {P: 1.0, C: 0.5, E: 0.7, M: 0.7, R: 0.9, S: 1.0}  # PROVISOIRE

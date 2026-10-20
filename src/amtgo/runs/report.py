@@ -120,6 +120,13 @@ def render_report(
         a("_Aucun modèle de mesure dans ce run._\n")
     else:
         _measurement_section(a, manifest, measurement)
+    a("## Domination, fragmentation, integration\n")
+    dfi = None if measurement is None else measurement.get("dfi")
+    if dfi is None:
+        a(_NA.format(m="M5") + "\n")
+    else:
+        _dfi_section(a, manifest, dfi)
+
     a("## Causal support\n")
     a("`CAUSAL_EFFECT_UNKNOWN` — bibliothèque causale non construite (M7).\n")
     a("## Pareto summary\n")
@@ -152,6 +159,13 @@ def render_report(
               f"`{manifest.constitutional_regime.regime_id.value}` (scénario, non doctrine)"]
     unknown = ["tout effet causal (`CAUSAL_EFFECT_UNKNOWN`)", "toute ontologie identitaire (M4)",
                "toute configuration territoriale préférable"]
+    if manifest.dfi_model is not None:
+        infer.append("D/F/I du statu quo déclaré (statut MODEL)")
+        assume += ["qualité des contacts intergroupes uniforme (non mesurée)",
+                   "liens sociaux décrits par un noyau de distance déclaré",
+                   "identités statiques sur l'horizon évalué"]
+        unknown += ["D^real (aucune observation de discrimination)",
+                    "fragmentation territoriale, de mobilité, culturelle, institutionnelle (canaux sans données)"]
     if manifest.composition_model is not None:
         infer.append("parts de catégories par cellule sous chaque ontologie (statut MODEL)")
         assume += ["indépendance a posteriori entre population et composition",
@@ -278,3 +292,36 @@ def _composition_section(a: Any, manifest: RunManifest, comp: dict[str, Any]) ->
       "minimum sur les maillages). Toute conclusion portant sur des catégories est conditionnelle "
       "à l'ontologie ; une carte historique à étiquette unique ne représente qu'une fraction de la "
       "population de chaque bloc.\n")
+
+
+def _dfi_section(a: Any, manifest: RunManifest, dfi: dict[str, Any]) -> None:
+    sq = manifest.status_quo
+    assert sq is not None
+    first = next(iter(dfi["per_mesh"].values()))
+    levels = ", ".join(f"{v} {k}" for k, v in first["jurisdictions"].items())
+    a(f"Évaluation du **statu quo déclaré** `{sq.status_quo_id}` ({levels}) "
+      f"sous le régime `{first['regime']}`. Ce n'est pas une proposition : c'est la baseline "
+      "STATUS_QUO / NO_TERRITORIAL_CHANGE. Champs de groupe : CONTROLLED ; seuls des agrégats figurent ici.\n")
+    a("| maillage | ontologie | J_conn | F réseau (pondéré) | max P(D > τ) | violations | alignement |")
+    a("|---|---|---|---|---|---|---|")
+    for mid, v in dfi["per_mesh"].items():
+        for oid, x in v["ontologies"].items():
+            h = x["headline"]
+            a(f"| {mid} | `{oid}` | {h['j_conn']:.2e} | {h['f_network_popweighted']:.2e} | "
+              f"{h['max_p_exceed']:.2f} | {x['domination']['violations']} | {x['alignment']['mean']:.2f} |")
+    a("")
+    unknown = sorted(set(first["ontologies"][next(iter(first["ontologies"]))]["unknown_fragmentation_channels"]))
+    a(f"Canaux de fragmentation **UNKNOWN** (sans données, jamais comptés comme nuls) : {', '.join(unknown)}. "
+      "Composante réalisée de la domination : **UNKNOWN** (aucune observation de discrimination).\n")
+    e = dfi["ensemble"]
+    a(f"**S^ontology (D/F/I) = {e['s_ontology_dfi']:.2f}**, **S^scale (D/F/I) = {e['s_scale_dfi']:.2f}** "
+      f"(1 − écart relatif maximal, plancher numérique {e['relative_floor']}).")
+    for o, gaps in e["scale_gaps_raw"].items():
+        flagged = [f"{k} : écart relatif brut {g['relative']:.2f}" for k, g in gaps.items()
+                   if g["below_floor"] and g["relative"] > 0]
+        if flagged:
+            a(f"- `{o}` — sous le plancher, la stabilité n'est jugée qu'en absolu : " + "; ".join(flagged) + ".")
+    a("")
+    rri = next(iter(first["ontologies"].values()))["reification"]
+    a(f"Risque de réification du statu quo par rapport à lui-même : {rri['status']} "
+      "(Δ d'alignement nul par construction ; les bornes sont exploratoires, non causales).\n")

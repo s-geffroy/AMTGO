@@ -1,0 +1,18 @@
+# Evaluation D/F/I (M5). Parametres de MODELE, PROVISOIRES.
+model_id: dfi_pilot
+version: "0.1.0"
+description: >
+  D/F/I du statu quo declare, sur les champs geles (population x composition),
+  sous chaque ontologie du run et sur chaque maillage.
+network_kernel_length_km: 10.0   # portee des liens sociaux (noyau exponentiel)
+network_kernel_cutoff: 3.0       # troncature a 3 longueurs
+integration_quality:
+  spatial: 1.0                   # SUPPOSEE uniforme : aucune mesure de qualite du contact
+status_quo: institutions/synthetic_status_quo.yaml
+reification:
+  beta_lo: 0.0
+  beta_hi: 0.5
+  reference_horizon_years: 10
+  horizon_years: 10
+  source: hypothese exploratoire (grade I7), non causale
+relative_floor: 0.01             # plancher numerique des ecarts relatifs

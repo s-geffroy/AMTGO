@@ -41,6 +41,15 @@ optimization:
   state_count_penalty_enabled: false  # invariant, prompt §42
   priority_profile: []                # pas d'ordre lexicographique par defaut : Pareto
 
+connection_weights:  # kappa_c de J_conn (02 §11), PROVISOIRES : poids egaux
+  spatial: 1.0
+  linguistic: 1.0
+  family: 1.0
+  social: 1.0
+  economic: 1.0
+  civic: 1.0
+  identity: 1.0
+
 consent:
   model_may_infer_final_consent: false  # invariant, prompt §59
 

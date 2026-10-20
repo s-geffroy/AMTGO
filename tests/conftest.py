@@ -30,7 +30,7 @@ def configs_dir(tmp_path: Path) -> Path:
     shutil.copytree(CONFIGS, dst)
     pilot = yaml.safe_load((dst / "runs" / "synthetic_pilot.yaml").read_text())
     light = dict(pilot, name="light", mesh_set=["meshes/pilot_grid_l4.yaml"])
-    for key in ("measurement_model", "composition_model", "ontology_set"):
+    for key in ("measurement_model", "composition_model", "ontology_set", "dfi_model"):
         light.pop(key)
     (dst / "runs" / "light.yaml").write_text(yaml.safe_dump(light))
     (dst / "runs" / "light_measure.yaml").write_text(

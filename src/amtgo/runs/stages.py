@@ -26,7 +26,7 @@ from amtgo.geo.multiscale import area_weighted_transfer, coverage_ratio
 from amtgo.geo.ops import create_base_mesh
 from amtgo.geo.support import allocate_point_masses
 from amtgo.manifests.run import RunManifest, verify_manifest
-from amtgo.runs import artifacts, composition_stages, measure_stages
+from amtgo.runs import artifacts, composition_stages, dfi_stages, measure_stages
 from amtgo.runs.report import render_report
 
 
@@ -59,6 +59,9 @@ def plan_steps(manifest: RunManifest) -> list[str]:
             steps += [f"measure_composition:{m.mesh_id}" for m in manifest.mesh_set]
             steps += ["ontology_ensemble"]
         steps += ["measurement_freeze"]
+        if manifest.dfi_model is not None:
+            steps += [f"dfi:{m.mesh_id}" for m in manifest.mesh_set]
+            steps += ["dfi_ensemble"]
     steps += ["report"]
     return steps
 
@@ -196,6 +199,11 @@ def _measurement_summary(ctx: StageContext) -> dict[str, Any]:
                          for d in ctx.manifest.mesh_set},
             "ensemble": artifacts.read_json(ctx.run_dir, "artifacts/ontology_ensemble.json"),
         }
+    dfi = None
+    if ctx.manifest.dfi_model is not None:
+        dfi = {"per_mesh": {d.mesh_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/dfi.json")
+                            for d in ctx.manifest.mesh_set},
+               "ensemble": artifacts.read_json(ctx.run_dir, "artifacts/dfi_ensemble.json")}
     freeze = artifacts.read_json(ctx.run_dir, "measurement_freeze.json")
     outputs = {
         "freeze_hash": freeze["freeze_hash"],
@@ -203,9 +211,12 @@ def _measurement_summary(ctx: StageContext) -> dict[str, Any]:
                    for k, v in sorted(per_mesh.items())},
         "computability": {k: v["field"]["computability"] for k, v in sorted(per_mesh.items())},
         "s_ontology": None if composition is None else _round_sig(composition["ensemble"]["s_ontology"]),
+        "dfi": None if dfi is None else {
+            k: {o: {kk: _round_sig(vv, 4) for kk, vv in x["headline"].items()} for o, x in v["ontologies"].items()}
+            for k, v in sorted(dfi["per_mesh"].items())},
     }
     return {"per_mesh": per_mesh, "comparison": comparison, "freeze": freeze,
-            "computability": worst, "outputs": outputs, "composition": composition}
+            "computability": worst, "outputs": outputs, "composition": composition, "dfi": dfi}
 
 
 def report(ctx: StageContext, _: str) -> dict[str, Any]:
@@ -250,6 +261,8 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "measure_composition": composition_stages.measure_composition,
     "ontology_ensemble": composition_stages.ontology_ensemble,
     "measurement_freeze": measure_stages.measurement_freeze,
+    "dfi": dfi_stages.dfi,
+    "dfi_ensemble": dfi_stages.dfi_ensemble,
     "report": report,
 }
 
