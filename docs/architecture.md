@@ -23,8 +23,8 @@ CONSTITUTIONAL REGIME  amtgo.institutions.regimes  M6  ✔  règles typées, fro
 SCENARIO ENSEMBLE      amtgo.scenarios             M6  ✔  S1, S2A, S2C agrégé ; viabilité (institutions.viability)
 CANDIDATE GENERATION   amtgo.candidates            M8  ✔  baselines, k-means, spectral, Louvain, S^scale
 INSTITUTIONAL COMP.    amtgo.institutions.composer M9  ✔  leviers §39 à géométrie fixe, bornes d'efficacité
-ROBUST OPTIMIZATION    amtgo.optimization          M10
-PARETO ARCHIVE         amtgo.optimization          M10
+ROBUST OPTIMIZATION    amtgo.optimization          M10 ✔  J, ρ, ε-dominance, droits durs, benchmark exact
+PARETO ARCHIVE         amtgo.optimization          M10 ✔  rangs, baselines, biais connus, INFEASIBLE
 VALIDATION             amtgo.validation           M11
 PRIVACY / SAFETY GATE  amtgo.privacy.guard         M2 (minimal) / M11
 EXPORT                 amtgo.export                M2 (carte publique)

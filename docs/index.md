@@ -43,7 +43,8 @@ pas un échec.
 | M7 | bibliothèque causale, DiD échelonné validé, transport, gel | fait |
 | M8 | candidats : baselines, familles géographiques et de graphe, stabilité multi-échelle | fait |
 | M9 | composeur institutionnel à géométrie fixe, monde I, conclusion NO_CHANGE possible | fait |
-| M10+ | optimiseur régional (Pareto), validation, red-team | à venir |
+| M10 | optimiseur régional : archive de Pareto robuste, ε-dominance, Gate O | fait |
+| M11+ | validation, red-team, Map-R | à venir |
 
 La mesure de population du pilote synthétique est validée contre la vérité :
 non identifiée à la maille de la cellule, identifiée à 100 km. La composition
@@ -55,7 +56,9 @@ chaque scénario — jamais hors contexte — et vérifiée sur le monde V. Les 
 causaux viennent d'une bibliothèque gelée : un effet estimé sur un panel fictif
 est admis, un autre, à adoption endogène, est rejeté. Des candidats territoriaux
 sont générés comme unités analytiques — non évalués, non publiés. À géométrie
-fixe, le composeur institutionnel conclut : aucun changement requis. À ce stade,
+fixe, le composeur institutionnel conclut : aucun changement requis. Une archive de
+Pareto robuste compare les candidats ; ses biais sont déclarés et aucune solution
+n'est publiable. À ce stade,
 **aucun découpage n'existe** : la [carte](carte.md) montre les pays
 actuels et les maillages d'analyse, et sa couche de candidats affiche
 *NOT_IDENTIFIABLE*.

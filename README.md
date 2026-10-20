@@ -12,7 +12,7 @@ synthétiques et la carte.
 
 État actuel : **M0–M7** (bootstrap, registre de sources, cœur spatial, mesure, ontologies,
 D/F/I, scénarios et viabilité contextuelle, bibliothèque causale gelée, candidats analytiques,
-composeur institutionnel).
+composeur institutionnel, archive de Pareto robuste).
 Aucun découpage n'est produit à ce stade.
 
 ## Sur le VPS
