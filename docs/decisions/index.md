@@ -24,3 +24,4 @@ Chaque ambiguïté ou incohérence de la spécification tranchée pendant l'impl
 | [ADR-0018](ADR-0018-scenarios-regimes-viabilite.md) | Scénarios, régimes typés, viabilité contextuelle (M6) | accepté |
 | [ADR-0019](ADR-0019-bibliotheque-causale.md) | Bibliothèque causale et gel (M7) | accepté |
 | [ADR-0020](ADR-0020-candidats.md) | Générateur de candidats territoriaux (M8) | accepté |
+| [ADR-0021](ADR-0021-composeur-institutionnel.md) | Composeur institutionnel à géométrie fixe (M9) | accepté |

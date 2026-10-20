@@ -105,3 +105,4 @@ Autres points relevés, sans décision nécessaire à ce stade :
 | M6 | scénarios, régimes typés, viabilité contextuelle ; monde V | **fait** |
 | M7 | bibliothèque causale : grades, DiD échelonné, transport, gel ; Gate C | **fait** |
 | M8 | candidats : baselines, familles, contiguïté, S^scale | **fait** |
+| M9 | composeur institutionnel à géométrie fixe ; monde I | **fait** |

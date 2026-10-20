@@ -42,7 +42,8 @@ pas un échec.
 | M6 | scénarios S1/S2A/S2C, régimes typés, viabilité contextuelle, monde V | fait |
 | M7 | bibliothèque causale, DiD échelonné validé, transport, gel | fait |
 | M8 | candidats : baselines, familles géographiques et de graphe, stabilité multi-échelle | fait |
-| M9+ | composeur institutionnel, optimiseur, validation | à venir |
+| M9 | composeur institutionnel à géométrie fixe, monde I, conclusion NO_CHANGE possible | fait |
+| M10+ | optimiseur régional (Pareto), validation, red-team | à venir |
 
 La mesure de population du pilote synthétique est validée contre la vérité :
 non identifiée à la maille de la cellule, identifiée à 100 km. La composition
@@ -53,7 +54,8 @@ vérifiées sur les mondes A–F. Sa viabilité est évaluée sous chaque régim
 chaque scénario — jamais hors contexte — et vérifiée sur le monde V. Les effets
 causaux viennent d'une bibliothèque gelée : un effet estimé sur un panel fictif
 est admis, un autre, à adoption endogène, est rejeté. Des candidats territoriaux
-sont générés comme unités analytiques — non évalués, non publiés. À ce stade,
+sont générés comme unités analytiques — non évalués, non publiés. À géométrie
+fixe, le composeur institutionnel conclut : aucun changement requis. À ce stade,
 **aucun découpage n'existe** : la [carte](carte.md) montre les pays
 actuels et les maillages d'analyse, et sa couche de candidats affiche
 *NOT_IDENTIFIABLE*.

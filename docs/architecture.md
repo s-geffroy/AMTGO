@@ -22,7 +22,7 @@ D/F/I                  amtgo.domination / fragmentation / integration   M5  ✔ 
 CONSTITUTIONAL REGIME  amtgo.institutions.regimes  M6  ✔  règles typées, frontière E/M/R/S dérivée
 SCENARIO ENSEMBLE      amtgo.scenarios             M6  ✔  S1, S2A, S2C agrégé ; viabilité (institutions.viability)
 CANDIDATE GENERATION   amtgo.candidates            M8  ✔  baselines, k-means, spectral, Louvain, S^scale
-INSTITUTIONAL COMP.    amtgo.institutions          M9
+INSTITUTIONAL COMP.    amtgo.institutions.composer M9  ✔  leviers §39 à géométrie fixe, bornes d'efficacité
 ROBUST OPTIMIZATION    amtgo.optimization          M10
 PARETO ARCHIVE         amtgo.optimization          M10
 VALIDATION             amtgo.validation           M11
