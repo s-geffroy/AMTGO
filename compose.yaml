@@ -1,0 +1,45 @@
+# Un worker : du travail de fond, aucune surface HTTP. Donc pas de labels
+# Traefik, pas de reseau edge, et 'exposure: none' dans app.yaml -- appctl
+# refuse l'un sans l'autre.
+services:
+  worker:
+    build:
+      context: ./src
+    restart: unless-stopped
+    networks:
+      - internal
+    environment:
+      APP_NAME: amtgo
+      TZ: Europe/Paris
+      WORKER_INTERVAL: "30"
+    volumes:
+      - state:/state
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
+          pids: 128
+    healthcheck:
+      # Le worker touche /tmp/heartbeat a chaque tour : le conteneur est sain
+      # tant que ce fichier est recent. Le seuil doit rester superieur a deux
+      # fois WORKER_INTERVAL. 'Sain' veut dire "la boucle tourne", pas "le
+      # travail reussit" -- ca, ce sont les logs qui le disent.
+      # Les '$$' sont des '$' : Docker Compose interprete un '$' seul.
+      test: ["CMD", "sh", "-c", "[ $$(( $$(date +%s) - $$(stat -c %Y /tmp/heartbeat) )) -lt 180 ]"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # 'docker stop' laisse 10 s avant le SIGKILL. Le worker s'arrete a la fin du
+    # cycle en cours : si un cycle peut durer plus longtemps, augmenter ici.
+    stop_grace_period: 30s
+
+networks:
+  internal:
+    name: amtgo-internal
+    external: true
+
+volumes:
+  state:
+    name: amtgo_state
