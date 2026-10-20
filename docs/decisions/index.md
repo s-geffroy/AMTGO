@@ -23,3 +23,4 @@ Chaque ambiguïté ou incohérence de la spécification tranchée pendant l'impl
 | [ADR-0017](ADR-0017-dfi.md) | Domination, fragmentation, intégration (M5) | accepté |
 | [ADR-0018](ADR-0018-scenarios-regimes-viabilite.md) | Scénarios, régimes typés, viabilité contextuelle (M6) | accepté |
 | [ADR-0019](ADR-0019-bibliotheque-causale.md) | Bibliothèque causale et gel (M7) | accepté |
+| [ADR-0020](ADR-0020-candidats.md) | Générateur de candidats territoriaux (M8) | accepté |

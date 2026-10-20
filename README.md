@@ -11,7 +11,7 @@ d'implémentation, les ADR, les rapports de milestone, les rapports de runs
 synthétiques et la carte.
 
 État actuel : **M0–M7** (bootstrap, registre de sources, cœur spatial, mesure, ontologies,
-D/F/I, scénarios et viabilité contextuelle, bibliothèque causale gelée).
+D/F/I, scénarios et viabilité contextuelle, bibliothèque causale gelée, candidats analytiques).
 Aucun découpage n'est produit à ce stade.
 
 ## Sur le VPS

@@ -21,7 +21,7 @@ CAUSAL LIBRARY—FROZEN  amtgo.causal                M7  ✔  grades I1–I7, Di
 D/F/I                  amtgo.domination / fragmentation / integration   M5  ✔  statu quo, mondes A–F
 CONSTITUTIONAL REGIME  amtgo.institutions.regimes  M6  ✔  règles typées, frontière E/M/R/S dérivée
 SCENARIO ENSEMBLE      amtgo.scenarios             M6  ✔  S1, S2A, S2C agrégé ; viabilité (institutions.viability)
-CANDIDATE GENERATION   amtgo.candidates            M8
+CANDIDATE GENERATION   amtgo.candidates            M8  ✔  baselines, k-means, spectral, Louvain, S^scale
 INSTITUTIONAL COMP.    amtgo.institutions          M9
 ROBUST OPTIMIZATION    amtgo.optimization          M10
 PARETO ARCHIVE         amtgo.optimization          M10
