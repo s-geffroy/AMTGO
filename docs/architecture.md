@@ -17,7 +17,7 @@ NORMALIZATION          amtgo.data.observations     M1  ✔  valid time, support,
 MEASUREMENT MODELS     amtgo.measurement           M3  ✔  vraisemblances, log-normal + Laplace, marges, validation
 ONTOLOGY ENSEMBLE      amtgo.ontology              M4  ✔  ontologies, crosswalks Dirichlet, composition, S^ontology
 LATENT STATE FIELDS    amtgo.measurement.fields    M3  ✔  statut MODEL, tirages, calculabilité ; measurement_freeze
-CAUSAL LIBRARY—FROZEN  amtgo.causal                M7
+CAUSAL LIBRARY—FROZEN  amtgo.causal                M7  ✔  grades I1–I7, DiD échelonné, transport, causal_freeze
 D/F/I                  amtgo.domination / fragmentation / integration   M5  ✔  statu quo, mondes A–F
 CONSTITUTIONAL REGIME  amtgo.institutions.regimes  M6  ✔  règles typées, frontière E/M/R/S dérivée
 SCENARIO ENSEMBLE      amtgo.scenarios             M6  ✔  S1, S2A, S2C agrégé ; viabilité (institutions.viability)
