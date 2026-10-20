@@ -23,9 +23,17 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 @pytest.fixture
 def configs_dir(tmp_path: Path) -> Path:
-    """Copie de configs/ modifiable par le test."""
+    """Copie de configs/ modifiable par le test, plus deux runs légers pour la mécanique de file."""
+    import yaml
+
     dst = tmp_path / "configs"
     shutil.copytree(CONFIGS, dst)
+    pilot = yaml.safe_load((dst / "runs" / "synthetic_pilot.yaml").read_text())
+    light = dict(pilot, name="light", mesh_set=["meshes/pilot_grid_l4.yaml"])
+    light.pop("measurement_model")
+    (dst / "runs" / "light.yaml").write_text(yaml.safe_dump(light))
+    (dst / "runs" / "light_measure.yaml").write_text(
+        yaml.safe_dump(dict(pilot, name="light_measure", mesh_set=["meshes/pilot_grid_l4.yaml"])))
     return dst
 
 

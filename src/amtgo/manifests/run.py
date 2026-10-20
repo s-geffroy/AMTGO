@@ -27,6 +27,7 @@ from amtgo.errors import ConfigurationError
 from amtgo.geo.mesh import MeshDefinition
 from amtgo.institutions.regimes import ConstitutionalRegime, load_regime
 from amtgo.manifests.normative import NormativeManifest
+from amtgo.measurement.manifest import MeasurementManifest
 from amtgo.utils.canonical import content_hash, stable_uuid
 from amtgo.utils.code_version import code_commit, code_version
 
@@ -53,6 +54,7 @@ class RunRequest(BaseModel):
     normative_manifest: str
     sources: tuple[SourceUse, ...]
     mesh_set: tuple[str, ...]
+    measurement_model: str | None = None
     ontology_set: tuple[str, ...] = ()
     scenario_set: tuple[str, ...] = ()
     seeds: tuple[int, ...] = (0,)
@@ -83,8 +85,8 @@ class RunManifest(BaseModel):
     constitutional_regime: ConstitutionalRegime
     constitutional_regime_hash: str
     mesh_set: tuple[MeshDefinition, ...]
+    measurement_model: MeasurementManifest | None = None
     # Couches non encore disponibles : explicitement nulles, jamais inventées.
-    measurement_model: dict[str, Any] | None = None
     ontology_set: tuple[str, ...] = ()
     causal_library: dict[str, Any] | None = None
     scenario_set: tuple[str, ...] = ()
@@ -139,6 +141,11 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
                     f"{mesh.mesh_id} : la source {mesh.extent.source_id} n'est pas déclarée "
                     f"pour le rôle {ROLE_ANALYSIS_EXTENT!r} dans ce run")
 
+    measurement = None
+    if request.measurement_model:
+        measurement = load_model(MeasurementManifest, configs_dir / request.measurement_model)
+        _check_measurement(measurement, sources)
+
     body: dict[str, Any] = {
         "code_commit": code_commit(),
         "code_version": code_version(),
@@ -149,11 +156,31 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         "constitutional_regime": regime,
         "constitutional_regime_hash": regime.content_hash,
         "mesh_set": meshes,
+        "measurement_model": measurement,
         "seeds": request.seeds,
     }
     draft = RunManifest(run_id=uuid.UUID(int=0), manifest_hash="", created_at=utcnow(), **body)
     h = manifest_body_hash(draft)
     return draft.model_copy(update={"run_id": stable_uuid("run", h), "manifest_hash": h})
+
+
+def _check_measurement(m: MeasurementManifest, sources: list[ResolvedSource]) -> None:
+    from amtgo.data.sources import RetrievalKind
+    from amtgo.measurement.engine import ROLE_MEASUREMENT
+
+    by_id = {s.manifest.source_id: s for s in sources}
+    for lk in m.likelihoods:
+        s = by_id.get(lk.source_id)
+        if s is None:
+            raise ConfigurationError(f"mesure : la source {lk.source_id} n'est pas dans le run")
+        if ROLE_MEASUREMENT not in s.use.roles:
+            raise ConfigurationError(f"mesure : rôle {ROLE_MEASUREMENT!r} non déclaré pour {lk.source_id}")
+    synthetic = [s.manifest for s in sources if s.manifest.retrieval.kind is RetrievalKind.SYNTHETIC]
+    if synthetic:
+        from amtgo.data.adapters.synthetic import world_of
+
+        if len({world_of(sm).world_hash for sm in synthetic}) > 1:
+            raise ConfigurationError("sources synthétiques issues de mondes différents dans un même run")
 
 
 def verify_manifest(manifest: RunManifest) -> None:

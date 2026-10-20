@@ -28,7 +28,7 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
     from amtgo.runs.state import RunStatus
 
     upgrade(db_settings)
-    assert current_revision(db_settings) == "0004"
+    assert current_revision(db_settings) == "0005"
     repo = make_repository(db_settings)
     manifest, _ = submit(db_settings.configs_dir / "runs/synthetic_pilot.yaml", db_settings)
     state = run_to_completion(db_settings, repo, str(manifest.run_id))
@@ -41,23 +41,30 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
 
         assert count("SELECT count(*) FROM run_manifests WHERE run_id = :r") == 1
         n_obs = count("SELECT count(*) FROM observations o JOIN sources s USING (source_id) "
-                      "WHERE s.slug = 'synthetic_pilot' AND :r IS NOT NULL")
-        assert n_obs == 200
+                      "WHERE s.slug = 'synthetic_survey' AND :r IS NOT NULL")
+        assert n_obs == 300
         assert count("SELECT count(*) FROM provenance_records WHERE run_id = :r") >= 6
         assert count("SELECT count(*) FROM cells WHERE mesh_id = 'pilot_grid_l4' AND :r IS NOT NULL") > 0
         bad = count("SELECT count(*) FROM cells WHERE NOT ST_IsValid(geometry) AND :r IS NOT NULL")
         assert bad == 0
+        # M3 : un champ par maillage, toutes cellules résumées, statut MODEL, gel enregistré.
+        assert count("SELECT count(*) FROM latent_fields WHERE run_id = :r") == 4
+        assert count("SELECT count(*) FROM latent_field_cells c JOIN latent_fields f USING (field_id) "
+                     "WHERE f.run_id = :r AND f.mesh_id = 'pilot_grid_l4'") == count(
+            "SELECT count(*) FROM cells WHERE mesh_id = 'pilot_grid_l4' AND :r IS NOT NULL")
+        assert count("SELECT count(*) FROM latent_fields WHERE run_id = :r AND evidence_status <> 'M'") == 0
+        assert count("SELECT count(*) FROM run_manifests WHERE run_id = :r AND measurement_hash LIKE 'sha256:%'") == 1
 
     # Rejouer toutes les écritures ne duplique rien.
     from amtgo.data.ingestion import read_observations
     from amtgo.runs.queue import runs_dir
 
-    path = runs_dir(db_settings) / str(manifest.run_id) / "artifacts" / "observations__synthetic_pilot.parquet"
+    path = runs_dir(db_settings) / str(manifest.run_id) / "artifacts" / "observations__synthetic_survey.parquet"
     repo.record_observations(read_observations(path))
     with engine.connect() as cx:
         n = cx.execute(text("SELECT count(*) FROM observations o JOIN sources s USING (source_id) "
-                            "WHERE s.slug = 'synthetic_pilot'")).scalar_one()
-        assert n == 200
+                            "WHERE s.slug = 'synthetic_survey'")).scalar_one()
+        assert n == 300
 
 
 def test_check_constraints(db_settings: Settings) -> None:

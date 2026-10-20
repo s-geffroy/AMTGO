@@ -1,4 +1,4 @@
-"""Modèles de mesure : likelihoods d'observation, champs latents, fusion.
+"""Modèles de mesure (M3) : vraisemblances, fusion linéaire-gaussienne, champs latents, validation.
 
-Milestone M3 : pas encore implémenté. Rien ici ne doit être importé avant.
+Un champ latent est toujours de statut MODEL. Voir ADR-0013.
 """

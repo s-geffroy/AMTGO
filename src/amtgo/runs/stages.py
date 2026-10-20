@@ -26,7 +26,7 @@ from amtgo.geo.multiscale import area_weighted_transfer, coverage_ratio
 from amtgo.geo.ops import create_base_mesh
 from amtgo.geo.support import allocate_point_masses
 from amtgo.manifests.run import RunManifest, verify_manifest
-from amtgo.runs import artifacts
+from amtgo.runs import artifacts, measure_stages
 from amtgo.runs.report import render_report
 
 
@@ -50,7 +50,12 @@ def plan_steps(manifest: RunManifest) -> list[str]:
     steps = ["validate_sources"]
     steps += [f"ingest:{s.manifest.source_id}" for s in manifest.data_manifest]
     steps += [f"build_mesh:{m.mesh_id}" for m in manifest.mesh_set]
-    steps += ["multiscale_check", "report"]
+    steps += ["multiscale_check"]
+    if manifest.measurement_model is not None:
+        steps += [f"measure:{m.mesh_id}" for m in manifest.mesh_set]
+        steps += [f"validate_measurement:{m.mesh_id}" for m in manifest.mesh_set]
+        steps += ["compare_fields", "measurement_freeze"]
+    steps += ["report"]
     return steps
 
 
@@ -160,6 +165,34 @@ def multiscale_check(ctx: StageContext, _: str) -> dict[str, Any]:
     return {"count": len(meshes)}
 
 
+def _round_sig(x: float, digits: int = 6) -> float:
+    """Arrondi à ``digits`` chiffres significatifs : tolérance numérique de reproductibilité."""
+    return float(f"{x:.{digits}g}")
+
+
+def _measurement_summary(ctx: StageContext) -> dict[str, Any]:
+    from amtgo.measurement.fields import read_field
+
+    per_mesh: dict[str, Any] = {}
+    for d in ctx.manifest.mesh_set:
+        meta, _, _ = read_field(ctx.run_dir, d.mesh_id)
+        val = artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/validation.json")
+        per_mesh[d.mesh_id] = {"field": meta, "validation": val}
+    # Classe la plus défavorable entre maillages : une conclusion ne vaut que si elle tient partout.
+    classes = [ComputabilityClass(v["field"]["computability"]) for v in per_mesh.values()]
+    worst = min(classes, key=lambda c: "DCBA".index(c.value)) if classes else ComputabilityClass.D
+    comparison = artifacts.read_json(ctx.run_dir, "artifacts/fields_comparison.json")
+    freeze = artifacts.read_json(ctx.run_dir, "measurement_freeze.json")
+    outputs = {
+        "freeze_hash": freeze["freeze_hash"],
+        "totals": {k: {kk: _round_sig(vv) for kk, vv in v["field"]["total"].items()}
+                   for k, v in sorted(per_mesh.items())},
+        "computability": {k: v["field"]["computability"] for k, v in sorted(per_mesh.items())},
+    }
+    return {"per_mesh": per_mesh, "comparison": comparison, "freeze": freeze,
+            "computability": worst, "outputs": outputs}
+
+
 def report(ctx: StageContext, _: str) -> dict[str, Any]:
     status = RecommendationStatus.NOT_IDENTIFIABLE
     computability = ComputabilityClass.D
@@ -168,10 +201,14 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
     meshes = {m.mesh_id: artifacts.read_json(ctx.run_dir, f"meshes/{m.mesh_id}/mesh.json")
               for m in ctx.manifest.mesh_set}
     multiscale = artifacts.read_json(ctx.run_dir, "artifacts/multiscale.json")
+    measurement = _measurement_summary(ctx) if ctx.manifest.measurement_model else None
+    if measurement is not None:
+        computability = measurement["computability"]
     outputs = {
         "observations": {k: v["observations_hash"] for k, v in sorted(sources.items())},
         "meshes": {k: v["cells_hash"] for k, v in sorted(meshes.items())},
         "multiscale": multiscale,
+        "measurement": None if measurement is None else measurement["outputs"],
         "recommendation_status": status.value,
         "computability_class": computability.value,
     }
@@ -180,7 +217,7 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
     outputs["outputs_hash"] = content_hash(outputs)
     artifacts.write_json(ctx.run_dir, "outputs.json", outputs)
     text = render_report(ctx.manifest, sources, meshes, multiscale, status, computability,
-                         outputs["outputs_hash"], artifacts.read_provenance(ctx.run_dir))
+                         outputs["outputs_hash"], artifacts.read_provenance(ctx.run_dir), measurement)
     from amtgo.runs.state import write_json_atomic
 
     write_json_atomic(ctx.run_dir / "report.md", text)
@@ -192,6 +229,10 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "ingest": ingest,
     "build_mesh": build_mesh,
     "multiscale_check": multiscale_check,
+    "measure": measure_stages.measure,
+    "validate_measurement": measure_stages.validate_measurement,
+    "compare_fields": measure_stages.compare_fields,
+    "measurement_freeze": measure_stages.measurement_freeze,
     "report": report,
 }
 

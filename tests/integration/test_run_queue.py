@@ -22,27 +22,48 @@ def _run(settings: Settings, request: str) -> str:
 
 
 def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
+    """Pilote complet M0–M3 : propriétés qualitatives (ADR-0010), pas de valeurs figées."""
     run_id = _run(settings, "runs/synthetic_pilot.yaml")
     d = runs_dir(settings) / run_id
     report = (d / "report.md").read_text()
     assert "NOT_IDENTIFIABLE" in report and "CAUSAL_EFFECT_UNKNOWN" in report
     assert "prouve" not in report  # 06 §15
+    assert "WE ASSUME" in report and "WE DO NOT KNOW" in report
     ms = json.loads((d / "artifacts" / "multiscale.json").read_text())
     assert set(ms["meshes"]) == {"pilot_h3_r5", "pilot_h3_r6", "pilot_grid_l4", "pilot_grid_l5"}
     for t in ms["transfers"]:
         assert t["mass_out"] + t["unallocated"] == pytest.approx(t["mass_in"], rel=1e-6)
-    assert len(list((d / "provenance").glob("*.json"))) >= 6
+    for mid in ms["meshes"]:
+        field = json.loads((d / "fields" / mid / "field.json").read_text())
+        val = json.loads((d / "fields" / mid / "validation.json").read_text())
+        assert field["evidence_status"] == "M" and field["laplace"]["converged"]
+        cal = val["calibration"]
+        assert cal["total_covered"]  # le total vrai est dans l'intervalle
+        assert 0.8 <= cal["cell_coverage"] <= 0.99  # ni sur- ni sous-confiant à l'excès
+        assert val["holdout"]["coverage"] >= 0.8
+        # L'ablation : l'enquête seule est moins informative sur le total que la fusion.
+        ab = val["ablation"]
+        width = {k: v["total_interval"][1] - v["total_interval"][0] for k, v in ab.items()}
+        assert width["synthetic_survey"] > width["synthetic_census+synthetic_survey"]
+    cmp_ = json.loads((d / "artifacts" / "fields_comparison.json").read_text())
+    assert cmp_["max_abs_z"] < 3.0  # maillages compatibles à 100 km
+    # L'information croît avec l'échelle : ce qui est D à la cellule peut être A/B à 100 km.
+    for mid, v in cmp_["reference_scale_information"].items():
+        cell = json.loads((d / "fields" / mid / "field.json").read_text())["median_information_ratio"]
+        assert v["median"] > cell
+    assert (d / "measurement_freeze.json").exists()
+    assert len(list((d / "provenance").glob("*.json"))) >= 12
 
 
 def test_resubmission_is_idempotent(settings: Settings) -> None:
-    a, created_a = submit(settings.configs_dir / "runs/synthetic_pilot.yaml", settings)
-    b, created_b = submit(settings.configs_dir / "runs/synthetic_pilot.yaml", settings)
+    a, created_a = submit(settings.configs_dir / "runs/light.yaml", settings)
+    b, created_b = submit(settings.configs_dir / "runs/light.yaml", settings)
     assert created_a and not created_b and a.run_id == b.run_id
     assert len(list_runs(settings)) == 1
 
 
 def test_interrupted_step_resumes(settings: Settings) -> None:
-    manifest, _ = submit(settings.configs_dir / "runs/synthetic_pilot.yaml", settings)
+    manifest, _ = submit(settings.configs_dir / "runs/light.yaml", settings)
     rid = str(manifest.run_id)
     repo = NullRepository()
     assert advance_one(settings, repo).outcome == "done"  # type: ignore[union-attr]
@@ -66,12 +87,12 @@ def test_reproducibility_same_manifest_same_outputs(tmp_path: Path, configs_dir:
 
 
 def test_deterministic_failure_fails_fast(settings: Settings) -> None:
-    p = settings.configs_dir / "sources" / "synthetic_pilot.yaml"
-    p.write_text(p.read_text().replace("n_clusters: 200", "n_clusters: oops"))
-    manifest, _ = submit(settings.configs_dir / "runs/synthetic_pilot.yaml", settings)
+    p = settings.configs_dir / "sources" / "synthetic_survey.yaml"
+    p.write_text(p.read_text().replace("n_ea: 300", "n_ea: oops"))
+    manifest, _ = submit(settings.configs_dir / "runs/light.yaml", settings)
     state = run_to_completion(settings, NullRepository(), str(manifest.run_id))
     assert state.status is RunStatus.FAILED
-    assert state.error and "n_clusters" in state.error  # le message n'est jamais avalé
+    assert state.error and "n_ea" in state.error  # le message n'est jamais avalé
 
 
 def test_transient_failure_retried(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -87,7 +108,7 @@ def test_transient_failure_retried(settings: Settings, monkeypatch: pytest.Monke
         return original(ctx, arg)
 
     monkeypatch.setitem(stages.STAGES, "validate_sources", flaky)
-    manifest, _ = submit(settings.configs_dir / "runs/synthetic_pilot.yaml", settings)
+    manifest, _ = submit(settings.configs_dir / "runs/light.yaml", settings)
     adv = advance_one(settings, NullRepository())
     assert adv is not None and adv.outcome == "retry"
     final = run_to_completion(settings, NullRepository(), str(manifest.run_id))

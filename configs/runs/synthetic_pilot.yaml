@@ -1,16 +1,19 @@
-# Run de reference M0-M2 sur le monde synthetique : ingestion, deux familles de
-# maillage x deux resolutions, controles de conservation, rapport.
+# Run de reference M0-M3 sur le monde synthetique : ingestion de deux instruments,
+# deux familles de maillage x deux resolutions, mesure, validation, gel, rapport.
 name: synthetic_pilot
 description: >
-  Pilote synthetique M0-M2. Exerce le registre de sources, l'ingestion, les
-  maillages H3 et grille LAEA a deux resolutions et les transferts multi-echelles.
-  Aucune categorie identitaire, aucune recommandation.
+  Pilote synthetique M0-M3. Exerce le registre de sources, l'ingestion de deux
+  instruments, les maillages H3 et grille LAEA a deux resolutions, la fusion de
+  mesure et sa validation contre la verite du monde synthetique. Aucune categorie
+  identitaire, aucune recommandation.
 region: synthetic_south_atlantic
 map_mode: R
 constitutional_regime: R1_COMMON_MARKET
 normative_manifest: normative/default.yaml
 sources:
-  - {manifest: sources/synthetic_pilot.yaml, roles: [multiscale_validation], redistribute: true}
+  - {manifest: sources/synthetic_survey.yaml, roles: [population_measurement, multiscale_validation], redistribute: true}
+  - {manifest: sources/synthetic_census.yaml, roles: [population_measurement, multiscale_validation], redistribute: true}
+measurement_model: measurement/population_v1.yaml
 mesh_set:
   - meshes/pilot_h3_r5.yaml
   - meshes/pilot_h3_r6.yaml

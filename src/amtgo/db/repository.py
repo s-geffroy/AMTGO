@@ -9,8 +9,9 @@ duplique rien.
 from __future__ import annotations
 
 import json
+import uuid
 from collections.abc import Iterable, Sequence
-from typing import Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from sqlalchemy import Engine, text
 
@@ -19,6 +20,9 @@ from amtgo.data.observations import Observation
 from amtgo.data.sources import Source, SourceManifest
 from amtgo.geo.mesh import Mesh
 from amtgo.manifests.run import RunManifest
+
+if TYPE_CHECKING:
+    from amtgo.measurement.fields import LatentFieldMeta
 
 # Taille des lots d'insertion : borne mémoire, pas paramètre scientifique.
 BATCH = 500
@@ -30,6 +34,9 @@ class Repository(Protocol):
     def record_source(self, manifest: SourceManifest, source: Source) -> None: ...
     def record_observations(self, observations: Iterable[Observation]) -> None: ...
     def record_mesh(self, mesh: Mesh) -> None: ...
+    def record_latent_field(self, run_id: uuid.UUID, mesh: Mesh, meta: LatentFieldMeta,
+                            rows: list[dict[str, Any]]) -> None: ...
+    def record_measurement_freeze(self, run_id: uuid.UUID, freeze_hash: str) -> None: ...
 
 
 class NullRepository:
@@ -48,6 +55,13 @@ class NullRepository:
         pass
 
     def record_mesh(self, mesh: Mesh) -> None:
+        pass
+
+    def record_latent_field(self, run_id: uuid.UUID, mesh: Mesh, meta: LatentFieldMeta,
+                            rows: list[dict[str, Any]]) -> None:
+        pass
+
+    def record_measurement_freeze(self, run_id: uuid.UUID, freeze_hash: str) -> None:
         pass
 
 
@@ -192,3 +206,44 @@ class PostgresRepository:
                     "res": c.resolution, "wkt": c.geometry.wkt, "parent": c.parent_cell_id,
                     "area": c.area_km2, "clipped": c.clipped,
                 } for c in batch])
+
+    def record_latent_field(self, run_id: uuid.UUID, mesh: Mesh, meta: LatentFieldMeta,
+                            rows: list[dict[str, Any]]) -> None:
+        with self.engine.begin() as cx:
+            cx.execute(text("""
+                INSERT INTO latent_fields (field_id, run_id, mesh_id, definition_hash, variable_id,
+                    time_period, measurement_hash, model_version, evidence_status, privacy_class,
+                    computability, summary, samples_hash)
+                VALUES (:fid, :run, :mesh, :dhash, :var, daterange(:p0, :p1, '[]'), :mhash, :mver,
+                    CAST(:ev AS evidence_status), CAST(:priv AS privacy_class), :comp,
+                    CAST(:summary AS jsonb), :shash)
+                ON CONFLICT (field_id) DO NOTHING
+            """), {
+                "fid": meta.field_id, "run": run_id, "mesh": mesh.mesh_id,
+                "dhash": mesh.definition.definition_hash, "var": meta.variable_id,
+                "p0": meta.period["start"], "p1": meta.period["end"], "mhash": meta.measurement_hash,
+                "mver": meta.model_version, "ev": meta.evidence_status.value,
+                "priv": meta.privacy_class.value, "comp": meta.computability.value,
+                "summary": json.dumps({"total": meta.total, "used": meta.used, "excluded": meta.excluded,
+                                       "median_information_ratio": meta.median_information_ratio}),
+                "shash": meta.samples_hash,
+            })
+        sql = text("""
+            INSERT INTO latent_field_cells (field_id, cell_id, mean, sd, lower_bound, upper_bound,
+                information_ratio, negative_fraction, computability)
+            VALUES (:fid, :cell, :mean, :sd, :lo, :hi, :info, :neg, :comp)
+            ON CONFLICT (field_id, cell_id) DO NOTHING
+        """)
+        for batch in _batches(rows):
+            with self.engine.begin() as cx:
+                cx.execute(sql, [{
+                    "fid": meta.field_id, "cell": r["cell_id"], "mean": r["mean"], "sd": r["sd"],
+                    "lo": r["lower"], "hi": r["upper"], "info": r["information_ratio"],
+                    "neg": r["negative_fraction"], "comp": r["computability"],
+                } for r in batch])
+
+    def record_measurement_freeze(self, run_id: uuid.UUID, freeze_hash: str) -> None:
+        with self.engine.begin() as cx:
+            cx.execute(text("UPDATE run_manifests SET measurement_hash = :h WHERE run_id = :r "
+                            "AND (measurement_hash IS NULL OR measurement_hash = :h)"),
+                       {"h": freeze_hash, "r": run_id})

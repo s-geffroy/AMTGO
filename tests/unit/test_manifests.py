@@ -67,14 +67,15 @@ def test_run_manifest_stable(configs_dir: Path) -> None:
     a = resolve_request(_request(configs_dir), configs_dir)
     b = resolve_request(_request(configs_dir), configs_dir)
     assert a.run_id == b.run_id and a.manifest_hash == b.manifest_hash
-    assert a.measurement_model is None and a.causal_library is None and a.solver is None
+    assert a.measurement_model is not None  # le pilote déclare un modèle de mesure (M3)
+    assert a.causal_library is None and a.solver is None
     verify_manifest(a)
 
 
 def test_run_manifest_changes_with_config(configs_dir: Path) -> None:
     a = resolve_request(_request(configs_dir), configs_dir)
-    p = configs_dir / "sources" / "synthetic_pilot.yaml"
-    p.write_text(p.read_text().replace("seed: 20251020", "seed: 1"))
+    p = configs_dir / "sources" / "synthetic_survey.yaml"
+    p.write_text(p.read_text().replace("n_ea: 300", "n_ea: 301"))
     b = resolve_request(_request(configs_dir), configs_dir)
     assert a.run_id != b.run_id
 

@@ -14,7 +14,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 import numpy as np
-from shapely.geometry import Point
+import shapely
 from shapely.strtree import STRtree
 
 from amtgo.core.enums import SupportType
@@ -35,6 +35,24 @@ def _disk_offsets(radius_m: float, n: int) -> np.ndarray:
     r = radius_m * np.sqrt(k / n)
     theta = k * _GOLDEN
     return np.column_stack([r * np.cos(theta), r * np.sin(theta)])
+
+
+def first_hits(tree: STRtree, pts: np.ndarray) -> np.ndarray:
+    """Pour chaque point (n, 2), indice de la géométrie qui le contient, −1 sinon.
+
+    Requête vectorisée ; un point sur une arête partagée va à la plus petite géométrie
+    d'indice (règle déterministe, identique à la version scalaire).
+    """
+    out = np.full(len(pts), -1, dtype=int)
+    if len(pts) == 0:
+        return out
+    pi, gi = tree.query(shapely.points(pts), predicate="intersects")
+    order = np.lexsort((gi, pi))
+    pi, gi = pi[order], gi[order]
+    first = np.ones(len(pi), dtype=bool)
+    first[1:] = pi[1:] != pi[:-1]
+    out[pi[first]] = gi[first]
+    return out
 
 
 @dataclass(frozen=True)
@@ -68,10 +86,8 @@ def allocate_point_masses(observations: Iterable[Observation], mesh: Mesh) -> Al
             assert obs.displacement_km is not None
             pts = _disk_offsets(obs.displacement_km * 1000.0, KERNEL_POINTS) + np.array([p.x, p.y])
         share = mass / len(pts)
-        for x, y in pts:
-            hits = tree.query(Point(x, y), predicate="intersects")
-            if len(hits) == 0:
-                lost += share
-                continue
-            out[min(ids[k] for k in hits)] += share
+        cell_of = first_hits(tree, pts)
+        lost += float((cell_of < 0).sum()) * share
+        for k in cell_of[cell_of >= 0]:
+            out[ids[int(k)]] += share
     return Allocation(dict(sorted(out.items())), total, lost)
