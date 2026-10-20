@@ -27,6 +27,7 @@ def render_report(
     provenance: list[ProvenanceRecord],
     measurement: dict[str, Any] | None = None,
     s2c: dict[str, Any] | None = None,
+    causal: dict[str, Any] | None = None,
 ) -> str:
     req = manifest.request
     L: list[str] = []
@@ -146,7 +147,10 @@ def render_report(
         _viability_section(a, manifest, via)
 
     a("## Causal support\n")
-    a("`CAUSAL_EFFECT_UNKNOWN` — bibliothèque causale non construite (M7).\n")
+    if causal is None:
+        a("`CAUSAL_EFFECT_UNKNOWN` — aucune bibliothèque causale dans ce run.\n")
+    else:
+        _causal_section(a, manifest, causal)
     a("## Pareto summary\n")
     a("Aucun archive de Pareto : aucun candidat n'a été généré (M8–M10). Baselines prévues : "
       "STATUS_QUO, NO_TERRITORIAL_CHANGE, INSTITUTIONAL_ONLY_REFORM.\n")
@@ -175,7 +179,8 @@ def render_report(
     infer = []
     assume = ["les seuils normatifs provisoires du manifeste", "le régime constitutionnel "
               f"`{manifest.constitutional_regime.regime_id.value}` (scénario, non doctrine)"]
-    unknown = ["tout effet causal (`CAUSAL_EFFECT_UNKNOWN`)", "toute ontologie identitaire (M4)",
+    unknown = ["tout effet causal hors bibliothèque gelée (`CAUSAL_EFFECT_UNKNOWN`)",
+               "toute ontologie identitaire (M4)",
                "toute configuration territoriale préférable"]
     if manifest.viability_model is not None:
         vm = manifest.viability_model
@@ -188,6 +193,14 @@ def render_report(
                     "réponse de mobilité volontaire à une réforme (S2A : CAUSAL_EFFECT_UNKNOWN)"]
     if any(not sc.climate.modelled for sc in manifest.scenario_set):
         unknown.append("climat dans les scénarios où il n'est pas modélisé")
+    if causal is not None:
+        facts = [k for k, v in causal["effects"].items() if v["status"] == "CAUSAL_FACT"]
+        if facts:
+            infer.append("effets estimés et admis de la bibliothèque gelée : " + ", ".join(f"`{k}`" for k in facts))
+        assume.append("tendances parallèles et absence d'anticipation des designs DiD (testées, non prouvées)")
+        rejected = [k for k, v in causal["effects"].items() if v["status"] == "CAUSAL_EFFECT_UNKNOWN"]
+        if rejected:
+            unknown.append("effets rejetés ou non transportables : " + ", ".join(f"`{k}`" for k in rejected))
     if manifest.dfi_model is not None:
         infer.append("D/F/I du statu quo déclaré (statut MODEL)")
         assume += ["qualité des contacts intergroupes uniforme (non mesurée)",
@@ -408,3 +421,40 @@ def _viability_section(a: Any, manifest: RunManifest, via: dict[str, Any]) -> No
         a("La viabilité d'au moins un territoire **dépend du régime constitutionnel** : toute analyse de "
           "souveraineté doit annoncer le régime (spec 14 §6, 05 §19).")
     a("")
+
+
+def _causal_section(a: Any, manifest: RunManifest, causal: dict[str, Any]) -> None:
+    lib = manifest.causal_library
+    assert lib is not None
+    val = causal["validation"]
+    a(f"Bibliothèque `{lib.library_id}` v{lib.version}, **gelée** avant toute évaluation qui la consomme "
+      f"(`{causal['freeze_hash'][:19]}…`). Le solveur ne peut ajuster aucun effet. Contexte cible : "
+      f"`{manifest.request.region}`.\n")
+    a("| effet | traitement | résultat | design | grade | transport (recouvrement) | statut | effet (IC 90 %) |")
+    a("|---|---|---|---|---|---|---|---|")
+    for k, e in causal["effects"].items():
+        eff = e["effect"]
+        shown = "—" if eff is None else (
+            f"[{eff['lower']:.3g}, {eff['upper']:.3g}]" if eff["mean"] is None
+            else f"{eff['mean']:.3g} [{eff['lower']:.3g}, {eff['upper']:.3g}]")
+        a(f"| `{k}` | {e['treatment']} | {e['outcome']} | {e['design']} | {e['grade']} | "
+          f"{e['transport']} ({e['overlap']:.2f}) | **{e['status']}** | {shown} |")
+    a("")
+    for k, e in causal["effects"].items():
+        failed = [d for d, v in e["diagnostics"].items() if v == "FAILED"]
+        failed += [r for r, v in e["robustness"].items() if v == "FAILED"]
+        if failed:
+            a(f"- `{k}` : **rejeté** — échecs : {', '.join(sorted(failed))}. Réponse : `CAUSAL_EFFECT_UNKNOWN`.")
+        elif e["status"] == "EXPLORATORY_ONLY":
+            a(f"- `{k}` : hypothèse d'expert (I7) — bornes exploratoires, jamais un fait causal.")
+    a("")
+    for k, v in val["estimations"].items():
+        t = v.get("synthetic_truth")
+        if t is not None:
+            verdict = "couverte" if t["covered"] else "**non couverte** (estimation biaisée)"
+            note = " ; l'effet a été rejeté par ses diagnostics" if v["admissibility"] == "UNSUPPORTED" else ""
+            a(f"- `{k}` : vérité synthétique {t['att']:.4f} — {verdict} par l'intervalle estimé "
+              f"(avant élargissement de transport){note}.")
+    a("")
+    a(f"**Gate C : {val['gate_c']}** — tout effet admis passe chaque test exécuté (région exclue, placebo, "
+      "contrôle négatif, vérité synthétique). Aucune affirmation causale sans grade (A5).\n")

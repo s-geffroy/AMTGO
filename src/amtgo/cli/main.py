@@ -17,6 +17,7 @@ ingest_app = typer.Typer(no_args_is_help=True, help="Ingestion.")
 export_app = typer.Typer(no_args_is_help=True, help="Exports (passent tous par le privacy guard).")
 validate_app = typer.Typer(no_args_is_help=True, help="Validation : mondes synthétiques, red-team.")
 scenario_app = typer.Typer(no_args_is_help=True, help="Scénarios (S1, S2A, S2C diagnostic agrégé).")
+causal_app = typer.Typer(no_args_is_help=True, help="Bibliothèque causale : validation, lecture d'un gel.")
 app.add_typer(run_app, name="run")
 app.add_typer(db_app, name="db")
 app.add_typer(source_app, name="source")
@@ -24,6 +25,7 @@ app.add_typer(ingest_app, name="ingest")
 app.add_typer(export_app, name="export")
 app.add_typer(validate_app, name="validate")
 app.add_typer(scenario_app, name="scenario")
+app.add_typer(causal_app, name="causal")
 
 
 def _resolve(path: Path) -> Path:
@@ -117,6 +119,47 @@ def scenario_validate(paths: list[Path] = typer.Argument(None)) -> None:  # noqa
             failed += 1
             typer.echo(f"ECHEC {p}: {exc}", err=True)
     if failed:
+        raise typer.Exit(1)
+
+
+@causal_app.command("validate")
+def causal_validate_cmd(paths: list[Path] = typer.Argument(None)) -> None:  # noqa: B008
+    """Valide des bibliothèques causales (par défaut : tout configs/causal/)."""
+    from amtgo.causal.library import CausalLibraryManifest
+    from amtgo.config.loader import load_model
+    from amtgo.errors import AMTGOError
+
+    targets = paths or sorted((get_settings().configs_dir / "causal").glob("*.yaml"))
+    failed = 0
+    for p in targets:
+        try:
+            lib = load_model(CausalLibraryManifest, _resolve(p))
+            grades = ", ".join(f"{d.effect_key}={d.grade.value}" for d in lib.declared)
+            typer.echo(f"OK   {lib.library_id} {lib.version} déclarés [{grades}] estimations "
+                       f"{[e.effect_key for e in lib.estimations]}")
+        except AMTGOError as exc:
+            failed += 1
+            typer.echo(f"ECHEC {p}: {exc}", err=True)
+    if failed:
+        raise typer.Exit(1)
+
+
+@causal_app.command("show")
+def causal_show(run_id: str) -> None:
+    """Affiche la bibliothèque gelée d'un run (empreinte vérifiée)."""
+    import json
+
+    from amtgo.causal.library import effect_from_json, library_hash
+    from amtgo.runs.queue import runs_dir
+
+    d = runs_dir(get_settings()) / run_id
+    freeze = json.loads((d / "causal_freeze.json").read_text())
+    effects = [effect_from_json(x) for x in json.loads((d / "artifacts/causal_library.json").read_text())["effects"]]
+    ok = library_hash(effects) == freeze["freeze_hash"]
+    typer.echo(f"gel {freeze['freeze_hash']} {'vérifié' if ok else 'ALTÉRÉ'}")
+    for e in effects:
+        typer.echo(f"  {e.effect_key:45s} {e.design.value:18s} {e.grade.value} {e.transport_status.value}")
+    if not ok:
         raise typer.Exit(1)
 
 

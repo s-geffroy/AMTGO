@@ -26,7 +26,14 @@ from amtgo.geo.multiscale import area_weighted_transfer, coverage_ratio
 from amtgo.geo.ops import create_base_mesh
 from amtgo.geo.support import allocate_point_masses
 from amtgo.manifests.run import RunManifest, verify_manifest
-from amtgo.runs import artifacts, composition_stages, dfi_stages, measure_stages, viability_stages
+from amtgo.runs import (
+    artifacts,
+    causal_stages,
+    composition_stages,
+    dfi_stages,
+    measure_stages,
+    viability_stages,
+)
 from amtgo.runs.report import render_report
 
 
@@ -46,6 +53,14 @@ class StageContext:
         return self.run_dir / "artifacts" / f"observations__{source_id}.parquet"
 
 
+def _causal_steps(manifest: RunManifest) -> list[str]:
+    """Estimation, validation et gel causal : après measurement_freeze, avant tout consommateur d'effet."""
+    if manifest.causal_library is None:
+        return []
+    return ([f"causal_estimate:{e.effect_key}" for e in manifest.causal_library.estimations]
+            + ["causal_validate", "causal_freeze"])
+
+
 def plan_steps(manifest: RunManifest) -> list[str]:
     steps = ["validate_sources"]
     steps += [f"ingest:{s.manifest.source_id}" for s in manifest.data_manifest]
@@ -59,12 +74,15 @@ def plan_steps(manifest: RunManifest) -> list[str]:
             steps += [f"measure_composition:{m.mesh_id}" for m in manifest.mesh_set]
             steps += ["ontology_ensemble"]
         steps += ["measurement_freeze"]
+        steps += _causal_steps(manifest)
         if manifest.dfi_model is not None:
             steps += [f"dfi:{m.mesh_id}" for m in manifest.mesh_set]
             steps += ["dfi_ensemble"]
         if manifest.viability_model is not None:
             steps += [f"viability:{m.mesh_id}" for m in manifest.mesh_set]
             steps += ["viability_ensemble"]
+    else:
+        steps += _causal_steps(manifest)
     if any(sc.diagnostic_only for sc in manifest.scenario_set):
         steps += ["s2c_diagnostic"]
     steps += ["report"]
@@ -253,12 +271,19 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
         computability = measurement["computability"]
     s2c = (artifacts.read_json(ctx.run_dir, "artifacts/s2c_diagnostic.json")
            if any(sc.diagnostic_only for sc in ctx.manifest.scenario_set) else None)
+    causal = None
+    if ctx.manifest.causal_library is not None:
+        causal = {**causal_stages.library_summary(ctx),
+                  "validation": artifacts.read_json(ctx.run_dir, "artifacts/causal_validation.json")}
     outputs = {
         "observations": {k: v["observations_hash"] for k, v in sorted(sources.items())},
         "meshes": {k: v["cells_hash"] for k, v in sorted(meshes.items())},
         "multiscale": multiscale,
         "measurement": None if measurement is None else measurement["outputs"],
         "s2c": None if s2c is None else {k: v["status"] for k, v in sorted(s2c.items())},
+        "causal": None if causal is None else {
+            "freeze_hash": causal["freeze_hash"], "gate_c": causal["validation"]["gate_c"],
+            "status": {k: v["status"] for k, v in sorted(causal["effects"].items())}},
         "recommendation_status": status.value,
         "computability_class": computability.value,
     }
@@ -267,7 +292,8 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
     outputs["outputs_hash"] = content_hash(outputs)
     artifacts.write_json(ctx.run_dir, "outputs.json", outputs)
     text = render_report(ctx.manifest, sources, meshes, multiscale, status, computability,
-                         outputs["outputs_hash"], artifacts.read_provenance(ctx.run_dir), measurement, s2c)
+                         outputs["outputs_hash"], artifacts.read_provenance(ctx.run_dir), measurement, s2c,
+                         causal)
     from amtgo.runs.state import write_json_atomic
 
     write_json_atomic(ctx.run_dir / "report.md", text)
@@ -285,6 +311,9 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "measure_composition": composition_stages.measure_composition,
     "ontology_ensemble": composition_stages.ontology_ensemble,
     "measurement_freeze": measure_stages.measurement_freeze,
+    "causal_estimate": causal_stages.causal_estimate,
+    "causal_validate": causal_stages.causal_validate,
+    "causal_freeze": causal_stages.causal_freeze,
     "dfi": dfi_stages.dfi,
     "dfi_ensemble": dfi_stages.dfi_ensemble,
     "viability": viability_stages.viability,

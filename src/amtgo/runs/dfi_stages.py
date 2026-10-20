@@ -36,6 +36,7 @@ from amtgo.integration.engine import integration
 from amtgo.measurement import fields as fields_mod
 from amtgo.ontology.model import UNMAPPED
 from amtgo.runs import artifacts
+from amtgo.runs.causal_stages import frozen_library
 from amtgo.utils.canonical import content_hash
 
 if TYPE_CHECKING:
@@ -159,12 +160,16 @@ def dfi(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
         align = alignment(state, partition)
         rri: dict[str, Any] = {"status": "CAUSAL_EFFECT_UNKNOWN"}
         if m.reification is not None:
-            # Statu quo comparé à lui-même (NO_TERRITORIAL_CHANGE) : Δ = 0 par construction.
-            resp = BoundedSalienceResponse(m.reification.beta_lo, m.reification.beta_hi,
-                                           m.reification.reference_horizon_years, m.reification.source)
-            rri = {"status": "BOUNDED", "baseline": "status_quo",
-                   "interval": [resp.salience_response(0.0, m.reification.horizon_years).lower,
-                                resp.salience_response(0.0, m.reification.horizon_years).upper]}
+            answer = frozen_library(ctx).query(m.reification.effect, ctx.manifest.request.region)
+            if answer.known:
+                # Statu quo comparé à lui-même (NO_TERRITORIAL_CHANGE) : Δ = 0 par construction.
+                iv = answer.interval()
+                rec = frozen_library(ctx).record(m.reification.effect)
+                resp = BoundedSalienceResponse(iv.lo, iv.hi, rec.time_horizon_years, rec.source_ids[0])
+                r = resp.salience_response(0.0, m.reification.horizon_years)
+                rri = {"status": "BOUNDED", "baseline": "status_quo", "interval": [r.lower, r.upper],
+                       "effect": m.reification.effect, "admissibility": answer.status,
+                       "grade": None if answer.grade is None else answer.grade.value}
         by_domain: dict[str, Any] = {}
         for d in dom:
             cur = by_domain.setdefault(d.domain.value, {"max_p_exceed": 0.0, "violations": 0, "urgent": 0,

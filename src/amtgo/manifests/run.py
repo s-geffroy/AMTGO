@@ -19,6 +19,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from amtgo.causal.library import CausalLibraryManifest
 from amtgo.config.loader import load_model
 from amtgo.core.enums import MapMode
 from amtgo.core.provenance import utcnow
@@ -43,6 +44,9 @@ ROLE_ANALYSIS_EXTENT = "analysis_extent"
 ROLE_STATUS_QUO = "status_quo_geometry"
 # Rôle requis pour qu'une source fournisse les comptes fiscaux de la viabilité (M6).
 ROLE_VIABILITY = "viability_inputs"
+# Rôles des sources de la bibliothèque causale (M7) : panels estimés, contexte cible du transport.
+ROLE_CAUSAL_ESTIMATION = "causal_estimation"
+ROLE_CAUSAL_TARGET = "causal_transport_target"
 
 
 class SourceUse(BaseModel):
@@ -68,6 +72,7 @@ class RunRequest(BaseModel):
     composition_model: str | None = None
     dfi_model: str | None = None
     viability_model: str | None = None
+    causal_library: str | None = None
     ontology_set: tuple[str, ...] = ()
     scenario_set: tuple[str, ...] = ()
     seeds: tuple[int, ...] = (0,)
@@ -108,8 +113,8 @@ class RunManifest(BaseModel):
     viability_model: ViabilityManifest | None = None
     observed_regime: ConstitutionalRegime | None = None
     regime_sensitivity: tuple[ConstitutionalRegime, ...] = ()
+    causal_library: CausalLibraryManifest | None = None
     # Couches non encore disponibles : explicitement nulles, jamais inventées.
-    causal_library: dict[str, Any] | None = None
     solver: dict[str, Any] | None = None
     seeds: tuple[int, ...]
 
@@ -210,6 +215,26 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         if len({r.regime_id for r in sensitivity}) != len(sensitivity):
             raise ConfigurationError("régime dupliqué dans regime_sensitivity")
 
+    causal = None
+    if request.causal_library:
+        causal = load_model(CausalLibraryManifest, configs_dir / request.causal_library)
+        by_id = {s.manifest.source_id: s for s in sources}
+        for est in causal.estimations:
+            for sid, role in ((est.panel_source, ROLE_CAUSAL_ESTIMATION), (est.target_source, ROLE_CAUSAL_TARGET)):
+                if sid not in by_id or role not in by_id[sid].use.roles:
+                    raise ConfigurationError(f"causalité : la source {sid} doit être déclarée avec le rôle {role!r}")
+    keys = set() if causal is None else ({d.effect_key for d in causal.declared}
+                                         | {e.effect_key for e in causal.estimations})
+    needed = []
+    if viability is not None:
+        needed += [viability.effects.market_access_elasticity, viability.effects.infrastructure_cost_reduction]
+    if dfi is not None and dfi.reification is not None:
+        needed.append(dfi.reification.effect)
+    missing = sorted(set(needed) - keys)
+    if missing:
+        raise ConfigurationError(f"effets causaux référencés absents de la bibliothèque du run : {missing} "
+                                 "(un effet n'est jamais un coefficient en dur, prompt §33)")
+
     body: dict[str, Any] = {
         "code_commit": code_commit(),
         "code_version": code_version(),
@@ -230,6 +255,7 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         "viability_model": viability,
         "observed_regime": observed,
         "regime_sensitivity": sensitivity,
+        "causal_library": causal,
         "seeds": request.seeds,
     }
     draft = RunManifest(run_id=uuid.UUID(int=0), manifest_hash="", created_at=utcnow(), **body)

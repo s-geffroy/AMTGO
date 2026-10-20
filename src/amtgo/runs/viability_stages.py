@@ -28,6 +28,7 @@ from amtgo.institutions.viability import (
 )
 from amtgo.measurement import fields as fields_mod
 from amtgo.runs import artifacts
+from amtgo.runs.causal_stages import frozen_library
 from amtgo.runs.dfi_stages import status_quo_partition
 from amtgo.scenarios.model import draw_scenario
 from amtgo.scenarios.projection import project_population
@@ -88,7 +89,11 @@ def viability(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
         territory_ids=list(level.jurisdictions), population=population @ to_territory,
         revenue=(population * per_capita["revenue"][:, fiscal_assign]) @ to_territory,
         service_cost=(population * per_capita["cost"][:, fiscal_assign]) @ to_territory)
-    exploratory, overhead = draw_model(vm, n_draws, seed)
+    lib = frozen_library(ctx)
+    region = ctx.manifest.request.region
+    effects = (lib.query(vm.effects.market_access_elasticity, region),
+               lib.query(vm.effects.infrastructure_cost_reduction, region))
+    exploratory, overhead = draw_model(vm, effects, n_draws, seed)
     thresholds = ctx.manifest.normative_manifest.viability
     results: dict[str, Any] = {}
     guards: dict[str, Any] = {}
@@ -101,7 +106,7 @@ def viability(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
         guards[sc.scenario_id] = {"forced_migration": projected.forced_migration,
                                   "reform_induced_relocation": projected.reform_induced_relocation,
                                   "voluntary_response": projected.voluntary_response}
-        context = ViabilityContext(union, vm, observed, thresholds, draws, exploratory, overhead)
+        context = ViabilityContext(union, vm, observed, thresholds, draws, effects, exploratory, overhead)
         results[sc.scenario_id] = {
             r.regime_id.value: {t: _summary(compute_viability(Territory(t, vm.level), r, sc, context))
                                 for t in level.jurisdictions}
@@ -111,12 +116,15 @@ def viability(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
            "observed_regime": observed.regime_id.value,
            "privacy_class": ctx.manifest.normative_manifest.privacy.default_access.value,
            "evidence_status": EvidenceStatus.MODEL.value, "thresholds": thresholds.model_dump(mode="json"),
-           "guards": guards, "assessments": results}
+           "guards": guards, "assessments": results,
+           "effects": {a.effect_key: {"status": a.status, "grade": None if a.grade is None else a.grade.value,
+                                      "reason": a.reason} for a in effects}}
     artifacts.write_json(ctx.run_dir, f"fields/{mesh_id}/viability.json", out)
     freeze = artifacts.read_json(ctx.run_dir, "measurement_freeze.json")
     record = ProvenanceRecord.create(
         "institutions.compute_viability",
-        [f"measurement_freeze:{freeze['freeze_hash']}", f"viability:{vm.content_hash}",
+        [f"measurement_freeze:{freeze['freeze_hash']}", f"causal_freeze:{lib.freeze_hash}",
+         f"viability:{vm.content_hash}",
          f"normative:{ctx.manifest.normative_manifest_hash}"]
         + [f"scenario:{sc.content_hash}" for sc in ctx.manifest.scenario_set]
         + [f"regime:{r.content_hash}" for r in regimes_evaluated(ctx)],

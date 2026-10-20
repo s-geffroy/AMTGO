@@ -88,11 +88,27 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
     s2c = json.loads((d / "artifacts" / "s2c_diagnostic.json").read_text())
     assert s2c["s2c_diagnostic"]["status"] == "NOT_APPLICABLE"
     assert "Contextual viability" in report and "Non disponible à ce stade (milestone M6)" not in report
+    # M7 : bibliothèque estimée, validée, gelée ; adoption endogène rejetée ; Gate C.
+    cv = json.loads((d / "artifacts" / "causal_validation.json").read_text())
+    assert cv["gate_c"] == "PASSED"
+    assert cv["rejected"] == ["language_rights_index_fictive"]
+    assert cv["estimations"]["fiscal_decentralization_service_coverage"]["synthetic_truth"]["covered"]
+    assert not cv["estimations"]["language_rights_index_fictive"]["synthetic_truth"]["covered"]
+    cf = json.loads((d / "causal_freeze.json").read_text())
+    assert cf["measurement_freeze"] == freeze_hash_of(d) and len(cf["effects"]) == 5
+    for mid in ms["meshes"]:
+        effects = json.loads((d / "fields" / mid / "viability.json").read_text())["effects"]
+        assert {v["status"] for v in effects.values()} == {"EXPLORATORY_ONLY"}
+    assert "Gate C : PASSED" in report and "CAUSAL_EFFECT_UNKNOWN" in report
     freeze = json.loads((d / "measurement_freeze.json").read_text())
     assert set(freeze["compositions"]) == set(ms["meshes"])
     assert "Parts seulement" in report
     assert (d / "measurement_freeze.json").exists()
     assert len(list((d / "provenance").glob("*.json"))) >= 12
+
+
+def freeze_hash_of(run_dir: Path) -> str:
+    return str(json.loads((run_dir / "measurement_freeze.json").read_text())["freeze_hash"])
 
 
 def test_resubmission_is_idempotent(settings: Settings) -> None:

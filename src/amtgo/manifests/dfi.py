@@ -14,20 +14,11 @@ class _Strict(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class ReificationBounds(_Strict):
-    """Bornes exploratoires de l'effet de l'institutionnalisation sur la saillance (I7, non causales)."""
+class ReificationSpec(_Strict):
+    """Effet de l'institutionnalisation sur la saillance : clé de la bibliothèque causale gelée (M7)."""
 
-    beta_lo: float
-    beta_hi: float
-    reference_horizon_years: float = Field(gt=0)
+    effect: str
     horizon_years: float = Field(gt=0)
-    source: str
-
-    @model_validator(mode="after")
-    def _ordered(self) -> Self:
-        if self.beta_lo > self.beta_hi:
-            raise ValueError("beta_lo > beta_hi")
-        return self
 
 
 class DFIManifest(_Strict):
@@ -39,7 +30,7 @@ class DFIManifest(_Strict):
     # Qualité des contacts par canal d'intégration : DÉCLARÉE (hypothèse) faute de mesure.
     integration_quality: dict[IntegChannel, float]
     status_quo: str  # chemin relatif à configs/
-    reification: ReificationBounds | None = None
+    reification: ReificationSpec | None = None
     # Plancher numérique des écarts relatifs (S^ontology, S^scale sur D/F/I).
     relative_floor: float = Field(gt=0)
 

@@ -74,11 +74,12 @@ def test_world_v_properties_hold() -> None:
 def _context(union: object = None) -> tuple[ViabilityContext, object]:
     sc = V.neutral_scenario()
     model = V.world_model("R0_CURRENT_LIKE")
-    exploratory, overhead = draw_model(model, V.DRAWS, 0)
+    effects = V.world_effects()
+    exploratory, overhead = draw_model(model, effects, V.DRAWS, 0)
     from amtgo.scenarios.model import draw_scenario
 
     return ViabilityContext(union, model, REGIMES["R0_CURRENT_LIKE"], THRESHOLDS,  # type: ignore[arg-type]
-                            draw_scenario(sc, V.DRAWS, 0), exploratory, overhead), sc
+                            draw_scenario(sc, V.DRAWS, 0), effects, exploratory, overhead), sc
 
 
 def test_missing_fiscal_accounts_are_unknown_not_viable() -> None:
@@ -117,3 +118,15 @@ def test_unknown_territory_refused() -> None:
     ctx, sc = _context(V.world_union())
     with pytest.raises(KeyError):
         compute_viability(Territory("atlantis", "state"), REGIMES["R0_CURRENT_LIKE"], sc, ctx)  # type: ignore[arg-type]
+
+
+def test_unknown_effect_makes_viability_unknown_not_zero() -> None:
+    """Sans effet identifié ni borne déclarée, la viabilité est UNKNOWN : l'effet n'est jamais pris nul."""
+    from amtgo.causal.library import CausalAnswer
+
+    ctx, sc = _context(V.world_union())
+    unknown = (CausalAnswer("x", "CAUSAL_EFFECT_UNKNOWN", None, None, "absent"), ctx.effects[1])
+    ctx2 = ViabilityContext(ctx.union, ctx.model, ctx.observed_regime, ctx.thresholds, ctx.draws, unknown,
+                            ctx.exploratory, ctx.overhead)
+    a = compute_viability(Territory("small_dense", "state"), REGIMES["R1_COMMON_MARKET"], sc, ctx2)  # type: ignore[arg-type]
+    assert a.status is ViabilityStatus.UNKNOWN

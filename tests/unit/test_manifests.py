@@ -68,7 +68,7 @@ def test_run_manifest_stable(configs_dir: Path) -> None:
     b = resolve_request(_request(configs_dir), configs_dir)
     assert a.run_id == b.run_id and a.manifest_hash == b.manifest_hash
     assert a.measurement_model is not None  # le pilote déclare un modèle de mesure (M3)
-    assert a.causal_library is None and a.solver is None
+    assert a.causal_library is not None and a.solver is None  # bibliothèque M7 ; solveur M10
     verify_manifest(a)
 
 

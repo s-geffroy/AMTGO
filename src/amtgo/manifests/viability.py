@@ -19,16 +19,15 @@ class SovereignOverhead(_Strict):
     security: Interval
 
 
-class ExploratoryEffects(_Strict):
-    """Coefficients NON CAUSAUX (grade I7) : bornes larges incluant l'effet nul (prompt §33).
+class ViabilityEffects(_Strict):
+    """Clés des effets dans la bibliothèque causale gelée (M7) — jamais des coefficients en dur.
 
-    Ils seront remplacés par la bibliothèque causale (M7). Toute conclusion qui
-    change entre leurs bornes est signalée « dépend de coefficients exploratoires ».
+    Toute conclusion qui change entre les bornes d'un effet non identifié est
+    signalée « dépend des bornes d'effets non identifiés ».
     """
 
-    market_access_elasticity: Interval  # élasticité de la base fiscale à l'accès au marché
-    infrastructure_cost_reduction: Interval  # baisse du coût des services par infrastructure commune
-    source: str
+    market_access_elasticity: str  # élasticité de la base fiscale à l'accès au marché
+    infrastructure_cost_reduction: str  # baisse du coût des services par infrastructure commune
 
 
 class ViabilityManifest(_Strict):
@@ -44,7 +43,7 @@ class ViabilityManifest(_Strict):
     regime_sensitivity: tuple[str, ...] = Field(min_length=1)
     level: str  # niveau du statu quo évalué (juridictions souveraines)
     sovereign_overhead: SovereignOverhead
-    exploratory: ExploratoryEffects
+    effects: ViabilityEffects
     # Hypothèse de clôture : l'union qui transfère et mutualise est la région analysée.
     union_closure: str
 

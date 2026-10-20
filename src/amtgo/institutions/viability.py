@@ -25,7 +25,8 @@ Couverture du territoire k, par tirage :
 - C_k : coût du panier de services observé × population × climat × urbanisation
   × (1 − δ·i_r)/(1 − δ·i_obs).
 
-γ et δ sont des coefficients exploratoires (I7), jamais des effets causaux.
+γ et δ viennent de la bibliothèque causale gelée (M7) : à défaut d'effet identifié,
+des bornes I7, jamais des faits causaux ; un effet inconnu rend la viabilité UNKNOWN.
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ from enum import StrEnum
 
 import numpy as np
 
+from amtgo.causal.library import CausalAnswer
 from amtgo.core.uncertainty import UncertainValue
 from amtgo.institutions.regimes import ConstitutionalRegime
 from amtgo.manifests.normative import ViabilityThresholds
@@ -78,6 +80,7 @@ class ViabilityContext:
     observed_regime: ConstitutionalRegime
     thresholds: ViabilityThresholds
     draws: ScenarioDraws  # tirages du scénario évalué
+    effects: tuple[CausalAnswer, CausalAnswer]  # γ (accès au marché), δ (infrastructures) : bibliothèque gelée
     exploratory: np.ndarray  # (S, 2) : γ, δ par tirage
     overhead: np.ndarray  # (S, 2) : F_admin, F_sec par tirage
 
@@ -104,7 +107,7 @@ class ViabilityAssessment:
             return (f"{self.territory_id} : viabilité UNKNOWN sous {self.regime_id}, scénario "
                     f"{self.scenario_id} (comptes fiscaux absents)")
         assert self.transfer_share is not None
-        dep = " ; dépend de coefficients exploratoires non causaux" if self.exploratory_dependency else ""
+        dep = " ; dépend des bornes d'effets non identifiés" if self.exploratory_dependency else ""
         return (f"{self.territory_id} : {self.status.value} sous {self.regime_id}, scénario {self.scenario_id}, "
                 f"couverture {self.coverage.mean:.2f} [{self.coverage.lower:.2f}, {self.coverage.upper:.2f}], "
                 f"transferts {self.transfer_share.mean:+.2f} du coût des services{dep}")
@@ -171,14 +174,18 @@ def compute_viability(territory: Territory, regime: ConstitutionalRegime, scenar
     if union is None:
         return ViabilityAssessment(territory.territory_id, rid, sid, ViabilityStatus.UNKNOWN,
                                    None, None, None, None, False)
+    unknown = [a.effect_key for a in context.effects if not a.known]
+    if unknown:
+        # Effet inconnu ≠ effet nul : sans γ ou δ, la couverture n'est pas calculable hors régime d'observation.
+        return ViabilityAssessment(territory.territory_id, rid, sid, ViabilityStatus.UNKNOWN,
+                                   None, None, None, None, False)
     k = union.index(territory)
     gamma, delta = context.exploratory[:, 0], context.exploratory[:, 1]
     cov, tr, ov = _coverage(union, regime, context, gamma, delta)
     status, p_short = _status(cov[:, k], context.thresholds)
-    e = context.model.exploratory
+    g_iv, d_iv = (a.interval() for a in context.effects)
     bounds = []
-    for g, dl in ((e.market_access_elasticity.lo, e.infrastructure_cost_reduction.lo),
-                  (e.market_access_elasticity.hi, e.infrastructure_cost_reduction.hi)):
+    for g, dl in ((g_iv.lo, d_iv.lo), (g_iv.hi, d_iv.hi)):
         c_b = _coverage(union, regime, context, np.full_like(gamma, g), np.full_like(delta, dl))[0]
         bounds.append(_status(c_b[:, k], context.thresholds)[0])
     return ViabilityAssessment(
@@ -187,13 +194,16 @@ def compute_viability(territory: Territory, regime: ConstitutionalRegime, scenar
         exploratory_dependency=any(b is not status for b in bounds))
 
 
-def draw_model(model: ViabilityManifest, n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
-    """Tirages des coefficients exploratoires (γ, δ) et des surcoûts (F_admin, F_sec)."""
+def draw_model(model: ViabilityManifest, effects: tuple[CausalAnswer, CausalAnswer], n: int,
+               seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """Tirages des effets (γ, δ) issus de la bibliothèque gelée, et des surcoûts (F_admin, F_sec).
+
+    Un effet inconnu donne des tirages NaN : ``compute_viability`` rend alors UNKNOWN.
+    """
     from amtgo.utils.canonical import sha256_hex
 
     rng = np.random.default_rng([seed, int(sha256_hex(model.content_hash)[:12], 16)])
-    e, o = model.exploratory, model.sovereign_overhead
-    exploratory = np.column_stack([e.market_access_elasticity.sample(rng, n),
-                                   e.infrastructure_cost_reduction.sample(rng, n)])
+    o = model.sovereign_overhead
+    exploratory = np.column_stack([a.draws(n, rng) if a.known else np.full(n, np.nan) for a in effects])
     overhead = np.column_stack([o.administration.sample(rng, n), o.security.sample(rng, n)])
     return exploratory, overhead

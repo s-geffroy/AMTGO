@@ -18,6 +18,9 @@ from typing import Any
 
 import numpy as np
 
+from amtgo.causal.library import CausalAnswer
+from amtgo.causal.model import IdentificationGrade
+from amtgo.core.uncertainty import UncertainValue
 from amtgo.institutions.regimes import ConstitutionalRegime
 from amtgo.institutions.viability import (
     FiscalUnion,
@@ -28,7 +31,7 @@ from amtgo.institutions.viability import (
     draw_model,
 )
 from amtgo.manifests.normative import ViabilityThresholds
-from amtgo.manifests.viability import ExploratoryEffects, SovereignOverhead, ViabilityManifest
+from amtgo.manifests.viability import SovereignOverhead, ViabilityEffects, ViabilityManifest
 from amtgo.scenarios.model import (
     ClimateAxis,
     EconomyAxis,
@@ -77,10 +80,16 @@ def world_model(observed: str) -> ViabilityManifest:
         regime_sensitivity=(observed,), level="state",
         sovereign_overhead=SovereignOverhead(administration=Interval(lo=2.0e6, hi=3.0e6),
                                              security=Interval(lo=4.0e6, hi=6.0e6)),
-        exploratory=ExploratoryEffects(market_access_elasticity=Interval(lo=0.0, hi=0.3),
-                                       infrastructure_cost_reduction=Interval(lo=0.0, hi=0.2),
-                                       source="monde V (fictif)"),
+        effects=ViabilityEffects(market_access_elasticity="world_v_market_access",
+                                 infrastructure_cost_reduction="world_v_infrastructure"),
         union_closure="monde V : les quatre territoires forment l'union")
+
+
+def world_effects() -> tuple[CausalAnswer, CausalAnswer]:
+    """Effets du monde V : bornes I7 déclarées (γ ∈ [0, 0,3], δ ∈ [0, 0,2]), jamais des faits."""
+    return tuple(CausalAnswer(k, "EXPLORATORY_ONLY", UncertainValue.bounds(0.0, hi), IdentificationGrade.I7,
+                              "monde V (fictif)")
+                 for k, hi in (("world_v_market_access", 0.3), ("world_v_infrastructure", 0.2)))  # type: ignore[return-value]
 
 
 def world_union(seed: int = 0) -> FiscalUnion:
@@ -101,9 +110,10 @@ def evaluate(regimes: dict[str, ConstitutionalRegime], observed: str, thresholds
     """{régime: {territoire: évaluation}} sous le scénario neutre."""
     sc = neutral_scenario()
     model = world_model(observed)
-    exploratory, overhead = draw_model(model, DRAWS, seed)
+    effects = world_effects()
+    exploratory, overhead = draw_model(model, effects, DRAWS, seed)
     ctx = ViabilityContext(world_union(seed), model, regimes[observed], thresholds,
-                           draw_scenario(sc, DRAWS, seed), exploratory, overhead)
+                           draw_scenario(sc, DRAWS, seed), effects, exploratory, overhead)
     return {rid: {t: compute_viability(Territory(t, "state"), r, sc, ctx) for t in TERRITORIES}
             for rid, r in regimes.items()}
 
@@ -127,7 +137,7 @@ def checks(res: dict[str, dict[str, ViabilityAssessment]], observed: str) -> lis
         ("V : aucun seuil de taille — un petit territoire viable, un grand non, sous le même régime",
          r0["small_dense"].status.value == "VIABLE" and r0["large_sparse"].status.value == "NOT_VIABLE",
          f"R0 : small_dense {r0['small_dense'].status.value} ; large_sparse {r0['large_sparse'].status.value}"),
-        ("V : au régime d'observation, les coefficients exploratoires n'ont aucun effet",
+        ("V : au régime d'observation, les bornes des effets non identifiés n'ont aucun effet",
          not any(a.exploratory_dependency for a in res[observed].values()),
          f"dépendances sous {observed} : {sum(a.exploratory_dependency for a in res[observed].values())}"),
         ("V : une viabilité n'a pas de valeur de vérité hors contexte (bool() lève)", no_truth,

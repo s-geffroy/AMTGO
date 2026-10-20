@@ -28,7 +28,7 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
     from amtgo.runs.state import RunStatus
 
     upgrade(db_settings)
-    assert current_revision(db_settings) == "0007"
+    assert current_revision(db_settings) == "0008"
     repo = make_repository(db_settings)
     manifest, _ = submit(db_settings.configs_dir / "runs/synthetic_pilot.yaml", db_settings)
     state = run_to_completion(db_settings, repo, str(manifest.run_id))
@@ -64,6 +64,10 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
         # M6 : régimes de la sensibilité et scénarios enregistrés, garde-fous en contraintes.
         assert count("SELECT count(DISTINCT regime_id) FROM constitutional_regimes WHERE :r IS NOT NULL") == 4
         assert count("SELECT count(DISTINCT scenario_id) FROM scenarios WHERE :r IS NOT NULL") == 4
+        # M7 : bibliothèque gelée enregistrée et rattachée au run.
+        assert count("SELECT count(*) FROM causal_freezes WHERE run_id = :r") == 5
+        assert count("SELECT count(*) FROM run_manifests WHERE run_id = :r "
+                     "AND causal_library_hash LIKE 'sha256:%'") == 1
 
     # Rejouer toutes les écritures ne duplique rien.
     from amtgo.data.ingestion import read_observations
@@ -96,3 +100,12 @@ def test_check_constraints(db_settings: Settings) -> None:
                 population, climate, urbanization, economy, migration, infrastructure, security)
             VALUES ('x', 'sha256:x', '1', 'S1', 10, '{}', '{}', '{}', '{}',
                 '{"forced_migration": 1000, "reform_induced_relocation": 0}', '{}', '{}')"""))
+    with pytest.raises(IntegrityError), engine.begin() as cx:
+        # Une hypothèse d'expert (I7) ne porte jamais une loi d'effet (04 §5).
+        cx.execute(text("""
+            INSERT INTO causal_effects (effect_id, content_hash, effect_key, treatment_definition,
+                outcome_definition, estimand, source_context, target_context, design, identification_grade,
+                effect_distribution, time_horizon, spillover_model, transportability, overlap_score,
+                mechanism, diagnostics, frozen_release)
+            VALUES (gen_random_uuid(), 'sha256:x', 'x', '{}', '{}', 'ATT', 's', 't', 'expert_hypothesis', 'I7',
+                '{"distribution_type": "EMPIRICAL"}', '{}', '{}', 'IDENTIFIED', 1.0, '{}', '{}', 'r')"""))
