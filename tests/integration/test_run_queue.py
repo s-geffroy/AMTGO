@@ -95,7 +95,7 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
     assert cv["estimations"]["fiscal_decentralization_service_coverage"]["synthetic_truth"]["covered"]
     assert not cv["estimations"]["language_rights_index_fictive"]["synthetic_truth"]["covered"]
     cf = json.loads((d / "causal_freeze.json").read_text())
-    assert cf["measurement_freeze"] == freeze_hash_of(d) and len(cf["effects"]) == 5
+    assert cf["measurement_freeze"] == freeze_hash_of(d) and len(cf["effects"]) == 10
     for mid in ms["meshes"]:
         effects = json.loads((d / "fields" / mid / "viability.json").read_text())["effects"]
         assert {v["status"] for v in effects.values()} == {"EXPLORATORY_ONLY"}
@@ -114,6 +114,15 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
     assert {v["n_states_by_mesh"]["pilot_grid_l4"] for v in ce["variants"].values()
             if v["family"] == "GEOGRAPHIC"} == {1, 2, 3, 4}
     assert "Candidate generation" in report and "non évalués" in report
+    # M9 : composeur à géométrie fixe ; le statu quo fictif ne viole aucun droit → NO_CHANGE, stable.
+    ie = json.loads((d / "artifacts" / "institutional_ensemble.json").read_text())
+    assert ie["conclusion"] == "NO_CHANGE" and ie["stability"] == "STABLE"
+    for mid in ms["meshes"]:
+        comp = json.loads((d / "fields" / mid / "institutional_composition.json").read_text())
+        for res in comp["ontologies"].values():
+            assert res["deferred_to_territorial_search"] == ["confederation", "sovereignty"]
+            assert all(o["status"] in ("NOT_NEEDED", "CREATES_VIOLATION") for o in res["options"])
+    assert "Institutional composition (fixed geometry)" in report
     freeze = json.loads((d / "measurement_freeze.json").read_text())
     assert set(freeze["compositions"]) == set(ms["meshes"])
     assert "Parts seulement" in report

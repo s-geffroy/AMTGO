@@ -31,7 +31,7 @@ def configs_dir(tmp_path: Path) -> Path:
     pilot = yaml.safe_load((dst / "runs" / "synthetic_pilot.yaml").read_text())
     light = dict(pilot, name="light", mesh_set=["meshes/pilot_grid_l4.yaml"])
     for key in ("measurement_model", "composition_model", "ontology_set", "dfi_model", "viability_model",
-                "scenario_set", "causal_library", "candidate_model"):
+                "scenario_set", "causal_library", "candidate_model", "composer_model"):
         light.pop(key)
     light["sources"] = [s for s in pilot["sources"]
                         if not {"viability_inputs", "causal_estimation"} & set(s["roles"])]

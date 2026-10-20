@@ -57,7 +57,7 @@ def _model(ctx: StageContext) -> CandidateManifest:
     return m
 
 
-def _adjacency(mesh: Mesh) -> list[list[int]]:
+def cell_adjacency(mesh: Mesh) -> list[list[int]]:
     index = {c: k for k, c in enumerate(mesh.cells)}
     return [[index[n] for n in nbrs] for nbrs in neighbor_graph(mesh).values()]
 
@@ -70,7 +70,7 @@ def generate(ctx: StageContext, mesh_id: str) -> tuple[list[TerritoryCandidate],
     pop = fields_mod.read_field(ctx.run_dir, mesh_id)[2].astype(np.float64).mean(axis=0)
     xy = np.array([[(p := to_equal_area(c.geometry).centroid).x / 1000.0, p.y / 1000.0]
                    for c in mesh.cells.values()])
-    adjacency = _adjacency(mesh)
+    adjacency = cell_adjacency(mesh)
     seed = ctx.manifest.seeds[0]
     out: list[TerritoryCandidate] = []
     assignments: dict[str, np.ndarray] = {}

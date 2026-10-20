@@ -153,6 +153,12 @@ def render_report(
     else:
         _candidate_section(a, manifest, candidates)
 
+    a("## Institutional composition (fixed geometry)\n")
+    if candidates is None or "composer" not in candidates:
+        a("_Aucun composeur institutionnel dans ce run._\n")
+    else:
+        _composer_section(a, manifest, candidates["composer"])
+
     a("## Causal support\n")
     if causal is None:
         a("`CAUSAL_EFFECT_UNKNOWN` — aucune bibliothèque causale dans ce run.\n")
@@ -502,3 +508,41 @@ def _candidate_section(a: Any, manifest: RunManifest, cand: dict[str, Any]) -> N
     a("Baselines : STATUS_QUO (rien ne change), NO_TERRITORIAL_CHANGE (seule l'application des droits peut "
       "varier), INSTITUTIONAL_ONLY_REFORM (compétences recomposées à géométrie fixe, M9). Le nombre d'États est "
       "balayé, jamais pénalisé ; une union (1 État) fait partie du balayage.\n")
+
+
+def _fmt_rri(r: list[float] | None) -> str:
+    return "UNKNOWN" if r is None else f"[{r[0]:.2g}, {r[1]:.2g}]"
+
+
+def _composer_section(a: Any, manifest: RunManifest, comp: dict[str, Any]) -> None:
+    cm = manifest.composer_model
+    assert cm is not None
+    e = comp["ensemble"]
+    a(f"Composeur `{cm.composer_id}` v{cm.version} : leviers testés sur la géométrie du statu quo, dans l'ordre "
+      "de recherche du §39, seuls puis cumulés, aux deux bornes de leur efficacité (bibliothèque gelée). "
+      "Recherche institutionnelle **avant** toute frontière.\n")
+    a(f"**Conclusion : {e['conclusion']}** ({e['stability']})"
+      + (f" — levier minimal : `{e['chosen']}`" if e["chosen"] else "") + ".\n")
+    mid = next(iter(comp["per_mesh"]))
+    first = comp["per_mesh"][mid]
+    for oid, res in first["ontologies"].items():
+        b = res["baseline"]
+        a(f"`{mid}`, ontologie `{oid}` — statu quo : {b['violations']} violation(s), max P(D > τ) "
+          f"{b['max_p_exceed']:.2f}, coût {b['cost']:.1f}.\n")
+        a("| option | statut | violations (borne basse) | F réseau | J_conn | RRI | coût | complexité | grades |")
+        a("|---|---|---|---|---|---|---|---|---|")
+        for o in res["options"]:
+            lo = o["lo"]
+            if lo is None:
+                a(f"| {o['option']} | **{o['status']}** | — | — | — | — | — | — | {', '.join(o['grades']) or '—'} |")
+                continue
+            jc = "—" if lo["j_conn"] is None else f"{lo['j_conn']:.2e}"
+            a(f"| {o['option']} | {o['status']} | {lo['violations']} | {lo['f_network']:.2e} | {jc} | "
+              f"{_fmt_rri(o['hi']['rri'])} | {lo['cost']:.1f} | {lo['complexity']} | {', '.join(o['grades'])} |")
+        a("")
+        a(f"Non dominés (vue robuste) : {', '.join(f'`{x}`' for x in res['non_dominated'])}. Renvoyés à la "
+          f"recherche territoriale (M10) : {', '.join(res['deferred_to_territorial_search']) or '—'}.\n")
+        break
+    a("Les efficacités sont des hypothèses d'expert (I7) : toute conclusion du composeur est **exploratoire**. "
+      "NO_CHANGE ou NO_TERRITORIAL_CHANGE_SUFFICIENT sont des résultats valides et attendus (01 §31) ; "
+      "INSTITUTIONAL_INSUFFICIENT_AT_FIXED_GEOMETRY ne serait pas une recommandation de frontière.\n")

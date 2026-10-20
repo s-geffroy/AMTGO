@@ -27,6 +27,7 @@ from amtgo.core.provenance import utcnow
 from amtgo.data.sources import SourceManifest
 from amtgo.errors import ConfigurationError
 from amtgo.geo.mesh import MeshDefinition
+from amtgo.institutions.composer import ComposerManifest
 from amtgo.institutions.regimes import ConstitutionalRegime, load_regime
 from amtgo.institutions.status_quo import StatusQuoSpec
 from amtgo.manifests.dfi import DFIManifest
@@ -75,6 +76,7 @@ class RunRequest(BaseModel):
     viability_model: str | None = None
     causal_library: str | None = None
     candidate_model: str | None = None
+    composer_model: str | None = None
     ontology_set: tuple[str, ...] = ()
     scenario_set: tuple[str, ...] = ()
     seeds: tuple[int, ...] = (0,)
@@ -117,6 +119,7 @@ class RunManifest(BaseModel):
     regime_sensitivity: tuple[ConstitutionalRegime, ...] = ()
     causal_library: CausalLibraryManifest | None = None
     candidate_model: CandidateManifest | None = None
+    composer_model: ComposerManifest | None = None
     # Couches non encore disponibles : explicitement nulles, jamais inventées.
     solver: dict[str, Any] | None = None
     seeds: tuple[int, ...]
@@ -226,6 +229,15 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
             for sid, role in ((est.panel_source, ROLE_CAUSAL_ESTIMATION), (est.target_source, ROLE_CAUSAL_TARGET)):
                 if sid not in by_id or role not in by_id[sid].use.roles:
                     raise ConfigurationError(f"causalité : la source {sid} doit être déclarée avec le rôle {role!r}")
+    composer = None
+    if request.composer_model:
+        composer = load_model(ComposerManifest, configs_dir / request.composer_model)
+        if dfi is None or status_quo is None:
+            raise ConfigurationError("le composeur exige un modèle D/F/I et un statu quo déclaré")
+        levels = [lv.name for lv in status_quo.levels]
+        if [composer.upper_level, composer.local_level] != levels[:2]:
+            raise ConfigurationError(
+                f"composeur : niveaux {composer.upper_level}/{composer.local_level} ≠ statu quo {levels}")
     keys = set() if causal is None else ({d.effect_key for d in causal.declared}
                                          | {e.effect_key for e in causal.estimations})
     needed = []
@@ -233,6 +245,8 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         needed += [viability.effects.market_access_elasticity, viability.effects.infrastructure_cost_reduction]
     if dfi is not None and dfi.reification is not None:
         needed.append(dfi.reification.effect)
+    if composer is not None:
+        needed += composer.effect_keys
     missing = sorted(set(needed) - keys)
     if missing:
         raise ConfigurationError(f"effets causaux référencés absents de la bibliothèque du run : {missing} "
@@ -270,6 +284,7 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         "regime_sensitivity": sensitivity,
         "causal_library": causal,
         "candidate_model": candidates,
+        "composer_model": composer,
         "seeds": request.seeds,
     }
     draft = RunManifest(run_id=uuid.UUID(int=0), manifest_hash="", created_at=utcnow(), **body)

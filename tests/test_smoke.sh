@@ -13,13 +13,13 @@ trap 'kill "$pid" 2>/dev/null || true; rm -rf "$tmp"' EXIT
 export AMTGO_STATE_DIR="$tmp/state" AMTGO_DB_HOST="" WORKER_INTERVAL=1 \
        WORKER_STATE="$tmp/state" WORKER_HEARTBEAT="$tmp/beat"
 
-run_id=$(amtgo run submit "$here/../configs/runs/synthetic_pilot.yaml" | tail -n1 | cut -d' ' -f1)
+run_id=$(amtgo run submit "$here/../configs/runs/smoke.yaml" | tail -n1 | cut -d' ' -f1)
 
 python3 -u "$here/../src/worker.py" > "$tmp/out" 2>&1 &
 pid=$!
 
 status=""
-for _ in $(seq 1 120); do
+for _ in $(seq 1 300); do
   status=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['status'])" \
            "$tmp/state/runs/$run_id/state.json" 2>/dev/null || true)
   [ "$status" = "SUCCEEDED" ] || [ "$status" = "FAILED" ] && break

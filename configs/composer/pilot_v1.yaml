@@ -1,0 +1,30 @@
+# Composeur institutionnel a geometrie fixe (M9). Parametres de MODELE, PROVISOIRES.
+# Leviers dans l'ordre de recherche du prompt §39 ; chaque efficacite vient de la
+# bibliotheque causale gelee (jamais un coefficient en dur).
+composer_id: composer_pilot
+version: "0.1.0"
+description: >
+  Leviers institutionnels testes sur la geometrie du statu quo, seuls puis cumules,
+  aux deux bornes de leur efficacite. Confederation et souverainete sont renvoyees
+  a la recherche territoriale (M10).
+upper_level: state
+local_level: district
+salience_effect: institutionalization_salience
+horizon_years: 10
+overlay_ring: 1
+cost:
+  units: unites de cout institutionnel (fictives)
+  coordination_per_shared_domain: 1.0
+  enforcement_per_check_unit: 1.0
+  threshold_change_per_unit: 1.0
+  overlay_per_cell_share: 1.0
+levers:
+  - {lever: rights_enforcement, effect: rights_enforcement_effectiveness, target_checks: 0.8}
+  - {lever: representation, effect: supermajority_effectiveness, threshold: 0.67}
+  - {lever: language_rights, effect: language_rights_effectiveness, domains: [culture_language], target_checks: 0.9}
+  - {lever: functional_overlay, effect: cross_border_cooperation_mitigation, channels: [network]}
+  - {lever: fiscal_autonomy, effect: devolution_effectiveness, domains: [public_services, public_employment], shift: 0.3}
+  - {lever: territorial_autonomy, effect: devolution_effectiveness, domains: [local_government, land, culture_language, public_services], shift: 0.5}
+  - {lever: federation, effect: devolution_effectiveness, domains: [civil_justice, political_voice, public_employment, public_services, land, culture_language, local_government], shift: 0.5}
+  - {lever: confederation}
+  - {lever: sovereignty}

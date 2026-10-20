@@ -2,7 +2,7 @@
 # Les effets declares sont des hypotheses d'expert (I7) : jamais des faits causaux.
 # Les effets estimes le sont dans le run, sur des panels synthetiques a verite connue.
 library_id: library_pilot
-version: "0.1.0"
+version: "0.2.0"
 description: >
   Hypotheses exploratoires reprises de M5-M6 (accès au marche, infrastructures
   communes, saillance identitaire) et deux estimations DiD echelonnees sur des
@@ -41,6 +41,62 @@ declared:
     time_horizon_years: 10
     mechanism: institutionnaliser une identite accroit sa saillance politique (04 §16)
     source: hypothese exploratoire (grade I7), non causale
+  # Efficacites des leviers du composeur institutionnel (M9) : part du changement nominal realisee.
+  - effect_key: rights_enforcement_effectiveness
+    treatment: {component: justice, definition: "garde-fous effectifs (juridiction independante, recours)", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: D, variable: rights_checks_realized, unit: part du changement nominal}
+    source_context: synthetic_south_atlantic
+    target_context: synthetic_south_atlantic
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.3, hi: 0.8}
+    time_horizon_years: 10
+    mechanism: des garde-fous nominaux ne sont que partiellement appliques
+    source: hypothese d'expert (monde synthetique), non causale
+  - effect_key: supermajority_effectiveness
+    treatment: {component: rep, definition: "seuil de decision qualifie", intensity_support: {lo: 0.5, hi: 0.75}}
+    outcome: {kind: D, variable: decision_threshold_realized, unit: part du changement nominal}
+    source_context: synthetic_south_atlantic
+    target_context: synthetic_south_atlantic
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.5, hi: 1.0}
+    time_horizon_years: 10
+    mechanism: une majorite qualifiee donne un pouvoir de blocage aux minorites politiques
+    source: hypothese d'expert (monde synthetique), non causale
+  - effect_key: language_rights_effectiveness
+    treatment: {component: lang, definition: "droits linguistiques garantis", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: D, variable: language_checks_realized, unit: part du changement nominal}
+    source_context: synthetic_south_atlantic
+    target_context: synthetic_south_atlantic
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.3, hi: 0.8}
+    time_horizon_years: 10
+    mechanism: garanties linguistiques dans l'administration et l'enseignement
+    source: hypothese d'expert (monde synthetique), non causale
+  - effect_key: cross_border_cooperation_mitigation
+    treatment: {component: mobility, definition: "overlay de cooperation transfrontaliere", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: F, variable: border_load_mitigation, unit: mu}
+    source_context: synthetic_south_atlantic
+    target_context: synthetic_south_atlantic
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.0, hi: 0.3}
+    time_horizon_years: 10
+    mechanism: une zone de cooperation attenue la charge frontaliere des liens
+    source: hypothese d'expert (monde synthetique), non causale
+  - effect_key: devolution_effectiveness
+    treatment: {component: fisc, definition: "transfert de competences vers le niveau local", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: D, variable: competence_shift_realized, unit: part du transfert nominal}
+    source_context: synthetic_south_atlantic
+    target_context: synthetic_south_atlantic
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.4, hi: 0.9}
+    time_horizon_years: 10
+    mechanism: les transferts de competences sont partiellement executes
+    source: hypothese d'expert (monde synthetique), non causale
 estimations:
   - effect_key: fiscal_decentralization_service_coverage
     panel_source: synthetic_policy_panel

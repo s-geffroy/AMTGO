@@ -142,6 +142,25 @@ def status_quo_partition(ctx: StageContext, mesh: Mesh) -> Partition:
     return build_partition(sq, mesh, ctx.manifest.constitutional_regime, polygons)
 
 
+def social_state(ctx: StageContext, mesh: Mesh, ontology_id: str, population: np.ndarray,
+                 kernel: sparse.csr_matrix) -> tuple[SocialState, float]:
+    """État social gelé d'une ontologie : effectifs par groupe, noyaux, qualité déclarée ; part non attribuée."""
+    m = ctx.manifest.dfi_model
+    if m is None:
+        raise ConfigurationError("aucun modèle D/F/I dans ce run")
+    shares, cats = _composition(ctx, mesh.mesh_id, ontology_id)
+    groups = [c for c in cats if c != UNMAPPED]
+    idx = [cats.index(g) for g in groups]
+    unmapped = float(shares[..., cats.index(UNMAPPED)].mean()) if UNMAPPED in cats else 0.0
+    counts = population[:, :, None] * shares[..., idx]
+    state = SocialState(
+        ontology_id=ontology_id, cell_ids=list(mesh.cells), groups=groups, population=counts,
+        ties={FragChannel.NETWORK: kernel}, exposure={IntegChannel.SPATIAL: kernel},
+        quality={c: np.full((len(groups), len(groups)), q) for c, q in m.integration_quality.items()},
+        assumptions=["qualité des contacts supposée uniforme", "population et composition indépendantes"])
+    return state, unmapped
+
+
 def dfi(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
     m = ctx.manifest.dfi_model
     sq = ctx.manifest.status_quo
@@ -157,16 +176,8 @@ def dfi(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
     per_ontology: dict[str, Any] = {}
     for ont in ctx.manifest.ontology_set:
         ctx.check_stop(f"dfi {mesh_id} {ont.ontology_id}")
-        shares, cats = _composition(ctx, mesh_id, ont.ontology_id)
-        groups = [c for c in cats if c != UNMAPPED]
-        idx = [cats.index(g) for g in groups]
-        unmapped = float(shares[..., cats.index(UNMAPPED)].mean()) if UNMAPPED in cats else 0.0
-        counts = population[:, :, None] * shares[..., idx]
-        state = SocialState(
-            ontology_id=ont.ontology_id, cell_ids=list(mesh.cells), groups=groups, population=counts,
-            ties={FragChannel.NETWORK: kernel}, exposure={IntegChannel.SPATIAL: kernel},
-            quality={c: np.full((len(groups), len(groups)), q) for c, q in m.integration_quality.items()},
-            assumptions=["qualité des contacts supposée uniforme", "population et composition indépendantes"])
+        state, unmapped = social_state(ctx, mesh, ont.ontology_id, population, kernel)
+        groups = state.groups
         frag = fragmentation(state, partition)
         integ = integration(state, partition, weights)
         dom = domination(state, partition, institutions, rights)
@@ -193,7 +204,7 @@ def dfi(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
             if d.realized is not None:
                 cur["realized"] = "OBSERVED"
         known_f = [f for f in frag if f.value is not None]
-        pop_g = counts.sum(axis=1).mean(axis=0)
+        pop_g = state.population.sum(axis=1).mean(axis=0)
         f_net = {f.group: f.value.mean for f in known_f if f.channel is FragChannel.NETWORK}  # type: ignore[union-attr]
         per_ontology[ont.ontology_id] = {
             "groups": groups, "unmapped_share": unmapped,

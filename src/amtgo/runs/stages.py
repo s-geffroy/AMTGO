@@ -30,6 +30,7 @@ from amtgo.runs import (
     artifacts,
     candidate_stages,
     causal_stages,
+    composer_stages,
     composition_stages,
     dfi_stages,
     measure_stages,
@@ -85,6 +86,9 @@ def plan_steps(manifest: RunManifest) -> list[str]:
         if manifest.candidate_model is not None:
             steps += [f"candidates:{m.mesh_id}" for m in manifest.mesh_set]
             steps += ["candidate_ensemble"]
+        if manifest.composer_model is not None:
+            steps += [f"compose:{m.mesh_id}" for m in manifest.mesh_set]
+            steps += ["compose_ensemble"]
     else:
         steps += _causal_steps(manifest)
     if any(sc.diagnostic_only for sc in manifest.scenario_set):
@@ -280,6 +284,11 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
         cand = {"ensemble": artifacts.read_json(ctx.run_dir, "artifacts/candidate_ensemble.json"),
                 "per_mesh": {d.mesh_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/candidates.json")
                              for d in ctx.manifest.mesh_set}}
+    if ctx.manifest.composer_model is not None and cand is not None:
+        cand["composer"] = {
+            "ensemble": artifacts.read_json(ctx.run_dir, "artifacts/institutional_ensemble.json"),
+            "per_mesh": {d.mesh_id: artifacts.read_json(
+                ctx.run_dir, f"fields/{d.mesh_id}/institutional_composition.json") for d in ctx.manifest.mesh_set}}
     causal = None
     if ctx.manifest.causal_library is not None:
         causal = {**causal_stages.library_summary(ctx),
@@ -293,6 +302,8 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
         "candidates": None if cand is None else {
             k: {"s_scale": None if v["s_scale"] is None else _round_sig(v["s_scale"], 4),
                 "n_states": v["n_states_by_mesh"]} for k, v in sorted(cand["ensemble"]["variants"].items())},
+        "composer": None if cand is None or "composer" not in cand else {
+            k: v for k, v in cand["composer"]["ensemble"].items() if k in ("conclusion", "chosen", "stability")},
         "causal": None if causal is None else {
             "freeze_hash": causal["freeze_hash"], "gate_c": causal["validation"]["gate_c"],
             "status": {k: v["status"] for k, v in sorted(causal["effects"].items())}},
@@ -333,6 +344,8 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "s2c_diagnostic": viability_stages.s2c_diagnostic,
     "candidates": candidate_stages.candidates,
     "candidate_ensemble": candidate_stages.candidate_ensemble,
+    "compose": composer_stages.compose_mesh,
+    "compose_ensemble": composer_stages.compose_ensemble,
     "report": report,
 }
 
