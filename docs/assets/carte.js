@@ -5,10 +5,13 @@
   const el = document.getElementById("amtgo-map");
   if (!el || typeof maplibregl === "undefined") return;
   const base = el.dataset.base;
+  // URL absolue : MapLibre charge les GeoJSON dans un web worker, qui ne résout pas un chemin
+  // relatif par rapport à la page (couches vides, sans erreur visible).
+  const url = (f) => new URL(base + f, document.baseURI).href;
   const css = (name) => getComputedStyle(document.body).getPropertyValue(name).trim() ||
     getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-  const fetchJSON = (f) => fetch(base + f).then((r) => {
+  const fetchJSON = (f) => fetch(url(f)).then((r) => {
     if (!r.ok) throw new Error(f + " : HTTP " + r.status);
     return r.json();
   });
@@ -63,8 +66,8 @@
     map.on("load", () => {
       const toggles = [];
       const files = Object.fromEntries(index.layers.map((l) => [l.id, l]));
-      map.addSource("countries", { type: "geojson", data: base + files.countries.file });
-      map.addSource("boundaries", { type: "geojson", data: base + files.boundaries.file });
+      map.addSource("countries", { type: "geojson", data: url(files.countries.file) });
+      map.addSource("boundaries", { type: "geojson", data: url(files.boundaries.file) });
       map.addLayer({ id: "countries-fill", type: "fill", source: "countries",
         paint: { "fill-color": css("--amtgo-country-fill") } });
       map.addLayer({ id: "countries-outline", type: "line", source: "countries",
@@ -80,7 +83,7 @@
 
       index.layers.filter((l) => l.id.startsWith("mesh_")).forEach((l) => {
         const color = l.family === "h3" ? css("--amtgo-h3") : css("--amtgo-grid");
-        map.addSource(l.id, { type: "geojson", data: base + l.file });
+        map.addSource(l.id, { type: "geojson", data: url(l.file) });
         map.addLayer({ id: l.id, type: "line", source: l.id,
           layout: { visibility: "none" }, paint: { "line-color": color, "line-width": 0.5, "line-opacity": 0.8 } });
         const label = (l.family === "h3" ? "Maillage H3 r" : "Grille LAEA niv. ") + l.resolution +
