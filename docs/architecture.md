@@ -30,6 +30,7 @@ PRIVACY / SAFETY GATE  amtgo.privacy             M11 ✔  publication entière (
 MAP-R                  amtgo.optimization.transition  M12 ✔  trajectoires §79, J_path, urgence, explications, 06 §15
 MAP-C-SHALLOW          amtgo.optimization.counterfactual M13 ✔  J_T retiré, X_2026 déclaré, prime de l'existant, phase 9
 CONTINENTAL COORD.     amtgo.optimization.continental M14 ✔  fronts régionaux × couches d'interface, coût d'interface, exactitude, 09 §14
+MAP-C-DEEP (RECHERCHE) amtgo.research             M15 ✔  SCM historique, Gate H, ensemble structurel, calibration ; hors produit
 EXPORT                 amtgo.export                M2 (carte publique)
 ```
 

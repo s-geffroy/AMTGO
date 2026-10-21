@@ -30,3 +30,4 @@ Chaque ambiguïté ou incohérence de la spécification tranchée pendant l'impl
 | [ADR-0024](ADR-0024-map-r-regional.md) | Map-R régional : trajectoires de transition et produit conditionnel (M12) | accepté |
 | [ADR-0025](ADR-0025-map-c-shallow.md) | Map-C-Shallow : contre-factuel contemporain sans privilège juridique (M13) | accepté |
 | [ADR-0026](ADR-0026-continental-coordination.md) | Coordination continentale par composition, sans solve monolithique (M14) | accepté |
+| [ADR-0027](ADR-0027-map-c-deep.md) | Map-C-Deep : branche de recherche, SCM historique sur monde synthétique (M15) | accepté |

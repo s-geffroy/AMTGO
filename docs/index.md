@@ -48,7 +48,7 @@ pas un échec.
 | M12 | Map-R régional : trajectoires depuis le statu quo, transition comprise, explications, lecture conditionnelle | fait |
 | M13 | Map-C-Shallow : contre-factuel contemporain sans privilège juridique, prime de l'existant | fait |
 | M14 | coordination continentale : composition des produits Map-R régionaux par couches d'interface | fait |
-| — | Map-C-Deep : branche de recherche séparée (prompt §55, 11 phase 11) | hors produit |
+| M15 | Map-C-Deep : branche de recherche séparée (11 phase 11), SCM historique sur monde synthétique, non prescriptif | fait (recherche) |
 
 La mesure de population du pilote synthétique est validée contre la vérité :
 non identifiée à la maille de la cellule, identifiée à 100 km. La composition

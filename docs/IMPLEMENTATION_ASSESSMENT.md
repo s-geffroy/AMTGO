@@ -111,3 +111,4 @@ Autres points relevés, sans décision nécessaire à ce stade :
 | M12 | Map-R régional : trajectoires de transition, hiérarchie contrefactuelle, produit conditionnel | **fait** |
 | M13 | Map-C-Shallow : sans privilège juridique (J_T retiré), X_2026 conservé et déclaré, prime de l'existant, phase 9 | **fait** |
 | M14 | coordination continentale : composition des fronts Map-R régionaux par couches d'interface, sans solve monolithique, exactitude vérifiée | **fait** |
+| M15 | Map-C-Deep (branche de recherche) : SCM historique validé sur monde synthétique, ensemble de formes structurelles, calibration ; non prescriptif | **fait (recherche)** |

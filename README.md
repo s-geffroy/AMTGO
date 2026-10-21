@@ -10,12 +10,13 @@ Documentation publique : <https://s-geffroy.github.io/AMTGO/>, avec l'évaluatio
 d'implémentation, les ADR, les rapports de milestone, les rapports de runs
 synthétiques et la carte.
 
-État actuel : **M0–M14** (bootstrap, registre de sources, cœur spatial, mesure, ontologies,
+État actuel : **M0–M15** (bootstrap, registre de sources, cœur spatial, mesure, ontologies,
 D/F/I, scénarios et viabilité contextuelle, bibliothèque causale gelée, candidats analytiques,
 composeur institutionnel, archive de Pareto robuste, validation et red-team avec gates de publication,
 Map-R régional : trajectoires de transition depuis le statu quo, Map-C-Shallow : contre-factuel sans
 privilège juridique de la géométrie actuelle, coordination continentale : composition de produits
-Map-R régionaux par des couches de coordination, sans solve monolithique).
+Map-R régionaux par des couches de coordination, sans solve monolithique ; et la branche de recherche
+Map-C-Deep : contre-factuel historique sur monde synthétique, non prescriptif).
 Aucun découpage n'est produit à ce stade.
 
 ## Sur le VPS
