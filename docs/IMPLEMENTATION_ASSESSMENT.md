@@ -108,3 +108,4 @@ Autres points relevés, sans décision nécessaire à ce stade :
 | M9 | composeur institutionnel à géométrie fixe ; monde I | **fait** |
 | M10 | optimiseur régional : archive de Pareto robuste ; Gate O | **fait** |
 | M11 | validation et red-team : stabilité, ablations, Goodhart, confidentialité ; gates M, C, O, S, R | **fait** |
+| M12 | Map-R régional : trajectoires de transition, hiérarchie contrefactuelle, produit conditionnel | **fait** |

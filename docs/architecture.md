@@ -27,6 +27,7 @@ ROBUST OPTIMIZATION    amtgo.optimization          M10 ✔  J, ρ, ε-dominance,
 PARETO ARCHIVE         amtgo.optimization          M10 ✔  rangs, baselines, biais connus, INFEASIBLE
 VALIDATION             amtgo.validation           M11 ✔  S^param, régimes, multi-échelle, ablations, Goodhart, falsification, gates
 PRIVACY / SAFETY GATE  amtgo.privacy             M11 ✔  publication entière (k, différenciation, proxies), red-team, Gate S
+MAP-R                  amtgo.optimization.transition  M12 ✔  trajectoires §79, J_path, urgence, explications, 06 §15
 EXPORT                 amtgo.export                M2 (carte publique)
 ```
 
