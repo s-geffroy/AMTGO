@@ -1,7 +1,7 @@
 # Modèle de menace (préliminaire)
 
-*Version M2. Le modèle complet et le red-team de reconstruction sont l'objet de
-M11 (Gate S).*
+*Version M11. Le red-team de reconstruction et Gate S sont en place ; le modèle de
+menace reste à valider par la gouvernance (06).*
 
 ## Actifs sensibles
 
@@ -30,9 +30,29 @@ Objectif : le système **public** doit rester inutile à ces usages opérationne
 | monde synthétique placé en plein océan | aucune confusion avec une population réelle |
 | interdictions structurelles (prompt §92) testées par introspection | pas de fonction de ciblage ou d'homogénéisation |
 
-## Non couvert à ce stade
+## Red-team M11 (Gate S, 05 §15-16)
 
-Reconstruction par intersection de couches, inférence de religion ou de route
-pastorale, seuils de petites cellules : sans objet tant qu'aucune couche de
-population ou de groupe n'est exportée. **Bloquant** pour toute publication
-future de telles couches.
+Une publication est évaluée **en entier** (`privacy.guard.evaluate_release`), couche par couche, dans l'ordre de priorité.
+
+| règle | attaque bloquée |
+|---|---|
+| comptage < k (manifeste normatif, `privacy.min_group_count`) → supprimé | reconstruction d'un petit groupe |
+| même comptage sur deux supports différents → seul le premier sort | intersection de couches publiques (différenciation) |
+| attribut proxy déclaré (`privacy.sensitive_proxies` : religion, langue, étiquette historique, parts de groupes, route) → restreint | inférence de religion |
+| mobilité ou route → restreinte | route pastorale sensible, acteur armé |
+| géométrie calculée à partir des parts de groupes → restreinte | frontière candidate révélant les groupes |
+| attributs de groupe → restreints | localisation d'une minorité, ciblage |
+
+Chaque attaque est rejouée deux fois :
+- pour une cible PUBLIC, où la population n'est jamais publiée telle quelle ;
+- pour une cible CONTROLLED, où la population peut sortir : les règles de petit effectif et de différenciation doivent alors tenir seules.
+
+Deux contrôles bénins doivent sortir, un maillage en PUBLIC et une population agrégée en CONTROLLED : un garde qui bloque tout passerait la suite sans rien prouver.
+
+**Gate S** passe si toutes les attaques sont bloquées, si les contrôles bénins sortent, et si aucune couche sensible de l'inventaire du run n'est publiable telle quelle. Sur le pilote, seuls les maillages le sont.
+
+## Non couvert
+
+- k et la liste des proxies sont un **choix déclaré** (03 §25 : pas de seuil universel), en attente du comité de gouvernance (06).
+- La différenciation est traitée de façon conservatrice : un attribut, un support. Un calcul exact des cellules reconstructibles entre supports emboîtés reste à faire.
+- Aucune couche de population ou de groupe n'est exportée : la carte publique ne porte que pays et maillages.

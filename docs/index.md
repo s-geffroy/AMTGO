@@ -44,7 +44,8 @@ pas un échec.
 | M8 | candidats : baselines, familles géographiques et de graphe, stabilité multi-échelle | fait |
 | M9 | composeur institutionnel à géométrie fixe, monde I, conclusion NO_CHANGE possible | fait |
 | M10 | optimiseur régional : archive de Pareto robuste, ε-dominance, Gate O | fait |
-| M11+ | validation, red-team, Map-R | à venir |
+| M11 | validation et red-team : S^parameter, régimes, multi-échelle, ablations, Goodhart, falsification, confidentialité, gates | fait |
+| M12+ | Map-R régional, Map-C-Shallow, composition continentale | à venir |
 
 La mesure de population du pilote synthétique est validée contre la vérité :
 non identifiée à la maille de la cellule, identifiée à 100 km. La composition
@@ -58,7 +59,9 @@ est admis, un autre, à adoption endogène, est rejeté. Des candidats territori
 sont générés comme unités analytiques — non évalués, non publiés. À géométrie
 fixe, le composeur institutionnel conclut : aucun changement requis. Une archive de
 Pareto robuste compare les candidats ; ses biais sont déclarés et aucune solution
-n'est publiable. À ce stade,
+n'est publiable. La validation recalcule cette archive sous chaque paramètre
+normatif, chaque régime et chaque maillage, l'attaque (Goodhart, confidentialité)
+et applique les gates de publication : le pilote reste NOT_IDENTIFIABLE. À ce stade,
 **aucun découpage n'existe** : la [carte](carte.md) montre les pays
 actuels et les maillages d'analyse, et sa couche de candidats affiche
 *NOT_IDENTIFIABLE*.

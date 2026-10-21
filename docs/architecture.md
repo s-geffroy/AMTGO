@@ -25,8 +25,8 @@ CANDIDATE GENERATION   amtgo.candidates            M8  ✔  baselines, k-means, 
 INSTITUTIONAL COMP.    amtgo.institutions.composer M9  ✔  leviers §39 à géométrie fixe, bornes d'efficacité
 ROBUST OPTIMIZATION    amtgo.optimization          M10 ✔  J, ρ, ε-dominance, droits durs, benchmark exact
 PARETO ARCHIVE         amtgo.optimization          M10 ✔  rangs, baselines, biais connus, INFEASIBLE
-VALIDATION             amtgo.validation           M11
-PRIVACY / SAFETY GATE  amtgo.privacy.guard         M2 (minimal) / M11
+VALIDATION             amtgo.validation           M11 ✔  S^param, régimes, multi-échelle, ablations, Goodhart, falsification, gates
+PRIVACY / SAFETY GATE  amtgo.privacy             M11 ✔  publication entière (k, différenciation, proxies), red-team, Gate S
 EXPORT                 amtgo.export                M2 (carte publique)
 ```
 

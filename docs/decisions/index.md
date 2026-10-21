@@ -26,3 +26,4 @@ Chaque ambiguïté ou incohérence de la spécification tranchée pendant l'impl
 | [ADR-0020](ADR-0020-candidats.md) | Générateur de candidats territoriaux (M8) | accepté |
 | [ADR-0021](ADR-0021-composeur-institutionnel.md) | Composeur institutionnel à géométrie fixe (M9) | accepté |
 | [ADR-0022](ADR-0022-optimiseur-regional.md) | Optimiseur régional : archive de Pareto robuste (M10) | accepté |
+| [ADR-0023](ADR-0023-validation-red-team.md) | Validation et red-team : stabilité, ablations, Goodhart, confidentialité, gates (M11) | accepté |
