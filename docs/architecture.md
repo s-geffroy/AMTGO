@@ -28,6 +28,7 @@ PARETO ARCHIVE         amtgo.optimization          M10 ✔  rangs, baselines, bi
 VALIDATION             amtgo.validation           M11 ✔  S^param, régimes, multi-échelle, ablations, Goodhart, falsification, gates
 PRIVACY / SAFETY GATE  amtgo.privacy             M11 ✔  publication entière (k, différenciation, proxies), red-team, Gate S
 MAP-R                  amtgo.optimization.transition  M12 ✔  trajectoires §79, J_path, urgence, explications, 06 §15
+MAP-C-SHALLOW          amtgo.optimization.counterfactual M13 ✔  J_T retiré, X_2026 déclaré, prime de l'existant, phase 9
 EXPORT                 amtgo.export                M2 (carte publique)
 ```
 
