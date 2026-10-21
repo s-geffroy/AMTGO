@@ -13,6 +13,7 @@ déclare explicitement chaque couche non encore disponible.
 <div id="amtgo-runs" markdown="1">
 - [Pilote synthétique (M0–M12)](generated/synthetic_pilot.md)
 - [Map-C-Shallow synthétique (M13)](generated/synthetic_c_shallow.md)
+- [Coordination continentale synthétique (M14)](generated/synthetic_continental.md)
 - [Fond de carte Afrique](generated/pages_africa.md)
 - [Mondes synthétiques A–F (D/F/I), V (viabilité) et I (composeur)](generated/worlds.md)
 </div>

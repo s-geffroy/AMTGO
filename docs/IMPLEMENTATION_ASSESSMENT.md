@@ -110,3 +110,4 @@ Autres points relevés, sans décision nécessaire à ce stade :
 | M11 | validation et red-team : stabilité, ablations, Goodhart, confidentialité ; gates M, C, O, S, R | **fait** |
 | M12 | Map-R régional : trajectoires de transition, hiérarchie contrefactuelle, produit conditionnel | **fait** |
 | M13 | Map-C-Shallow : sans privilège juridique (J_T retiré), X_2026 conservé et déclaré, prime de l'existant, phase 9 | **fait** |
+| M14 | coordination continentale : composition des fronts Map-R régionaux par couches d'interface, sans solve monolithique, exactitude vérifiée | **fait** |

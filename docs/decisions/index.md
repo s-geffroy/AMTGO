@@ -29,3 +29,4 @@ Chaque ambiguïté ou incohérence de la spécification tranchée pendant l'impl
 | [ADR-0023](ADR-0023-validation-red-team.md) | Validation et red-team : stabilité, ablations, Goodhart, confidentialité, gates (M11) | accepté |
 | [ADR-0024](ADR-0024-map-r-regional.md) | Map-R régional : trajectoires de transition et produit conditionnel (M12) | accepté |
 | [ADR-0025](ADR-0025-map-c-shallow.md) | Map-C-Shallow : contre-factuel contemporain sans privilège juridique (M13) | accepté |
+| [ADR-0026](ADR-0026-continental-coordination.md) | Coordination continentale par composition, sans solve monolithique (M14) | accepté |

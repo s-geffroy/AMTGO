@@ -47,7 +47,8 @@ pas un échec.
 | M11 | validation et red-team : S^parameter, régimes, multi-échelle, ablations, Goodhart, falsification, confidentialité, gates | fait |
 | M12 | Map-R régional : trajectoires depuis le statu quo, transition comprise, explications, lecture conditionnelle | fait |
 | M13 | Map-C-Shallow : contre-factuel contemporain sans privilège juridique, prime de l'existant | fait |
-| M14 | composition continentale | à venir |
+| M14 | coordination continentale : composition des produits Map-R régionaux par couches d'interface | fait |
+| — | Map-C-Deep : branche de recherche séparée (prompt §55, 11 phase 11) | hors produit |
 
 La mesure de population du pilote synthétique est validée contre la vérité :
 non identifiée à la maille de la cellule, identifiée à 100 km. La composition
@@ -66,7 +67,8 @@ normatif, chaque régime et chaque maillage, l'attaque (Goodhart, confidentialit
 et applique les gates de publication : le pilote reste NOT_IDENTIFIABLE. Map-R
 compare enfin des trajectoires depuis le statu quo, transition comprise : aucune ne
 fait mieux que rester partout. Map-C-Shallow retire le privilège juridique de la
-géométrie actuelle : elle reste au front, et ce privilège ne protège ici rien de plus. À ce stade,
+géométrie actuelle : elle reste au front, et ce privilège ne protège ici rien de plus. Composer
+deux régions par des couches de coordination ne fait rien entrer au front à la borne robuste. À ce stade,
 **aucun découpage n'existe** : la [carte](carte.md) montre les pays
 actuels et les maillages d'analyse, et sa couche de candidats affiche
 *NOT_IDENTIFIABLE*.
