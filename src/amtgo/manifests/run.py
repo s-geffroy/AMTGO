@@ -145,7 +145,8 @@ def manifest_body_hash(manifest: RunManifest) -> str:
 
 def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
     if request.map_mode is MapMode.C_DEEP:
-        raise ConfigurationError("Map-C-Deep : branche de recherche séparée, non implémentée (prompt §77)")
+        raise ConfigurationError("Map-C-Deep : branche de recherche séparée du produit — requête `kind: c_deep` "
+                                 "(configs/research/), jamais un mode de run du produit (prompt §55, 11 phase 11)")
     if not request.mesh_set:
         raise ConfigurationError("au moins un maillage est requis")
 

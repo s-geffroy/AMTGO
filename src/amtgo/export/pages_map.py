@@ -57,7 +57,8 @@ def _write(out: Path, name: str, payload: Any) -> None:
 def export_pages_map(run_dir: Path, out: Path) -> dict[str, Any]:
     manifest = load_manifest(run_dir)
     if not isinstance(manifest, RunManifest):
-        raise ConfigurationError("carte Pages : un run continental ne produit aucune géométrie à exporter")
+        raise ConfigurationError("carte Pages : seul un run régional produit des couches ; un run "
+                                 "continental ou un contre-factuel historique (Map-C-Deep) n'en exporte aucune")
     outputs = artifacts.read_json(run_dir, "outputs.json")
     out.mkdir(parents=True, exist_ok=True)
     layers: list[dict[str, Any]] = []

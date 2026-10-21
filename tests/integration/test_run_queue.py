@@ -305,3 +305,22 @@ def test_continental_composition_end_to_end(settings: Settings) -> None:
     assert not re.search(r"\b(prouve|meilleur|optimal)", report)
     again, created = submit(settings.configs_dir / "continental/synthetic_continental.yaml", settings)
     assert not created and again.run_id == manifest.run_id
+
+
+def test_c_deep_research_branch_end_to_end(settings: Settings) -> None:
+    """Map-C-Deep : SCM historique validé, ensemble de formes structurelles, calibration, aucun produit."""
+    run_id = _run(settings, "research/c_deep_synthetic.yaml")
+    d = runs_dir(settings) / run_id
+    p = json.loads((d / "artifacts" / "c_deep.json").read_text())
+    assert p["status"] == "HISTORICAL_COUNTERFACTUAL — NON_PRESCRIPTIVE" and p["experimental"]
+    assert p["conclusion"] == "HISTORICAL_COUNTERFACTUAL_ESTIMATED" and len(p["ensemble"]) >= 2
+    assert p["calibration"]["status"] == "COVERED"
+    assert not p["public_layer"]["published"] and p["privacy_class"] == "CONTROLLED"
+    assert not any(k.startswith("group_share") for k in p["counterfactual"]["counterfactual"])
+    groups = json.loads((d / "artifacts" / "c_deep_groups.json").read_text())
+    assert groups["privacy_class"] == "CONTROLLED"
+    report = (d / "report.md").read_text()
+    assert "HISTORICAL_COUNTERFACTUAL — NON_PRESCRIPTIVE" in report and "group_share" not in report
+    assert "nécessaire, pas suffisant" in report and not re.search(r"\b(prouve|meilleur|optimal)", report)
+    for f in ("pareto_archive.json", "map_r.json", "continental.json"):
+        assert not (d / "artifacts" / f).exists()

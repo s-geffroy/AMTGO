@@ -24,6 +24,10 @@ done
 rid=$(amtgo run execute configs/continental/synthetic_continental.yaml | tail -n1 | cut -d' ' -f1)
 amtgo export report "$rid" "$work/docs/runs/generated/synthetic_continental.md"
 
+# Branche de recherche Map-C-Deep (11 phase 11) : monde historique synthetique, jamais une carte.
+rid=$(amtgo run execute configs/research/c_deep_synthetic.yaml | tail -n1 | cut -d' ' -f1)
+amtgo export report "$rid" "$work/docs/runs/generated/c_deep_synthetic.md"
+
 amtgo validate worlds --out "$work/docs/runs/generated/worlds.md" > /dev/null
 
 mkdocs build --strict --config-file "$work/mkdocs.yml" --site-dir "$(realpath -m "$out")"

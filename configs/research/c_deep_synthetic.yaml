@@ -1,0 +1,51 @@
+# Map-C-Deep (branche de recherche, 11 phase 11) sur un monde historique SYNTHETIQUE a verite connue.
+# Une partition (1925) coupe l'aire d'un groupe fictif ; le contre-factuel retire cette partition.
+# Le theta vrai ne sert qu'a generer l'histoire observee et a calibrer : l'estimation ne le lit jamais.
+# Aucune source reelle, aucun coefficient contemporain, aucun deplacement de population.
+kind: c_deep
+name: c_deep_synthetic
+description: >
+  Exercice historique de sensibilite sur monde synthetique : une partition coupant
+  l'aire d'un groupe fictif, et le contre-factuel sans partition. SCM historique estime
+  sur recensements et enquetes historiques simules, valide (holdout temporel,
+  leave-region-out, placebo), ensemble de formes structurelles, calibre sur la verite.
+  Contre-factuel historique, non prescriptif ; aucune carte.
+world:
+  seed: 1885
+  nx: 20
+  ny: 16
+  spacing_km: 10
+  background: 50
+  towns:
+    - {x: 3, y: 8, peak: 2000, scale_km: 15}
+    - {x: 16, y: 8, peak: 800, scale_km: 12}
+  groups: [a, b]
+  second_group: {x: 12, y: 8, scale_km: 40, max_share: 0.8}
+  identity_initial: 0.3
+  growth_per_decade: 0.12
+  kernels: {migration_km: 25, capital_km: 15, ties_km: 12}
+  truth: {mu: 0.08, alpha: 0.6, gamma: 2.0, beta: 0.6, nu: 0.15, lam: 0.7}
+history:
+  start: 1885
+  end: 2025
+  factual:
+    - {year: 1885, capitals: [[3, 8]]}
+    - {year: 1925, border_x: 10, capitals: [[3, 8], [16, 8]]}
+  counterfactual:
+    - {year: 1885, capitals: [[3, 8]]}
+observation:
+  census_years: [1885, 1905, 1925, 1945, 1965, 1985, 2005, 2025]
+  share_years: [1885, 1945, 2025]
+  survey_years: [1885, 1915, 1945, 1985, 2025]
+  block: [5, 4]
+  noise: {census: 0.03, init: 0.05, shares: 0.02, survey: 0.03}
+models: [border_friction, no_border_friction]
+validation:
+  holdout_from: 2005
+  tolerance_rms_z: 2.0         # residus hors echantillon standardises par le bruit declare : ~1 sous un modele correct
+  placebo: {border_y: 8, year: 1925}
+  placebo_z: 2.0
+  bootstrap: 30
+  seed: 7
+  interval_level: 0.9
+reference_line_x: 10

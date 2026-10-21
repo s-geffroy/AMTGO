@@ -20,14 +20,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from amtgo.config.loader import load_model
+from amtgo.config.loader import load_model, read_yaml
 from amtgo.config.settings import Settings
 from amtgo.core.provenance import utcnow
 from amtgo.db.repository import Repository
 from amtgo.errors import AMTGOError, StageInterrupted
+from amtgo.manifests.c_deep import KIND as C_DEEP_KIND
+from amtgo.manifests.c_deep import CDeepManifest, resolve_c_deep
 from amtgo.manifests.continental import ContinentalManifest, ContinentalRequest, is_continental, resolve_continental
 from amtgo.manifests.run import RunManifest, RunRequest, resolve_request
-from amtgo.runs import continental_stages
+from amtgo.runs import c_deep_stages, continental_stages
 from amtgo.runs.stages import StageContext, plan_steps, run_step
 from amtgo.runs.state import RunState, RunStatus, StepState, load_state, save_state, write_json_atomic
 from amtgo.utils.logging import log_event
@@ -41,14 +43,15 @@ def cache_dir(settings: Settings) -> Path:
     return settings.state_dir / "cache"
 
 
-AnyManifest = RunManifest | ContinentalManifest
+AnyManifest = RunManifest | ContinentalManifest | CDeepManifest
 
 
 def submit(request_path: Path, settings: Settings) -> tuple[AnyManifest, bool]:
     """Soumet une requête. Renvoie (manifeste, créé?) ; resoumettre le même contenu est sans effet.
 
     Une requête continentale (M14) soumet d'abord ses runs régionaux : le worker suivant
-    l'ordre de soumission, la composition ne démarre qu'après eux.
+    l'ordre de soumission, la composition ne démarre qu'après eux. Une requête ``c_deep``
+    relève de la branche de recherche (11 phase 11) : même file, aucun produit.
     """
     manifest: AnyManifest
     if is_continental(request_path):
@@ -57,6 +60,9 @@ def submit(request_path: Path, settings: Settings) -> tuple[AnyManifest, bool]:
         for path in regional.values():
             submit(path, settings)
         name, steps = crequest.name, continental_stages.plan_steps(manifest)
+    elif _kind(request_path) == C_DEEP_KIND:
+        manifest = resolve_c_deep(request_path)
+        name, steps = manifest.request.name, c_deep_stages.plan_steps(manifest)
     else:
         request = load_model(RunRequest, request_path)
         manifest = resolve_request(request, settings.configs_dir)
@@ -71,10 +77,18 @@ def submit(request_path: Path, settings: Settings) -> tuple[AnyManifest, bool]:
     return manifest, True
 
 
+def _kind(path: Path) -> str | None:
+    data = read_yaml(path)
+    return data.get("kind") if isinstance(data, dict) else None
+
+
 def load_manifest(run_dir: Path) -> AnyManifest:
     text = (run_dir / "manifest.json").read_text(encoding="utf-8")
-    if '"kind": "continental"' in text[:200] or '"kind":"continental"' in text[:200]:
+    head = text[:200].replace(" ", "")
+    if '"kind":"continental"' in head:
         return ContinentalManifest.model_validate_json(text)
+    if f'"kind":"{C_DEEP_KIND}"' in head:
+        return CDeepManifest.model_validate_json(text)
     return RunManifest.model_validate_json(text)
 
 
@@ -126,6 +140,9 @@ def advance_one(
         cctx = continental_stages.ContinentalContext(run_dir, manifest, repo, runs_dir(settings), cache_dir(settings),
                                                      should_stop)
         run = lambda: continental_stages.run_step(cctx, step.name)  # noqa: E731
+    elif isinstance(manifest, CDeepManifest):
+        dctx = c_deep_stages.CDeepContext(run_dir, manifest, should_stop)
+        run = lambda: c_deep_stages.run_step(dctx, step.name)  # noqa: E731
     else:
         ctx = StageContext(run_dir, manifest, repo, cache_dir(settings), should_stop)
         run = lambda: run_step(ctx, step.name)  # noqa: E731

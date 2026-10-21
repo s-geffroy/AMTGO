@@ -857,3 +857,76 @@ def render_continental(manifest: Any, p: dict[str, Any]) -> str:
     a(f"Couche cartographique : **vide** — {p['public_layer']['reason']}. Valide à la date du run "
       f"({p['valid_as_of']['run_created_at']}).\n")
     return "\n".join(L) + "\n"
+
+
+def render_c_deep(manifest: Any, p: dict[str, Any]) -> str:
+    """Rapport de la branche de recherche Map-C-Deep : exercice historique de sensibilité, jamais une carte."""
+    req = manifest.request
+    L: list[str] = []
+    a = L.append
+    a(f"# Rapport de recherche Map-C-Deep — `{req.name}`\n")
+    a(f"> **{p['status']}** — branche de recherche expérimentale, séparée du produit principal (11 phase 11). "
+      "Exercice historique de sensibilité sur monde **synthétique** : ni une carte, ni une recommandation. "
+      "Aucune adoption ne peut être inférée par le modèle.\n")
+    a("## Run identity\n")
+    a("| champ | valeur |\n|---|---|")
+    a(f"| run_id | `{manifest.run_id}` |")
+    a(f"| manifest_hash | `{manifest.manifest_hash}` |")
+    a(f"| code_version | `{manifest.code_version}` |")
+    a(f"| histoire | {req.history.start} → {req.history.end} (pas de 10 ans) |\n")
+    a(req.description.strip() + "\n")
+    a(f"Question : *{p['question']}* Coefficients contemporains : {p['contemporary_coefficients']}. "
+      f"Actions contre-factuelles : {p['counterfactual_actions']}.\n")
+
+    a("## SCM historique et Gate H (04 §21)\n")
+    a("| modèle | θ estimé | holdout temporel | leave-region-out | placebo | Gate H |")
+    a("|---|---|---|---|---|---|")
+    for m, g in p["gate_h"].items():
+        th = p["theta"][m]["estimate"] or {}
+        se = p["theta"][m]["se"] or {}
+        theta = ", ".join(f"{k}={v:.2f}" + (f"±{se[k]:.2f}" if se.get(k) is not None else "")
+                          for k, v in th.items() if k in se)
+        c = g["checks"]
+
+        def chk(name: str, c: dict[str, Any] = c) -> str:
+            if name not in c:
+                return "—"
+            x = c[name]
+            if name == "placebo":
+                return f"β={x['beta_placebo']:.3f} (se {x['se']:.3f}) {'✓' if x['passed'] else '✗'}"
+            return (f"z recens. {x['error']['census']:.2f} (écart max {_pct(x['error']['census_max_relative'])}), "
+                    f"z enquêtes {x['error']['survey']:.2f} "
+                    f"{'✓' if x['passed'] else '✗'}")
+
+        a(f"| {m} | {theta or g.get('reason') or '—'} | {chk('temporal_holdout')} | {chk('leave_region_out')} | "
+          f"{chk('placebo')} | {'PASSED' if g['passed'] else 'FAILED'} |")
+    a("")
+    a(f"z : moyenne quadratique des résidus hors échantillon en unités du bruit déclaré (≈ 1 sous un modèle "
+      f"correct), tolérance {req.validation.tolerance_rms_z:g} ; l'écart relatif maximal des recensements est "
+      "donné à titre d'information. Les modèles qui "
+      "passent forment l'ensemble : l'incertitude de forme structurelle n'est pas résorbée en retenant une "
+      "seule forme. Le Gate H est **nécessaire, pas suffisant** : une forme structurelle fausse le passe et manque "
+      f"pourtant la vérité contre-factuelle. D'où l'exigence d'au moins {req.validation.min_structural_forms} "
+      "formes validées.\n")
+
+    a("## Contre-factuel historique\n")
+    a(f"**Conclusion : {p['conclusion']}**" + (f" — {p['reason']}." if p.get("reason") else ".") + "\n")
+    if p["counterfactual"] is not None:
+        cf = p["counterfactual"]
+        lv = round(100 * p["interval_level"])
+        a(f"Ensemble : {', '.join(p['ensemble'])} ; {p['n_draws']} tirages. Intervalles à {lv} % "
+          f"(année {req.history.end}) :\n")
+        a("| indicateur | factuel reconstruit | contre-factuel | écart (cf − factuel) | vérité synthétique couverte |")
+        a("|---|---|---|---|---|")
+        cal = p["calibration"]["on_synthetic_truth"]
+        for k, v in cf["counterfactual"].items():
+            f, d = cf["factual"][k], cf["delta"][k]
+            a(f"| {k} | {f['median']:.4f} | {v['median']:.4f} [{v['lo']:.4f}, {v['hi']:.4f}] | "
+              f"{d['median']:+.4f} [{d['lo']:+.4f}, {d['hi']:+.4f}] | "
+              f"{'oui' if cal[k]['counterfactual_covered'] and cal[k]['delta_covered'] else '**non**'} |")
+        a("")
+        a(f"Calibration sur la vérité du monde synthétique : **{p['calibration']['status']}**. Elle n'existe que "
+          "parce que le monde est synthétique : sur une histoire réelle, rien ne la remplacerait.\n")
+        a("Les parts de groupes contre-factuelles sont calculées mais **non publiées** (CONTROLLED).\n")
+    a(f"Couche cartographique : **vide** — {p['public_layer']['reason']}.\n")
+    return "\n".join(L) + "\n"
