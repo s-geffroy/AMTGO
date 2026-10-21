@@ -115,6 +115,32 @@ services:
           pids: 128
     command: ["amtgo", "--help"]
 
+  gh:
+    # GitHub CLI jetable : `sudo appctl run gh <args>` (ex. `run list`). Lecture seule
+    # cote GitHub (token fine-grained), aucun montage du projet, aucune ecriture.
+    build:
+      context: ./tools/gh
+    image: amtgo-gh
+    profiles: ["cli"]  # appctl run n'active que ce profil
+    networks:
+      - internal
+    environment:
+      GH_REPO: s-geffroy/AMTGO
+      GH_PROMPT_DISABLED: "1"
+      GH_NO_UPDATE_NOTIFIER: "1"
+      HOME: /tmp
+    secrets:
+      - gh_token
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+          pids: 64
+
 networks:
   internal:
     name: amtgo-internal
@@ -129,3 +155,5 @@ volumes:
 secrets:
   db_password:
     file: /etc/app-secrets/amtgo/db_password
+  gh_token:
+    file: /etc/app-secrets/amtgo/gh_token

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Lit le token (fine-grained, lecture seule) depuis le secret Compose et lance gh.
+# Le token ne passe ni par l'environnement de compose, ni par la ligne de commande, ni par les logs.
+set -eu
+if [ -r /run/secrets/gh_token ]; then
+  GH_TOKEN=$(cat /run/secrets/gh_token)
+  export GH_TOKEN
+fi
+exec gh "$@"
