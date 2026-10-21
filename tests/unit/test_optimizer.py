@@ -70,7 +70,7 @@ def test_no_abstract_state_count_penalty() -> None:
 def test_manifest_epsilon_covers_known_objectives_only() -> None:
     base = {"optimizer_id": "o", "version": "1", "description": "d", "border_cost_per_km": 0.0,
             "benchmark_tolerance": 0.05,
-            "epsilon": {k: 0.01 for k in ("J_D", "J_F", "J_conn", "J_V", "J_G", "J_T", "J_inst", "J_reif")}}
+            "epsilon": {k: 0.01 for k in ("J_D", "J_F", "J_conn", "J_V", "J_G", "J_T", "J_inst", "J_pkg", "J_reif")}}
     OptimizerManifest.model_validate(base)
     with pytest.raises(ValidationError):  # J_R est UNKNOWN : pas de résolution déclarable
         OptimizerManifest.model_validate({**base, "epsilon": {**base["epsilon"], "J_R": 0.1}})

@@ -287,6 +287,16 @@ def _objectives(m: dict[str, Any]) -> tuple[float, ...]:
                        (m[k] if m[k] is not None else np.inf)) for k in _OBJECTIVES)
 
 
+def configuration(base: Configuration, levers: list[LeverSpec], effects: dict[str, CausalAnswer],
+                  manifest: ComposerManifest, cells: list[str], bound: str) -> Configuration:
+    """Applique une suite de leviers, chacun à la borne ``lo`` ou ``hi`` de son efficacité gelée."""
+    cfg = base
+    for lv in levers:
+        iv = effects[lv.effect].interval()  # type: ignore[index]
+        cfg = apply_lever(cfg, lv, iv.lo if bound == "lo" else iv.hi, manifest, cells)
+    return cfg
+
+
 def compose(state: SocialState, partition: Partition, institutions: dict[str, list[Institution]],
             rights: RightsThresholds, weights: dict[IntegChannel, float], manifest: ComposerManifest,
             effects: dict[str, CausalAnswer], adjacency: list[list[int]],
@@ -312,10 +322,7 @@ def compose(state: SocialState, partition: Partition, institutions: dict[str, li
             return
         res = {}
         for bound in ("lo", "hi"):
-            cfg = base
-            for lv in levers:
-                iv = effects[lv.effect].interval()  # type: ignore[index]
-                cfg = apply_lever(cfg, lv, iv.lo if bound == "lo" else iv.hi, manifest, cells)
+            cfg = configuration(base, levers, effects, manifest, cells, bound)
             res[bound] = evaluate(state, partition, cfg, base, rights, weights, manifest, salience, base_index)
         options.append({"option": label, "levers": [lv.lever.value for lv in levers], **res,
                         "status": _status(res["lo"], res["hi"], baseline["violations"]), "grades": grades})

@@ -9,20 +9,35 @@
 - J_V : max des P(couverture < τ_V) sur États et scénarios S1/S2A, sous le régime du run ;
 - J_G : part des liens fonctionnels (toute la population) coupés par les frontières d'État ;
 - J_R : risque (conflit, sécurité) — **UNKNOWN** : aucune donnée, jamais 0 ;
+- J_P : coût d'hétérogénéité des préférences institutionnelles (M11) — **UNKNOWN** : la
+  préférence réelle est un input externe, non identifiable sans enquête (03 §31, 08) ;
+  elle n'est **jamais** déduite des parts de groupes (ce serait optimiser l'homogénéité) ;
 - J_T : coût de transition = part de la population qui change d'État (meilleur appariement) ;
 - J_inst : coûts réels (02 §15) — surcoûts fixes par État (administration, sécurité non
   mutualisée), part mutualisée payée une fois, gestion des frontières ∝ longueur ; aucune
   pénalité abstraite au nombre d'États (§42) ;
+- J_pkg : coût du paquet institutionnel recomposé pour lever une violation de droits
+  (composeur M9 appliqué au candidat, M11) — unités du composeur, d'où un objectif séparé
+  plutôt qu'un taux de conversion inventé ;
 - J_reif : borne haute du risque de réification par rapport au statu quo.
 
-La géométrie candidate reçoit le gabarit institutionnel du statu quo : États au
+La géométrie candidate reçoit d'abord le gabarit institutionnel du statu quo : États au
 niveau supérieur, juridictions locales = districts du statu quo découpés par les
-nouveaux États (emboîtement garanti).
+nouveaux États (emboîtement garanti). Si elle viole la contrainte de droits, le
+composeur y cherche un paquet de leviers à géométrie fixe (M11).
+
+Un objectif UNKNOWN ne départage pas l'archive, mais il interdit d'affirmer qu'une
+option domine le statu quo, sauf si un **axiome structurel** le tranche (M11) : tout
+coût d'hétérogénéité des préférences est monotone par fusion — fusionner deux unités
+n'abaisse jamais l'hétérogénéité interne (somme des dispersions intra-unités). Un
+raffinement du statu quo n'est donc jamais pire sur J_P ; une fusion n'y est jamais
+meilleure. C'est un ordre qualitatif, jamais un nombre.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
+from enum import StrEnum
 from typing import Any
 
 import numpy as np
@@ -35,6 +50,7 @@ from amtgo.fragmentation.engine import fragmentation
 from amtgo.geo.multiscale import transfer_distance
 from amtgo.geo.partition import Partition, PartitionLevel
 from amtgo.identity.state import BoundedSalienceResponse, SocialState
+from amtgo.infrastructure.hyperedges import Hyperedge
 from amtgo.institutions.competences import Institution
 from amtgo.institutions.composer import Configuration, institutionalization
 from amtgo.institutions.regimes import ConstitutionalRegime
@@ -42,8 +58,45 @@ from amtgo.institutions.viability import FiscalUnion, Territory, ViabilityContex
 from amtgo.integration.engine import integration
 from amtgo.manifests.normative import RightsThresholds
 
-OBJECTIVES = ("J_D", "J_F", "J_conn", "J_V", "J_G", "J_R", "J_T", "J_inst", "J_reif")
-UNKNOWN_OBJECTIVES = ("J_R",)
+OBJECTIVES = ("J_D", "J_F", "J_conn", "J_V", "J_G", "J_R", "J_P", "J_T", "J_inst", "J_pkg", "J_reif")
+UNKNOWN_OBJECTIVES = ("J_R", "J_P")
+
+
+class SqRelation(StrEnum):
+    """Relation d'emboîtement d'une géométrie au statu quo (niveau des États)."""
+
+    EQUAL = "EQUAL"
+    REFINEMENT = "REFINEMENT"  # chaque État candidat est contenu dans un État du statu quo
+    COARSENING = "COARSENING"  # chaque État du statu quo est contenu dans un État candidat
+    CROSSING = "CROSSING"
+
+
+class UnknownBound(StrEnum):
+    """Ce qu'on sait d'un objectif UNKNOWN face au statu quo."""
+
+    EQUAL = "EQUAL"
+    NOT_WORSE = "NOT_WORSE"  # ne peut pas renverser une dominance
+    NOT_BETTER = "NOT_BETTER"  # ne peut que la renverser
+    UNDETERMINED = "UNDETERMINED"
+
+
+def sq_relation(assign: np.ndarray, baseline: np.ndarray) -> SqRelation:
+    pairs = set(zip(assign.tolist(), baseline.tolist(), strict=True))
+    fine = len({a for a, _ in pairs}) == len(pairs)  # un État candidat → un seul État du statu quo
+    coarse = len({b for _, b in pairs}) == len(pairs)
+    if fine and coarse:
+        return SqRelation.EQUAL
+    return SqRelation.REFINEMENT if fine else SqRelation.COARSENING if coarse else SqRelation.CROSSING
+
+
+def unknown_vs_status_quo(objective: str, relation: SqRelation) -> UnknownBound:
+    """Borne structurelle d'un objectif UNKNOWN face au statu quo (axiome de monotonie de J_P)."""
+    if relation is SqRelation.EQUAL:
+        return UnknownBound.EQUAL
+    if objective == "J_P":
+        return {SqRelation.REFINEMENT: UnknownBound.NOT_WORSE,
+                SqRelation.COARSENING: UnknownBound.NOT_BETTER}.get(relation, UnknownBound.UNDETERMINED)
+    return UnknownBound.UNDETERMINED
 
 
 def candidate_partition(assign: np.ndarray, sq: Partition, regime_border: Any) -> Partition:
@@ -77,14 +130,25 @@ def border_length_km(edges: list[tuple[int, int, float]], assign: np.ndarray) ->
 
 def evaluate_geometry(state: SocialState, partition: Partition, institutions: dict[str, list[Institution]],
                       rights: RightsThresholds, weights: dict[IntegChannel, float],
-                      salience: CausalAnswer, horizon_years: float, base_index: float) -> dict[str, Any]:
-    """Objectifs dépendant de l'ontologie : J_D, J_F, J_conn, J_reif (et la contrainte de droits)."""
+                      salience: CausalAnswer, horizon_years: float, base_index: float,
+                      overlays: list[Hyperedge] | None = None,
+                      alt_thresholds: tuple[float, ...] = ()) -> dict[str, Any]:
+    """Objectifs dépendant de l'ontologie : J_D, J_F, J_conn, J_reif (et la contrainte de droits).
+
+    ``alt_thresholds`` : seuils τ de domination grave à réévaluer (sensibilité normative,
+    05 §18) ; la faisabilité sous (τ, ε) se lit alors J_D(τ) ≤ ε.
+    """
+    overlays = overlays or []
     dom = domination(state, partition, institutions, rights)
-    frag = fragmentation(state, partition)
-    integ = integration(state, partition, weights)
+    frag = fragmentation(state, partition, overlays)
+    integ = integration(state, partition, weights, overlays)
     pop_g = state.population.sum(axis=1).mean(axis=0)
     f_net = {f.group: f.value.mean for f in frag if f.channel is FragChannel.NETWORK and f.value is not None}
-    index = institutionalization(state, partition, Configuration(institutions, []))
+    index = institutionalization(state, partition, Configuration(institutions, overlays))
+    by_threshold = {}
+    for tau in alt_thresholds:
+        alt = domination(state, partition, institutions, rights.model_copy(update={"severe_domination_threshold": tau}))
+        by_threshold[repr(tau)] = max((d.p_exceed for d in alt), default=0.0)
     reif = None
     if salience.known:
         iv = salience.interval()
@@ -94,7 +158,7 @@ def evaluate_geometry(state: SocialState, partition: Partition, institutions: di
     return {"J_D": max((d.p_exceed for d in dom), default=0.0),
             "J_F": float(sum(f_net.get(g, 0.0) * pop_g[i] for i, g in enumerate(state.groups)) / pop_g.sum()),
             "J_conn": None if integ.j_conn is None else float(integ.j_conn.mean or 0.0),
-            "J_reif": reif,
+            "J_reif": reif, "J_D_by_threshold": by_threshold,
             "violations": sorted({f"droits:{d.group}|{d.domain.value}" for d in dom if d.violation})}
 
 

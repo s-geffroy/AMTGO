@@ -1,10 +1,11 @@
-# Optimiseur regional (M10). Parametres de MODELE, PROVISOIRES.
+# Optimiseur regional (M10, complete en M11). Parametres de MODELE, PROVISOIRES.
 # Aucune ponderation entre objectifs : archive de Pareto robuste, epsilon-dominance.
 optimizer_id: optimizer_pilot
-version: "0.1.0"
+version: "0.2.0"
 description: >
-  Archive de Pareto des candidats territoriaux (M8), avec le gabarit institutionnel du
-  statu quo, robustes sur ontologies x maillages ; contrainte de droits dure.
+  Archive de Pareto des candidats territoriaux (M8), recomposes institutionnellement
+  quand ils violent la contrainte de droits, robustes sur ontologies x maillages ;
+  contrainte de droits dure ; sensibilite normative et detecteurs Goodhart (M11).
 epsilon:                 # resolution : un ecart plus petit ne departage jamais
   J_D: 0.01              # probabilite
   J_F: 0.0005
@@ -13,6 +14,22 @@ epsilon:                 # resolution : un ecart plus petit ne departage jamais
   J_G: 0.005
   J_T: 0.01              # part de population
   J_inst: 1.0e6          # unites fiscales fictives
+  J_pkg: 0.05            # unites du composeur (fictives)
   J_reif: 0.001
 border_cost_per_km: 5.0e4
 benchmark_tolerance: 0.05
+# Sensibilite normative (05 §18) : chaque valeur est testee seule, le reste nominal.
+sensitivity:
+  severe_domination_threshold: [0.4, 0.6]        # nominal 0.5 (manifeste normatif)
+  severe_domination_probability_max: [0.01, 0.1] # nominal 0.05
+  robustness:                                    # nominal alpha=0.9, lambda_tail=1, lambda_var=0
+    - {cvar_alpha: 0.9, lambda_tail: 0.0, lambda_var: 0.0}
+    - {cvar_alpha: 0.75, lambda_tail: 2.0, lambda_var: 0.0}
+  epsilon_scale: [0.5, 2.0]
+  border_cost_per_km: [0.0, 1.0e5]
+# Detecteurs Goodhart (05 §14) : signalement pour revue humaine, jamais exclusion.
+goodhart:
+  micro_state_population_share: 0.05
+  micro_state_area_share: 0.05
+  min_compactness: 0.1
+  max_border_protrusion_share: 0.2  # candidats generes <= 0.07, dents de scie >= 0.37 (pilote M11)
