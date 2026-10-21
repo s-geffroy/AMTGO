@@ -112,6 +112,10 @@ class ConsentRules(_Strict):
 
 class PrivacyRules(_Strict):
     default_access: PrivacyClass = PrivacyClass.CONTROLLED
+    # Modèle de menace de publication (05 §15, M11) : 03 §25 interdit un seuil universel ;
+    # ces valeurs sont un choix déclaré, versionné avec le manifeste.
+    min_group_count: int = Field(ge=1)  # k : plus petit comptage publiable
+    sensitive_proxies: tuple[str, ...]  # attributs dont on peut inférer un attribut sensible
 
     @model_validator(mode="after")
     def _not_public_by_default(self) -> Self:

@@ -173,6 +173,9 @@ def render_report(
           "sont présentes.\n")
     else:
         _pareto_section(a, manifest, candidates["pareto"])
+    if candidates is not None and "validation" in candidates:
+        a("## Validation & red-team\n")
+        _validation_section(a, candidates["validation"])
     a("## Stability summary\n")
     if candidates is None:
         a(_NA.format(m="M8+") + "\n")
@@ -558,12 +561,22 @@ def _pareto_section(a: Any, manifest: RunManifest, p: dict[str, Any]) -> None:
     rw = p["robustness"]
     a(f"Archive de Pareto **robuste** : ρ(J) = E_ω[J] + {rw['lambda_tail']}·CVaR_{rw['cvar_alpha']}(J) + "
       f"{rw['lambda_var']}·Var_ω(J) sur ω = (maillage × ontologie) ; ε-dominance ; contrainte de droits dure. "
-      "Aucune pondération entre objectifs, aucune « meilleure solution ». Institutions : gabarit du statu quo.\n")
+      "Aucune pondération entre objectifs, aucune « meilleure solution ». Institutions : gabarit du statu quo, "
+      "recomposé par le composeur (J_pkg) quand la géométrie viole la contrainte de droits.\n")
     a(f"**Conclusion : {p['conclusion']}**.")
     if p["improving_on_status_quo"]:
         a("Variantes qui font au moins aussi bien que le statu quo partout (hors coût de transition) : "
           + ", ".join(f"`{k}`" for k in p["improving_on_status_quo"]) + ". C'est une propriété de l'archive "
           "sous les objectifs modélisés, jamais une recommandation : voir les biais connus ci-dessous.")
+    elif p.get("unresolved_dominance"):
+        a("Des variantes dominent le statu quo sur les objectifs **connus** (hors transition), mais un objectif "
+          "UNKNOWN peut renverser cette dominance : elle n'est pas résolue.\n")
+        a("| variante | " + " | ".join(p["unknown_objectives"]) + " |")
+        a("|---|" + "---|" * len(p["unknown_objectives"]))
+        for name, bounds in p["unresolved_dominance"].items():
+            a(f"| `{name}` | " + " | ".join(bounds.get(u, "—") for u in p["unknown_objectives"]) + " |")
+        a("\nNOT_BETTER : l'axiome de monotonie par fusion dit que l'objectif ne peut qu'y être pire que pour le "
+          "statu quo (fusion d'États) ; UNDETERMINED : aucun axiome ne tranche.")
     else:
         a("Aucune variante ne fait au moins aussi bien que le statu quo sur tous les objectifs (hors coût de "
           "transition) : le statu quo reste sur le front, et rien ne justifie un redécoupage.")
@@ -591,3 +604,65 @@ def _pareto_section(a: Any, manifest: RunManifest, p: dict[str, Any]) -> None:
       f"La coupe seule a pour front exact des micro-territoires ({b['cut_only_front']['smallest_state_cells']} "
       "cellule(s)) : elle n'est jamais un objectif isolé.\n")
     a(f"Publication : {p['publication']}. Statut : **{p['recommendation_status']}**.\n")
+
+
+def _validation_section(a: Any, v: dict[str, Any]) -> None:
+    g = v["gates"]
+    a("Gates de publication (05 §20) : " + " ; ".join(f"**{k}** {s}" for k, s in g.items())
+      + f". Catégorie : **{v['publication_category']}** — {v['release_note']}.\n")
+    a(f"S^publish = min(S^ontology, S^scale, S^time, S^parameter) = "
+      f"{'UNKNOWN' if v['s_publish'] is None else format(v['s_publish'], '.2f')} (τ = {v['s_publish_tau']}). "
+      f"S^time : {v['s_time']}.\n")
+    a("| variante | S^ont | S^scale | S^param | S^publish |")
+    a("|---|---|---|---|---|")
+    for k, s in v["stability"].items():
+        cells = ["—" if s[c] is None else f"{s[c]:.2f}" for c in ("s_ontology", "s_scale", "s_parameter", "s_publish")]
+        a(f"| `{v['names'].get(k, k)}` | " + " | ".join(cells) + " |")
+    a("")
+    sens = v["sensitivity"]
+    a("**Sensibilité normative** (05 §18, un paramètre à la fois) :\n")
+    a("| paramètre | valeur | conclusion | entrent au front | sortent du front |")
+    a("|---|---|---|---|---|")
+    for r in sens["settings"]:
+        a(f"| {r['parameter']} | {r['value']} | {'**' if r['conclusion_changed'] else ''}{r['conclusion']}"
+          f"{'**' if r['conclusion_changed'] else ''} | {len(r['entered_front'])} | {len(r['left_front'])} |")
+    a("")
+    pc = sens["political_choices"]
+    a(("Paramètres qui changent la conclusion — **choix politiques**, pas conclusions scientifiques : "
+       + ", ".join(pc) + ".") if pc else "Aucun paramètre testé ne change la conclusion.")
+    rg = v["regimes"]
+    a(f"\n**Régimes** (05 §19 ; {rg['scope']}) : nominal {rg['nominal']} ; "
+      + ", ".join(f"{r} → {x['conclusion']}" for r, x in rg["alternatives"].items())
+      + (". La conclusion **dépend du régime**." if rg["regime_dependent"] else ". Conclusion inchangée.") + "\n")
+    ms = v["multiscale"]
+    a("**Multi-échelle** (05 §5) : " + ", ".join(f"`{m}` → {x['conclusion']} (front {len(x['front'])})"
+                                                for m, x in ms["per_mesh"].items())
+      + ". Dépendantes d'un seul maillage : "
+      + (", ".join(f"`{v['names'].get(k, k)}`" for k in ms["single_mesh_dependent"]) or "aucune")
+      + f" ; front variable selon le maillage : {len(ms['mesh_dependent'])} variante(s).\n")
+    a("**Ablations** (05 §13) :\n")
+    a("| module retiré | statut | conclusion | entrent | sortent |")
+    a("|---|---|---|---|---|")
+    for x in v["ablations"]:
+        if x["status"] != "RUN":
+            a(f"| {x['ablation']} | {x['status']} ({x['what']}) | — | — | — |")
+            continue
+        a(f"| {x['ablation']} | {x['what']} | {x['conclusion']} | {len(x['entered_front'])} | "
+          f"{len(x['left_front'])} |")
+    a("")
+    gh = v["goodhart"]
+    a(f"**Goodhart** (05 §14) : {gh['status']}.")
+    for r in gh["attacks"]:
+        a(f"- `{r['attack']}` : {'faisable' if r['feasible'] else 'infaisable'}, rang {r['rank'] or '—'}, "
+          f"signalements {', '.join(r['flags']) or 'aucun'}{' — **faille**' if r['loophole'] else ''}.")
+    if gh.get("flagged_variants"):
+        a("- variantes signalées pour revue : " + ", ".join(f"`{v['names'].get(k, k)}` ({', '.join(f)})"
+                                                        for k, f in gh["flagged_variants"].items()) + ".")
+    a("")
+    a("**Falsification** (05 §11) : " + " ; ".join(f"{c['control']} {c['status']}" for c in v["falsification"])
+      + ".\n")
+    p = v["privacy"]
+    a(f"**Confidentialité** (05 §15-16) : Gate S {p['gate_s']} — {sum(x['blocked'] for x in p['attacks'])}/"
+      f"{len(p['attacks'])} attaques bloquées, contrôles bénins publiés : "
+      f"{sum(c['released'] for c in p['benign_controls'])}/{len(p['benign_controls'])}. "
+      f"Couches publiables telles quelles : {', '.join(p['public_layers']) or 'aucune'}.\n")

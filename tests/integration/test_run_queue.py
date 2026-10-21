@@ -132,6 +132,20 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
     assert pa["known_biases"] and pa["infeasibility"] is None
     assert sum(1 for s in pa["solutions"] if s["rank"] == 1) > 1  # un front, jamais une solution unique
     assert "Archive de Pareto **robuste**" in report and "Biais connus" in report
+    # M11 : objectifs inconnus → dominance non résolue ; gates ; rien de publiable ; red-team passé.
+    assert pa["conclusion"] in ("DOMINANCE_UNRESOLVED_UNKNOWN_OBJECTIVES", "NO_TERRITORIAL_CHANGE")
+    assert all(s["objectives"]["J_P"] is None for s in pa["solutions"])
+    va = json.loads((d / "artifacts" / "validation.json").read_text())
+    assert set(va["gates"]) == {"M", "C", "O", "S", "R"} and va["gates"]["S"] == "PASSED"
+    assert va["gates"]["O"] == "PASSED" and va["goodhart"]["status"] == "PASSED"  # aucune faille ouverte
+    assert va["s_publish"] is None and va["gates"]["R"] == "NOT_EVALUABLE"  # S^time inconnu
+    assert va["publication_category"] == "NOT_IDENTIFIABLE" and not va["release_allowed"]
+    assert all(c["status"] != "FAILED" for c in va["falsification"])
+    assert all(a["blocked"] for a in va["privacy"]["attacks"])
+    assert {x["layer"] for x in va["privacy"]["inventory"] if x["action"] == "allow"} == \
+        {f"mesh_{m}" for m in ms["meshes"]}  # seuls les maillages sortiraient tels quels
+    assert len(va["sensitivity"]["settings"]) == 10 and {a["ablation"] for a in va["ablations"]} >= {"D", "F", "I"}
+    assert "Validation & red-team" in report
     freeze = json.loads((d / "measurement_freeze.json").read_text())
     assert set(freeze["compositions"]) == set(ms["meshes"])
     assert "Parts seulement" in report

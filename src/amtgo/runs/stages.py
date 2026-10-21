@@ -35,6 +35,7 @@ from amtgo.runs import (
     dfi_stages,
     measure_stages,
     optimizer_stages,
+    validation_stages,
     viability_stages,
 )
 from amtgo.runs.report import render_report
@@ -92,7 +93,7 @@ def plan_steps(manifest: RunManifest) -> list[str]:
             steps += ["compose_ensemble"]
         if manifest.optimizer_model is not None:
             steps += [f"evaluate_candidates:{m.mesh_id}" for m in manifest.mesh_set]
-            steps += ["pareto"]
+            steps += ["pareto", "validation"]
     else:
         steps += _causal_steps(manifest)
     if any(sc.diagnostic_only for sc in manifest.scenario_set):
@@ -295,6 +296,9 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
                 ctx.run_dir, f"fields/{d.mesh_id}/institutional_composition.json") for d in ctx.manifest.mesh_set}}
     if ctx.manifest.optimizer_model is not None and cand is not None:
         cand["pareto"] = artifacts.read_json(ctx.run_dir, "artifacts/pareto_archive.json")
+        cand["validation"] = artifacts.read_json(ctx.run_dir, "artifacts/validation.json")
+        # La catégorie de publication vient des gates (05 §20-21), jamais d'un défaut optimiste.
+        status = RecommendationStatus(cand["validation"]["publication_category"])
     causal = None
     if ctx.manifest.causal_library is not None:
         causal = {**causal_stages.library_summary(ctx),
@@ -313,6 +317,8 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
         "pareto": None if cand is None or "pareto" not in cand else {
             "conclusion": cand["pareto"]["conclusion"], "gate_o": cand["pareto"]["gate_o"],
             "ranks": {s["key"]: s["rank"] for s in cand["pareto"]["solutions"]}},
+        "validation": None if cand is None or "validation" not in cand else {
+            k: cand["validation"][k] for k in ("conclusion", "gates", "publication_category", "release_allowed")},
         "causal": None if causal is None else {
             "freeze_hash": causal["freeze_hash"], "gate_c": causal["validation"]["gate_c"],
             "status": {k: v["status"] for k, v in sorted(causal["effects"].items())}},
@@ -357,6 +363,7 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "compose_ensemble": composer_stages.compose_ensemble,
     "evaluate_candidates": optimizer_stages.evaluate_candidates,
     "pareto": optimizer_stages.pareto,
+    "validation": validation_stages.validation,
     "report": report,
 }
 

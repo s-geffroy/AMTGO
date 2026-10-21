@@ -49,6 +49,7 @@ class Repository(Protocol):
     def record_candidates(self, run_id: uuid.UUID, mesh: Mesh, candidates: Sequence[TerritoryCandidate],
                           assignments: dict[str, Any]) -> None: ...
     def record_solutions(self, run_id: uuid.UUID, regime_id: str, archive: dict[str, Any]) -> None: ...
+    def record_validation(self, run_id: uuid.UUID, report: dict[str, Any]) -> None: ...
 
 
 class NullRepository:
@@ -91,6 +92,9 @@ class NullRepository:
         pass
 
     def record_solutions(self, run_id: uuid.UUID, regime_id: str, archive: dict[str, Any]) -> None:
+        pass
+
+    def record_validation(self, run_id: uuid.UUID, report: dict[str, Any]) -> None:
         pass
 
 
@@ -424,3 +428,22 @@ class PostgresRepository:
                         CAST(:m AS jsonb), CAST(:stab AS jsonb), CAST(:cs AS jsonb), CAST(:p AS privacy_class))
                     ON CONFLICT (solution_id) DO NOTHING
                 """), batch)
+
+    def record_validation(self, run_id: uuid.UUID, report: dict[str, Any]) -> None:
+        details = {"M": report["gate_m"], "C": {}, "O": {"goodhart": report["goodhart"]["status"]},
+                   "S": {"public_layers": report["privacy"]["public_layers"]},
+                   "R": {"s_publish": report["s_publish"], "tau": report["s_publish_tau"],
+                         "single_mesh_dependent": report["multiscale"]["single_mesh_dependent"]}}
+        rows = [{"r": run_id, "g": g, "s": s, "d": json.dumps(details[g])} for g, s in report["gates"].items()]
+        with self.engine.begin() as cx:
+            cx.execute(text("""
+                INSERT INTO validation_gates (run_id, gate, status, detail)
+                VALUES (:r, :g, :s, CAST(:d AS jsonb))
+                ON CONFLICT (run_id, gate) DO UPDATE SET status = EXCLUDED.status, detail = EXCLUDED.detail
+            """), rows)
+            cx.execute(text("""
+                UPDATE solutions SET status = CAST(:c AS recommendation_status),
+                    stability = stability || CAST(:stab AS jsonb)
+                WHERE run_id = :r
+            """), {"r": run_id, "c": report["publication_category"],
+                   "stab": json.dumps({"validated": True})})

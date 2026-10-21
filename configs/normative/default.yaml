@@ -59,3 +59,11 @@ consent:
 
 privacy:
   default_access: CONTROLLED  # spec, prompt §59
+  # Modele de menace de publication (M11, 05 §15). 03 §25 : pas de seuil universel.
+  min_group_count: 50         # PROVISOIRE : k, plus petit comptage publiable
+  sensitive_proxies:          # attributs dont un attribut sensible peut etre infere
+    - religion
+    - language_share
+    - historical_label
+    - group_share
+    - route

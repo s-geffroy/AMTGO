@@ -28,7 +28,7 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
     from amtgo.runs.state import RunStatus
 
     upgrade(db_settings)
-    assert current_revision(db_settings) == "0011"
+    assert current_revision(db_settings) == "0012"
     repo = make_repository(db_settings)
     manifest, _ = submit(db_settings.configs_dir / "runs/synthetic_pilot.yaml", db_settings)
     state = run_to_completion(db_settings, repo, str(manifest.run_id))
@@ -74,6 +74,15 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
         # M10 : archive enregistrée, aucune solution autre que NOT_IDENTIFIABLE.
         assert count("SELECT count(*) FROM solutions WHERE run_id = :r") == 15
         assert count("SELECT count(*) FROM solutions WHERE run_id = :r AND status <> 'NOT_IDENTIFIABLE'") == 0
+        # M11 : un gate par lettre ; aucune solution ROBUST/CONDITIONAL sans eux (déclencheur).
+        assert count("SELECT count(*) FROM validation_gates WHERE run_id = :r") == 5
+        assert count("SELECT count(*) FROM solutions WHERE run_id = :r AND stability ? 'validated'") == 15
+
+    # M11 : la base refuse une solution « ROBUST » quand un gate du run n'est pas passé.
+    from sqlalchemy.exc import DBAPIError
+
+    with pytest.raises(DBAPIError, match="sans tous les gates"), engine.begin() as cx:
+        cx.execute(text("UPDATE solutions SET status = 'ROBUST' WHERE run_id = :r"), {"r": manifest.run_id})
 
     # Rejouer toutes les écritures ne duplique rien.
     from amtgo.data.ingestion import read_observations
