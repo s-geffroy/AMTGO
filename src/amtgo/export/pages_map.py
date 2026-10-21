@@ -27,7 +27,8 @@ from shapely.geometry.base import BaseGeometry
 
 from amtgo.core.enums import PrivacyClass, RecommendationStatus
 from amtgo.data.ingestion import read_observations
-from amtgo.errors import ForbiddenSourceRole
+from amtgo.errors import ConfigurationError, ForbiddenSourceRole
+from amtgo.manifests.run import RunManifest
 from amtgo.privacy.guard import ExportLayer, require_allowed
 from amtgo.runs import artifacts
 from amtgo.runs.queue import load_manifest
@@ -55,6 +56,8 @@ def _write(out: Path, name: str, payload: Any) -> None:
 
 def export_pages_map(run_dir: Path, out: Path) -> dict[str, Any]:
     manifest = load_manifest(run_dir)
+    if not isinstance(manifest, RunManifest):
+        raise ConfigurationError("carte Pages : un run continental ne produit aucune géométrie à exporter")
     outputs = artifacts.read_json(run_dir, "outputs.json")
     out.mkdir(parents=True, exist_ok=True)
     layers: list[dict[str, Any]] = []

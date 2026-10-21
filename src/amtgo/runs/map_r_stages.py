@@ -15,11 +15,13 @@ support causal, régime normatif, options de transition — et non une carte :
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from amtgo.causal.library import CausalAnswer
 from amtgo.core.provenance import ProvenanceRecord
 from amtgo.errors import ConfigurationError
-from amtgo.optimization.archive import build, geometry_relation
+from amtgo.optimization.archive import Archive, Variant, build, geometry_relation
 from amtgo.optimization.objectives import OBJECTIVES
 from amtgo.optimization.transition import (
     INSTITUTIONAL_FAMILY,
@@ -56,14 +58,29 @@ def _urgent(ctx: StageContext) -> dict[str, int]:
     return out
 
 
-def map_r(ctx: StageContext, _: str) -> dict[str, Any]:
+@dataclass
+class RegionalPaths:
+    """Trajectoires Map-R d'un run et leur archive (réutilisées par la coordination continentale, M14)."""
+
+    paths: list[Path]
+    variants: list[Variant]
+    archive: Archive
+    eps: dict[str, float]
+    skipped: list[str]
+    urgent: dict[str, int]
+    affected: list[str]
+    effects: dict[str, CausalAnswer]
+    inst_key: str
+    by_key: dict[str, dict[str, Any]]
+
+
+def regional_paths(ctx: StageContext) -> RegionalPaths:
     tm, om, cm, dm = (ctx.manifest.transition_model, ctx.manifest.optimizer_model, ctx.manifest.composer_model,
                       ctx.manifest.dfi_model)
     if tm is None or om is None or cm is None or dm is None:
         raise ConfigurationError("Map-R exige les trajectoires, l'optimiseur, le composeur et D/F/I")
     nm = ctx.manifest.normative_manifest
     archive = artifacts.read_json(ctx.run_dir, "artifacts/pareto_archive.json")
-    validation = artifacts.read_json(ctx.run_dir, "artifacts/validation.json")
     vs, _attacks, _evals = variants(ctx)
     by_key = {s["key"]: s for s in archive["solutions"]}
     sq = next(v for v in vs if v.family == "STATUS_QUO")
@@ -100,6 +117,18 @@ def map_r(ctx: StageContext, _: str) -> dict[str, Any]:
     eps = {**om.epsilon, PATH_OBJECTIVE: tm.path_epsilon}
     objectives = (*OBJECTIVES, PATH_OBJECTIVE)
     a = build(pvs, eps, nm.robustness, normative_parameters(ctx), objectives, sq_comparison_excludes=())
+    return RegionalPaths(paths, pvs, a, eps, skipped, urgent, affected, effects, inst_key, by_key)
+
+
+def map_r(ctx: StageContext, _: str) -> dict[str, Any]:
+    tm, cm, dm = ctx.manifest.transition_model, ctx.manifest.composer_model, ctx.manifest.dfi_model
+    assert tm is not None and cm is not None and dm is not None
+    nm = ctx.manifest.normative_manifest
+    validation = artifacts.read_json(ctx.run_dir, "artifacts/validation.json")
+    rp = regional_paths(ctx)
+    paths, a, eps, by_key, effects = rp.paths, rp.archive, rp.eps, rp.by_key, rp.effects
+    skipped, urgent, affected, inst_key = rp.skipped, rp.urgent, rp.affected, rp.inst_key
+    lib = frozen_library(ctx)
     families = {p.path_id: p.family for p in paths}
     concl = conclusion(a.conclusion, a.improving, families)
     sols = {s.key: s for s in a.solutions}

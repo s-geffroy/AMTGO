@@ -18,13 +18,16 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from amtgo.config.loader import load_model
 from amtgo.config.settings import Settings
 from amtgo.core.provenance import utcnow
 from amtgo.db.repository import Repository
 from amtgo.errors import AMTGOError, StageInterrupted
+from amtgo.manifests.continental import ContinentalManifest, ContinentalRequest, is_continental, resolve_continental
 from amtgo.manifests.run import RunManifest, RunRequest, resolve_request
+from amtgo.runs import continental_stages
 from amtgo.runs.stages import StageContext, plan_steps, run_step
 from amtgo.runs.state import RunState, RunStatus, StepState, load_state, save_state, write_json_atomic
 from amtgo.utils.logging import log_event
@@ -38,24 +41,41 @@ def cache_dir(settings: Settings) -> Path:
     return settings.state_dir / "cache"
 
 
-def submit(request_path: Path, settings: Settings) -> tuple[RunManifest, bool]:
-    """Soumet une requête. Renvoie (manifeste, créé?) ; resoumettre le même contenu est sans effet."""
-    request = load_model(RunRequest, request_path)
-    manifest = resolve_request(request, settings.configs_dir)
+AnyManifest = RunManifest | ContinentalManifest
+
+
+def submit(request_path: Path, settings: Settings) -> tuple[AnyManifest, bool]:
+    """Soumet une requête. Renvoie (manifeste, créé?) ; resoumettre le même contenu est sans effet.
+
+    Une requête continentale (M14) soumet d'abord ses runs régionaux : le worker suivant
+    l'ordre de soumission, la composition ne démarre qu'après eux.
+    """
+    manifest: AnyManifest
+    if is_continental(request_path):
+        crequest = load_model(ContinentalRequest, request_path)
+        manifest, regional = resolve_continental(crequest, settings.configs_dir)
+        for path in regional.values():
+            submit(path, settings)
+        name, steps = crequest.name, continental_stages.plan_steps(manifest)
+    else:
+        request = load_model(RunRequest, request_path)
+        manifest = resolve_request(request, settings.configs_dir)
+        name, steps = request.name, plan_steps(manifest)
     run_dir = runs_dir(settings) / str(manifest.run_id)
     if (run_dir / "state.json").exists():
         return load_manifest(run_dir), False
     write_json_atomic(run_dir / "manifest.json", manifest.model_dump_json(indent=2))
-    state = RunState(run_id=str(manifest.run_id),
-                     steps=[StepState(name=s) for s in plan_steps(manifest)])
+    state = RunState(run_id=str(manifest.run_id), steps=[StepState(name=s) for s in steps])
     save_state(run_dir, state)
-    log_event("run.submitted", run_id=str(manifest.run_id), count=len(state.steps),
-              detail=request.name)
+    log_event("run.submitted", run_id=str(manifest.run_id), count=len(state.steps), detail=name)
     return manifest, True
 
 
-def load_manifest(run_dir: Path) -> RunManifest:
-    return RunManifest.model_validate_json((run_dir / "manifest.json").read_text(encoding="utf-8"))
+def load_manifest(run_dir: Path) -> AnyManifest:
+    text = (run_dir / "manifest.json").read_text(encoding="utf-8")
+    if '"kind": "continental"' in text[:200] or '"kind":"continental"' in text[:200]:
+        return ContinentalManifest.model_validate_json(text)
+    return RunManifest.model_validate_json(text)
 
 
 def list_runs(settings: Settings) -> list[RunState]:
@@ -101,7 +121,14 @@ def advance_one(
         return Advance(state.run_id, "-", state.status, "done")
 
     manifest = load_manifest(run_dir)
-    ctx = StageContext(run_dir, manifest, repo, cache_dir(settings), should_stop)
+    run: Callable[[], dict[str, Any]]
+    if isinstance(manifest, ContinentalManifest):
+        cctx = continental_stages.ContinentalContext(run_dir, manifest, repo, runs_dir(settings), cache_dir(settings),
+                                                     should_stop)
+        run = lambda: continental_stages.run_step(cctx, step.name)  # noqa: E731
+    else:
+        ctx = StageContext(run_dir, manifest, repo, cache_dir(settings), should_stop)
+        run = lambda: run_step(ctx, step.name)  # noqa: E731
     state.status = RunStatus.RUNNING
     step.started_at = utcnow()
     step.attempts += 1
@@ -109,7 +136,7 @@ def advance_one(
 
     t0 = time.monotonic()
     try:
-        info = run_step(ctx, step.name)
+        info = run()
     except StageInterrupted:
         step.attempts -= 1  # un arrêt demandé n'est pas un échec
         save_state(run_dir, state)
@@ -174,7 +201,14 @@ def _fail(run_dir: Path, state: RunState, step: StepState, exc: BaseException, e
 
 
 def run_to_completion(settings: Settings, repo: Repository, run_id: str) -> RunState:
-    """Exécution synchrone d'un run (CLI, CI) : mêmes étapes, même code que le worker."""
+    """Exécution synchrone d'un run (CLI, CI) : mêmes étapes, même code que le worker.
+
+    Un run continental exécute d'abord ses runs régionaux, comme le ferait le worker.
+    """
+    manifest = load_manifest(runs_dir(settings) / run_id)
+    if isinstance(manifest, ContinentalManifest):
+        for rr in manifest.regions:
+            run_to_completion(settings, repo, str(rr.run_id))
     while advance_one(settings, repo, run_id=run_id) is not None:
         pass
     return load_state(runs_dir(settings) / run_id)

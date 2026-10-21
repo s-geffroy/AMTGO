@@ -28,7 +28,7 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
     from amtgo.runs.state import RunStatus
 
     upgrade(db_settings)
-    assert current_revision(db_settings) == "0013"
+    assert current_revision(db_settings) == "0015"
     repo = make_repository(db_settings)
     manifest, _ = submit(db_settings.configs_dir / "runs/synthetic_pilot.yaml", db_settings)
     state = run_to_completion(db_settings, repo, str(manifest.run_id))
@@ -128,3 +128,29 @@ def test_check_constraints(db_settings: Settings) -> None:
                 mechanism, diagnostics, frozen_release)
             VALUES (gen_random_uuid(), 'sha256:x', 'x', '{}', '{}', 'ATT', 's', 't', 'expert_hypothesis', 'I7',
                 '{"distribution_type": "EMPIRICAL"}', '{}', '{}', 'IDENTIFIED', 1.0, '{}', '{}', 'r')"""))
+
+
+def test_continental_composition_persisted(db_settings: Settings) -> None:
+    """M14 : la composition et ses runs régionaux, rattachés à leurs manifestes ; rejouer ne duplique rien."""
+    from amtgo.db.engine import make_engine, make_repository, upgrade
+    from amtgo.runs.artifacts import read_json
+    from amtgo.runs.queue import run_to_completion, runs_dir, submit
+    from amtgo.runs.state import RunStatus
+
+    upgrade(db_settings)
+    repo = make_repository(db_settings)
+    manifest, _ = submit(db_settings.configs_dir / "continental/synthetic_continental.yaml", db_settings)
+    state = run_to_completion(db_settings, repo, str(manifest.run_id))
+    assert state.status is RunStatus.SUCCEEDED, state.error
+    product = read_json(runs_dir(db_settings) / str(manifest.run_id), "artifacts/continental.json")
+    repo.record_continental(manifest, product)  # type: ignore[arg-type]  # rejouer : aucun doublon
+    with make_engine(db_settings).connect() as cx:
+        row = cx.execute(text("SELECT conclusion, publication_category, front_size FROM continental_compositions "
+                              "WHERE run_id = :r"), {"r": manifest.run_id}).one()
+        assert row.conclusion == product["conclusion"] and row.publication_category == "NOT_IDENTIFIABLE"
+        n = cx.execute(text("SELECT count(*) FROM continental_regions c JOIN run_manifests m "
+                            "ON m.run_id = c.regional_run_id WHERE c.run_id = :r"), {"r": manifest.run_id}).scalar_one()
+        assert n == 2
+        n = cx.execute(text("SELECT count(*) FROM provenance_records WHERE continental_run_id = :r "
+                            "AND run_id IS NULL"), {"r": manifest.run_id}).scalar_one()
+        assert n == 1

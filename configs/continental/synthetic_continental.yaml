@@ -1,0 +1,15 @@
+# Coordination continentale du pilote (M14) : deux regions synthetiques adjacentes le long de
+# 21 W, chacune un run Map-R complet (ouest = smoke, est = synthetic_east), composees par des
+# couches de coordination a leur interface. Aucun solve continental monolithique (07 §13).
+kind: continental
+name: synthetic_continental
+description: >
+  Composition de deux produits Map-R regionaux synthetiques (ouest, est) par des
+  couches de coordination declarees (marche, mobilite, corridor, securite) a leur
+  interface. Aucune frontiere ne traverse l'interface ; aucune carte, aucune recommandation.
+region: synthetic_south_atlantic_continental
+regions:
+  - {region_id: west, run: runs/smoke.yaml}
+  - {region_id: east, run: runs/synthetic_east.yaml}
+coordination_model: coordination/pilot_v1.yaml
+causal_library: causal/library_continental.yaml

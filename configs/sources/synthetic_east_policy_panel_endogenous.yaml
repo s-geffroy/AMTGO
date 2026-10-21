@@ -1,0 +1,65 @@
+# Region EST (M14). Instrument SYNTHETIQUE "panel de politique" (M7) : reforme fictive B, adoption endogene.
+# Autre region du meme monde synthetique (contexte SOURCE, distinct du pilote).
+source_id: synthetic_east_policy_panel_endogenous
+name: Monde synthetique EST - panel de politique (reforme fictive B, adoption endogene)
+provider: AMTGO (genere)
+release: "0.3.0"
+citation: "AMTGO synthetic world v0.3.0, instrument policy_panel, region EST (genere, aucune donnee reelle)."
+license:
+  license_id: synthetic-no-restriction
+  name: Donnees synthetiques generees par AMTGO
+  redistribution: true
+  commercial_use: true
+  attribution_required: false
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [causal_estimation]
+  forbidden: [real_world_inference, group_territory_inference]
+method: >
+  Panel equilibre districts x annees 2010-2024, adoption echelonnee d'une reforme
+  fictive (cohortes 2015, 2018, jamais), resultat et controle negatif.
+temporal_start: 2010-01-01
+temporal_end: 2024-12-31
+default_evidence_status: D
+quality:
+  source_reliability: 1.0
+  spatial_precision: 0.4
+  temporal_precision: 1.0
+  construct_validity: 0.8
+  representativeness: 1.0
+  license_usability: 1.0
+  privacy_usability: 1.0
+retrieval:
+  kind: synthetic
+  adapter: synthetic
+  parameters:
+    instrument: policy_panel
+    world:
+      seed: 20261021
+      bbox: [-21.0, -26.0, -17.0, -22.0]
+      background_density: 5.0
+      n_towns: 20
+      town_peak_density: [50.0, 800.0]
+      town_scale_km: [3.0, 15.0]
+      quadrature_km: 2.0
+      groups:
+        categories: [alpha, beta, gamma, delta]
+        background_weights: [0.15, 0.35, 0.2, 0.3]
+        town_concentration: 8.0
+        town_anchor_weight: 0.7
+    panel:
+      bbox: [-35.0, -36.0, -31.0, -32.0]
+      districts_x: 6
+      districts_y: 6
+      first_year: 2010
+      last_year: 2024
+      cohorts: [2015, 2018]
+      att: 0.08                  # effet vrai a pleine montee (indice de couverture des services)
+      ramp_years: 3
+      noise_sd: 0.02
+      adoption: endogenous
+      endogenous_pre_slope: 0.015
+      density_log_mean: 3.0      # densites du contexte source (hab./km2), log-normales
+      density_log_sd: 0.9

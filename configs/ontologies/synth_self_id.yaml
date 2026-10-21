@@ -7,7 +7,7 @@ dimension: ethnocultural
 kind: self_identification
 description: Categories declarees par les repondants de l'enquete synthetique.
 evidence_status: D
-source_ids: [synthetic_survey]
+source_ids: [synthetic_survey, synthetic_east_survey]
 concepts:
   - {concept_id: alpha, source_label: alpha, definition: categorie fictive alpha, self_identified: true}
   - {concept_id: beta, source_label: beta, definition: categorie fictive beta, self_identified: true}

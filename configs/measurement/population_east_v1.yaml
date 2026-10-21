@@ -1,0 +1,42 @@
+# Region EST (M14). Modele de mesure M3 : population par cellule, prior log-normal, ajustement de
+# Gauss-Newton et approximation de Laplace (ADR-0013). Tous les parametres numeriques ci-dessous sont des parametres de
+# MODELE (non normatifs), PROVISOIRES, enregistres dans le RunManifest ; leur
+# sensibilite doit etre rapportee.
+model_id: population_lognormal_laplace_east
+version: "0.1.0"
+variable_id: population_count
+description: >
+  Population par cellule. Prior log-normal faiblement informatif sur la densite
+  (positif), Gauss-Newton + Laplace, tirages par la regle de Matheron au mode.
+target_period: {start: 2025-01-01, end: 2025-12-31}
+prior:
+  kind: independent_lognormal_density
+  median_density_per_km2: 20.0  # PROVISOIRE
+  log_sd: 1.5                   # PROVISOIRE : 95 % entre ~1 et ~380 hab./km2
+likelihoods:
+  - source_id: synthetic_east_survey
+    variable_id: population_count_ea
+    model: ea_count_density
+    variance_inflation: 1.0
+    representativeness_cv: 1.0  # PROVISOIRE : un point d'EA ne vaut pas la cellule
+  - source_id: synthetic_east_census
+    variable_id: population_total_admin
+    model: area_total
+    use: margin  # desagregation : recalage exact de chaque tirage sur un total tire selon son bruit
+    variance_inflation: 1.0
+quality_gates:
+  min_construct_validity: 0.5
+  min_privacy_usability: 0.5
+  min_license_usability: 0.5
+sampling:
+  n_samples: 200
+  seed: 7
+  interval_level: 0.9
+validation:
+  holdout_fraction: 0.2
+computability:
+  # Ratio d'information median 1 - var_post/var_prior. PROVISOIRE.
+  a_min: 0.9
+  b_min: 0.6
+  c_min: 0.3
+  max_negative_sample_fraction: 0.05

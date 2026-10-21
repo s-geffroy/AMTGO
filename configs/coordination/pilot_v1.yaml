@@ -1,0 +1,33 @@
+# Coordination continentale (M14, 11 phase 10). Parametres de MODELE, PROVISOIRES.
+# Les couts annuels sont des hypotheses declarees, dans les unites fiscales fictives des
+# comptes regionaux ; les effets (mu) viennent de la bibliotheque continentale gelee.
+# Aucun bassin : le monde synthetique n'a pas d'hydrographie, un bassin n'est pas invente.
+model_id: coordination_pilot
+version: "0.1.0"
+description: >
+  Couches de coordination a l'interface de deux regions synthetiques : marche commun
+  etendu, accord de mobilite, corridor transfrontalier (bande de 25 km), coordination
+  de securite aux frontieres. Chacune est une etape d'affaiblissement de frontiere (§79).
+layers:
+  - layer_id: market
+    type: market
+    acts_on: cross_links
+    effect: market_integration_link_mitigation
+    annual_cost: {lo: 2.0e6, hi: 6.0e6}
+  - layer_id: mobility
+    type: migration
+    acts_on: cross_links
+    effect: mobility_agreement_link_mitigation
+    annual_cost: {lo: 1.0e6, hi: 4.0e6}
+  - layer_id: corridor
+    type: corridor
+    acts_on: cross_links
+    band_km: 25
+    effect: corridor_link_mitigation
+    annual_cost: {lo: 3.0e6, hi: 1.0e7}
+  - layer_id: security
+    type: security
+    acts_on: border_cost
+    effect: security_coordination_border_cost_reduction
+    annual_cost: {lo: 2.0e6, hi: 5.0e6}
+max_exhaustive_combinations: 2000

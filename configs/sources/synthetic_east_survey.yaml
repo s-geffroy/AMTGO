@@ -1,0 +1,57 @@
+# Region EST (M14), adjacente a l'ouest le long de 21 W. Instrument SYNTHETIQUE "enquete" : zones d'enumeration comptees puis
+# geomasquees. Meme bloc 'world' que synthetic_census (verifie a la resolution
+# du run). Territoire fictif en plein Atlantique Sud : aucune population reelle.
+source_id: synthetic_east_survey
+name: Monde synthetique EST - enquete (zones d'enumeration geomasquees)
+provider: AMTGO (genere)
+release: "0.3.0"
+citation: "AMTGO synthetic world v0.3.0, instrument survey, region EST (genere, aucune donnee reelle)."
+license:
+  license_id: synthetic-no-restriction
+  name: Donnees synthetiques generees par AMTGO
+  redistribution: true
+  commercial_use: true
+  attribution_required: false
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [population_measurement, multiscale_validation, composition_measurement]
+  forbidden: [real_world_inference, group_territory_inference]
+method: EA de surface connue, comptage Poisson, deplacement uniforme dans un disque.
+temporal_start: 2025-01-01
+temporal_end: 2025-12-31
+default_evidence_status: D
+quality:
+  source_reliability: 1.0
+  spatial_precision: 0.6
+  temporal_precision: 1.0
+  construct_validity: 1.0
+  representativeness: 0.8
+  license_usability: 1.0
+  privacy_usability: 1.0
+retrieval:
+  kind: synthetic
+  adapter: synthetic
+  parameters:
+    instrument: survey
+    world:
+      seed: 20261021
+      bbox: [-21.0, -26.0, -17.0, -22.0]
+      background_density: 5.0
+      n_towns: 20
+      town_peak_density: [50.0, 800.0]
+      town_scale_km: [3.0, 15.0]
+      quadrature_km: 2.0
+      groups:
+        categories: [alpha, beta, gamma, delta]
+        background_weights: [0.15, 0.35, 0.2, 0.3]
+        town_concentration: 8.0
+        town_anchor_weight: 0.7
+    survey:
+      n_ea: 300
+      ea_area_km2: 2.0
+      displacement_km: 5.0
+      identity:
+        ontology_id: synth_self_id
+        respondents: 25

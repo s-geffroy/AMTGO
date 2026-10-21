@@ -1,0 +1,6 @@
+# Region EST (M14). Grille carree LAEA, 400 km / 2^4 = 25 km de cote.
+mesh_id: east_grid_l4
+family: grid_laea
+resolution: 4
+grid_base_km: 400
+extent: {kind: bbox, bbox: [-21.0, -26.0, -17.0, -22.0]}

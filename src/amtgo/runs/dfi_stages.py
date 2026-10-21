@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 QUADRATURE_POINTS = 16
 
 
-def _cell_points(mesh: Mesh, per_cell: int) -> list[np.ndarray]:
+def cell_points(mesh: Mesh, per_cell: int) -> list[np.ndarray]:
     """Points déterministes uniformes dans chaque cellule (LAEA, km) : grille, puis rejet."""
     import shapely
 
@@ -80,7 +80,7 @@ def network_kernel(mesh: Mesh, length_km: float, cutoff: float) -> sparse.csr_ma
     (beaucoup de paires proches de l'arête commune) : F variait d'un facteur 3 selon
     la maille (révision M5, ADR-0017). Troncature à ``cutoff``·L + diamètres des cellules.
     """
-    pts = _cell_points(mesh, QUADRATURE_POINTS)
+    pts = cell_points(mesh, QUADRATURE_POINTS)
     centres = np.array([p.mean(axis=0) for p in pts])
     radius = np.array([np.max(np.linalg.norm(p - p.mean(axis=0), axis=1)) for p in pts])
     tree = cKDTree(centres)

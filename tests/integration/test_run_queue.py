@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -275,3 +276,32 @@ def test_map_c_shallow_end_to_end(settings: Settings) -> None:
     assert not (d / "artifacts" / "map_r.json").exists()  # pas de trajectoires depuis G_0
     report = (d / "report.md").read_text()
     assert "## Map-C-Shallow" in report and "Prime de l'existant" in report and "prouve" not in report
+
+
+def test_continental_composition_end_to_end(settings: Settings) -> None:
+    """M14 : deux runs Map-R régionaux composés à leur interface, sans solve monolithique."""
+    manifest, created = submit(settings.configs_dir / "continental/synthetic_continental.yaml", settings)
+    assert created
+    order = [s.run_id for s in list_runs(settings)]
+    regional = [str(r.run_id) for r in manifest.regions]  # type: ignore[union-attr]
+    assert set(regional) < set(order) and order.index(str(manifest.run_id)) > max(order.index(r) for r in regional)
+    state = run_to_completion(settings, NullRepository(), str(manifest.run_id))
+    assert state.status is RunStatus.SUCCEEDED, state.error
+    d = runs_dir(settings) / str(manifest.run_id)
+    p = json.loads((d / "artifacts" / "continental.json").read_text())
+    assert p["decomposition"]["monolithic"] is False
+    assert all(e["checked"] and e["exact"] for e in p["decomposition"]["exactness"]), p["decomposition"]
+    sq = next(f for f in p["front"] if f["status_quo"])
+    assert sq["rank"] == 1 and p["conclusion"] in ("STATUS_QUO_NOT_DOMINATED",
+                                                   "DOMINANCE_UNRESOLVED_UNKNOWN_OBJECTIVES")
+    # Le coût de la frontière d'interface, invisible en région, est compté au niveau continental.
+    itf = p["interfaces"][0]
+    assert itf["border_km"] > 300 and p["costs_moved_to_continental_level"]["interface_border_management"] > 0
+    # Borne basse nulle : aucune couche n'est établie ; la borne haute ne donne qu'une priorité de recherche.
+    assert itf["layer_front_robust"] == [] and itf["verdict"] is None
+    assert p["publication_category"] == "NOT_IDENTIFIABLE" and not p["public_layer"]["published"]
+    report = (d / "report.md").read_text()
+    assert "## Décomposition (07 §13)" in report and "## Régimes de conclusion (09 §14)" in report
+    assert not re.search(r"\b(prouve|meilleur|optimal)", report)
+    again, created = submit(settings.configs_dir / "continental/synthetic_continental.yaml", settings)
+    assert not created and again.run_id == manifest.run_id

@@ -1,0 +1,43 @@
+# Region EST (M14). STATU QUO fictif du monde synthetique (STATUS_QUO, prompt §78) : 16 districts
+# (polygones du recensement synthetique) regroupes en deux Etats fictifs.
+# Ce n'est pas une proposition : c'est la baseline evaluee. Valeurs PROVISOIRES.
+status_quo_id: synthetic_status_quo_east
+version: "0.1.0"
+description: Region EST - deux Etats fictifs (ouest, est) de huit districts chacun.
+levels:
+  - name: state
+    group_of: district
+    groups:
+      state_w: ["d-00-", "d-01-"]
+      state_e: ["d-02-", "d-03-"]
+    border: regime          # gabarit du regime constitutionnel du run
+  - name: district
+    from_source: synthetic_east_census
+    variable_id: population_total_admin
+    border: {P: 0.3, C: 0.0, E: 0.05, M: 0.0, R: 0.1, S: 0.0}
+institutions:
+  # Competences partagees entre niveaux : somme = 1 par domaine (prompt §84).
+  state:
+    threshold: 0.5            # majorite simple
+    rights_default: 0.5
+    competences:
+      civil_justice: 1.0
+      political_voice: 0.7
+      executive_power: 1.0
+      security: 1.0
+      public_employment: 0.6
+      public_services: 0.5
+      land: 0.5
+      resources: 1.0
+      culture_language: 0.7
+      local_government: 0.2
+  district:
+    threshold: 0.5
+    rights_default: 0.5
+    competences:
+      political_voice: 0.3
+      public_employment: 0.4
+      public_services: 0.5
+      land: 0.5
+      culture_language: 0.3
+      local_government: 0.8

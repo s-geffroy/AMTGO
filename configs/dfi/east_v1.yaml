@@ -1,0 +1,15 @@
+# Region EST (M14). Evaluation D/F/I (M5). Parametres de MODELE, PROVISOIRES.
+model_id: dfi_east
+version: "0.2.0"
+description: >
+  D/F/I du statu quo declare, sur les champs geles (population x composition),
+  sous chaque ontologie du run et sur chaque maillage.
+network_kernel_length_km: 10.0   # portee des liens sociaux (noyau exponentiel)
+network_kernel_cutoff: 3.0       # troncature a 3 longueurs
+integration_quality:
+  spatial: 1.0                   # SUPPOSEE uniforme : aucune mesure de qualite du contact
+status_quo: institutions/synthetic_status_quo_east.yaml
+reification:                     # effet tire de la bibliotheque causale gelee (M7)
+  effect: institutionalization_salience
+  horizon_years: 10
+relative_floor: 0.01             # plancher numerique des ecarts relatifs

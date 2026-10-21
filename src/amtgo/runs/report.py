@@ -747,3 +747,113 @@ def _map_c_section(a: Any, m: dict[str, Any]) -> None:
     a("")
     a(f"Couche cartographique : **vide** — {m['public_layer']['reason']}. Valide à la date du run "
       f"({m['valid_as_of']['run_created_at']}) et des données ({', '.join(m['valid_as_of']['data_vintages'])}).\n")
+
+
+def render_continental(manifest: Any, p: dict[str, Any]) -> str:
+    """Rapport d'un run de coordination continentale (M14). Aucune carte, aucune recommandation."""
+    req = manifest.request
+    L: list[str] = []
+    a = L.append
+    a(f"# Rapport de run continental — `{req.name}`\n")
+    a("> Rapport généré automatiquement. AMTGO est un outil d'aide à la décision : il ne "
+      "possède aucune autorité constitutionnelle, et aucune adoption ne peut être inférée "
+      "par le modèle.\n")
+    a("## Run identity\n")
+    a("| champ | valeur |\n|---|---|")
+    a(f"| run_id | `{manifest.run_id}` |")
+    a(f"| manifest_hash | `{manifest.manifest_hash}` |")
+    a(f"| code_version | `{manifest.code_version}` |")
+    a(f"| contexte de coordination | {req.region} |")
+    a(f"| régime | {p['regime']} |")
+    a(f"| coordination | `{manifest.coordination_model.model_id}` v{manifest.coordination_model.version} |\n")
+    a(req.description.strip() + "\n")
+
+    a("## Décomposition (07 §13)\n")
+    d = p["decomposition"]
+    a("Aucun solve continental monolithique : " + " → ".join(d["levels"]) + ". Aucune frontière ne traverse "
+      "une interface ; une frontière inter-régionale relèverait d'un run régional sur la macro-région.\n")
+    a("| région | run régional | conclusion Map-R | dépend du régime | catégorie | gates | options au front |")
+    a("|---|---|---|---|---|---|---|")
+    for r, v in p["regions"].items():
+        gates = ", ".join(f"{k} {g}" for k, g in v["gates"].items())
+        a(f"| {r} | `{v['run_id'][:8]}…` | {v['map_r_conclusion']} | {'oui' if v['regime_dependent'] else 'non'} | "
+          f"{v['publication_category']} | {gates} | "
+          f"{d['regional_fronts'][r]} |")
+    a("")
+    a(f"Options composées : **{d['composed_options']}**. Contrôle d'exactitude (07 §14) :\n")
+    for e in d["exactness"]:
+        if e["checked"]:
+            a(f"- {e['check']} : {e['size']} options énumérées — "
+              + ("front identique." if e["exact"] else f"**écart** : {e['missed']} manquées, "
+                                                        f"{e['spurious']} en trop."))
+        else:
+            a(f"- {e['check']} : {e['reason']} — l'élagage reste **approché** sur ce plan.")
+    if d["repaired"]:
+        a(f"- Réparation : {len(d['repaired'])} option(s) du front exhaustif réintégrée(s) dans l'archive.")
+    a("")
+
+    a("## Interfaces et couches de coordination (11 phase 10)\n")
+    a("| couche | agit sur | μ (bornes de l'effet gelé) | coût annuel déclaré | pénalité J_path |")
+    a("|---|---|---|---|---|")
+    for lid, la in p["layers"].items():
+        a(f"| {lid} | {la['acts_on']} | [{la['mu'][0]:.2f}, {la['mu'][1]:.2f}] | "
+          f"{_fmt(la['annual_cost'][0])} – {_fmt(la['annual_cost'][1])} | {la['penalty']:.2f} |")
+    for lid, why in p["layers_not_evaluable"].items():
+        a(f"| {lid} | — | non évaluable : {why} | — | — |")
+    a("")
+    for i in p["interfaces"]:
+        share = ", ".join(f"{k} {_pct(v)}" for k, v in i["cross_share"].items())
+        a(f"- **{i['interface']}** : frontière de {i['border_km']:.0f} km, coût de gestion "
+          f"{_fmt(i['border_cost'])} (invisible au niveau régional, compté ici) ; part des liens fonctionnels "
+          f"qui la traversent : {share}.")
+        a("  - Ensembles de couches au front, borne robuste (μ basse, coût haut) : "
+          + (", ".join("+".join(s) for s in i["layer_front_robust"]) or "aucun") + ".")
+        a("  - Priorité de recherche — entreraient au front à la borne haute de l'effet : "
+          + (", ".join("+".join(s) for s in i["research_priority"]) or "aucun") + ".")
+    a("")
+
+    a("## Archive continentale\n")
+    a(f"**Conclusion : {p['conclusion']}**. Catégorie de publication : **{p['publication_category']}** "
+      "(la moins publiable des régions).\n")
+    if p["unresolved"]:
+        a("Dominent le statu quo sur les objectifs connus, sans que les inconnus tranchent : "
+          + ", ".join(f"`{k}`" for k in p["unresolved"]) + ".\n")
+    a("| rang | statu quo | trajectoires régionales | couches | J_D | J_G | J_T | J_inst | J_path |")
+    a("|---|---|---|---|---|---|---|---|---|")
+    for f in p["front"]:
+        o = f["objectives"]
+        regs = " ; ".join(f"{r}: {v['name']}" for r, v in f["regions"].items())
+        lay = " ; ".join(f"{i}: {'+'.join(ls) or '—'}" for i, ls in f["layers"].items()) or "—"
+        a(f"| {f['rank'] or '—'} | {'oui' if f['status_quo'] else ''} | {regs} | {lay} | {_fmt_obj(o.get('J_D'))} | "
+          f"{_fmt_obj(o.get('J_G'))} | {_fmt_obj(o.get('J_T'))} | {_fmt(o.get('J_inst'))} | "
+          f"{_fmt_obj(o.get('J_path'))} |")
+    a("")
+
+    a("## Régimes de conclusion (09 §14)\n")
+    a("Un régime n'est établi que si une option domine le statu quo, inconnus tranchés ; un compromis au front "
+      "n'établit rien." + (" Catégorie NOT_IDENTIFIABLE : lecture indicative seulement."
+                           if p["publication_category"] == "NOT_IDENTIFIABLE" else "") + "\n")
+    for r, v in p["verdicts"].items():
+        est = v["established"]
+        ev = v["separation_evidence"]
+
+        def why(k: str, x: str, ev: dict[str, Any] = ev) -> str:
+            if k != "separation_supplementaire_dangereuse":
+                return f"`{x}`"
+            e = ev[x]
+            return f"`{x}` : {e if isinstance(e, str) else 'pire sur ' + ', '.join(e)}"
+
+        a(f"- **{r}** : " + ("; ".join(f"{k} ({', '.join(why(k, x) for x in xs)})" for k, xs in est.items())
+                             if est else v["note"]) + ".")
+        if v["reification_signals"]:
+            a(f"  - Signal, sans établir de régime : créeraient plus de réification (J_reif, borne haute d'un "
+              f"effet déclaré) : {', '.join(f'`{x}`' for x in v['reification_signals'])}.")
+    for i in p["interfaces"]:
+        a(f"- **{i['interface']}** : " + (f"{i['verdict']} ({', '.join('+'.join(s) for s in i['improving_layers'])})"
+                                          if i["verdict"] else "aucune couche ne domine l'absence de couche "
+                                                               "à la borne robuste") + ".")
+    a("")
+    a(p["statement"] + "\n")
+    a(f"Couche cartographique : **vide** — {p['public_layer']['reason']}. Valide à la date du run "
+      f"({p['valid_as_of']['run_created_at']}).\n")
+    return "\n".join(L) + "\n"

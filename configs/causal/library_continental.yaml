@@ -1,0 +1,66 @@
+# Bibliotheque causale de la COORDINATION continentale (M14). Toutes les couches sont FICTIVES.
+# Aucun panel continental : seuls des effets declares (I7, hypotheses d'expert) sont admis, et
+# leur borne basse est 0 -- rien n'etablit qu'une couche attenue quoi que ce soit. La borne haute
+# ne sert qu'a dire ce qu'il faudrait mesurer (priorite de recherche), jamais a conclure.
+library_id: library_continental
+version: "0.1.0"
+description: >
+  Hypotheses exploratoires sur l'attenuation des liens fonctionnels transfrontaliers
+  par des couches de coordination entre deux regions synthetiques, et sur la reduction
+  du cout de gestion de la frontiere par une coordination de securite.
+declared:
+  - effect_key: market_integration_link_mitigation
+    treatment: {component: market_access, definition: "marche commun etendu a l'interface", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: F, variable: border_load_mitigation, unit: mu}
+    source_context: synthetic_south_atlantic_continental
+    target_context: synthetic_south_atlantic_continental
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.0, hi: 0.3}
+    time_horizon_years: 10
+    mechanism: un marche commun abaisse la charge frontaliere des echanges
+    source: hypothese d'expert (monde synthetique), non causale
+  - effect_key: mobility_agreement_link_mitigation
+    treatment: {component: mobility, definition: "accord de libre circulation a l'interface", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: F, variable: border_load_mitigation, unit: mu}
+    source_context: synthetic_south_atlantic_continental
+    target_context: synthetic_south_atlantic_continental
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.0, hi: 0.2}
+    time_horizon_years: 10
+    mechanism: la libre circulation abaisse la charge frontaliere des deplacements
+    source: hypothese d'expert (monde synthetique), non causale
+  - effect_key: corridor_link_mitigation
+    treatment: {component: infrastructure, definition: "corridor transfrontalier (bande de l'interface)", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: F, variable: border_load_mitigation, unit: mu}
+    source_context: synthetic_south_atlantic_continental
+    target_context: synthetic_south_atlantic_continental
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.0, hi: 0.4}
+    time_horizon_years: 10
+    mechanism: un corridor commun abaisse la charge frontaliere des liens proches de l'interface
+    source: hypothese d'expert (monde synthetique), non causale
+  - effect_key: security_coordination_border_cost_reduction
+    treatment: {component: police, definition: "coordination de securite aux frontieres", intensity_support: {lo: 0.0, hi: 1.0}}
+    outcome: {kind: V, variable: border_management_cost, unit: reduction relative}
+    source_context: synthetic_south_atlantic_continental
+    target_context: synthetic_south_atlantic_continental
+    design: expert_hypothesis
+    grade: I7
+    bounds: {lo: 0.0, hi: 0.3}
+    time_horizon_years: 10
+    mechanism: une gestion coordonnee mutualise les controles
+    source: hypothese d'expert (monde synthetique), non causale
+transport:
+  identified_overlap: 0.9     # PROVISOIRE
+  partial_widening: 2.0       # PROVISOIRE
+novelty:
+  kappa: 1.0                  # PROVISOIRE : bornes x (1 + d_A)
+  max_distance: 0.5           # PROVISOIRE
+diagnostics:
+  alpha: 0.05
+  interval_level: 0.9
+  bootstrap_draws: 200
+  placebo_shift_years: 2

@@ -27,6 +27,7 @@ from amtgo.ontology.model import Ontology, OntologyCrosswalk
 from amtgo.scenarios.model import Scenario
 
 if TYPE_CHECKING:
+    from amtgo.manifests.continental import ContinentalManifest
     from amtgo.measurement.fields import LatentFieldMeta
 
 # Taille des lots d'insertion : borne mémoire, pas paramètre scientifique.
@@ -51,6 +52,9 @@ class Repository(Protocol):
     def record_solutions(self, run_id: uuid.UUID, regime_id: str, archive: dict[str, Any]) -> None: ...
     def record_validation(self, run_id: uuid.UUID, report: dict[str, Any]) -> None: ...
     def record_transitions(self, run_id: uuid.UUID, product: dict[str, Any]) -> None: ...
+
+    def record_continental(self, manifest: ContinentalManifest, product: dict[str, Any],
+                           provenance: Sequence[ProvenanceRecord] = ()) -> None: ...
 
 
 class NullRepository:
@@ -99,6 +103,10 @@ class NullRepository:
         pass
 
     def record_transitions(self, run_id: uuid.UUID, product: dict[str, Any]) -> None:
+        pass
+
+    def record_continental(self, manifest: ContinentalManifest, product: dict[str, Any],
+                           provenance: Sequence[ProvenanceRecord] = ()) -> None:
         pass
 
 
@@ -471,3 +479,41 @@ class PostgresRepository:
                         CAST(:c AS jsonb), :i, :v, :rank, :f)
                     ON CONFLICT (transition_id) DO NOTHING
                 """), batch)
+
+    def record_continental(self, manifest: ContinentalManifest, product: dict[str, Any],
+                           provenance: Sequence[ProvenanceRecord] = ()) -> None:
+        """Une composition continentale et ses runs régionaux (déjà enregistrés par leurs propres runs).
+
+        Idempotent : une composition déjà enregistrée (étape rejouée, run resoumis) ne réécrit rien,
+        provenance comprise — ses identifiants dépendent de l'horodatage, ON CONFLICT ne suffirait pas.
+        """
+        with self.engine.begin() as cx:
+            inserted = cx.execute(text("""
+                INSERT INTO continental_compositions (run_id, manifest_hash, manifest, code_commit, regime,
+                    conclusion, publication_category, front_size, product, created_at)
+                VALUES (:r, :h, CAST(:m AS jsonb), :c, :reg, :concl, :cat, :n, CAST(:p AS jsonb), :t)
+                ON CONFLICT (run_id) DO NOTHING
+            """), {"r": manifest.run_id, "h": manifest.manifest_hash, "m": manifest.model_dump_json(),
+                   "c": manifest.code_commit, "reg": manifest.constitutional_regime, "concl": product["conclusion"],
+                   "cat": product["publication_category"], "n": sum(1 for f in product["front"] if f["rank"] == 1),
+                   "p": json.dumps(product), "t": manifest.created_at}).rowcount
+            if not inserted:
+                return
+            for rr in manifest.regions:
+                cx.execute(text("""
+                    INSERT INTO continental_regions (run_id, region_id, regional_run_id)
+                    VALUES (:r, :rid, :rr) ON CONFLICT DO NOTHING
+                """), {"r": manifest.run_id, "rid": rr.region_id, "rr": rr.run_id})
+            if provenance:
+                cx.execute(text("""
+                    INSERT INTO provenance_records (record_id, transformation, input_ids, output_ids,
+                        code_version, parameters, run_id, continental_run_id, created_at)
+                    VALUES (:record_id, :transformation, :input_ids, :output_ids, :code_version,
+                        CAST(:parameters AS jsonb), NULL, :run_id, :created_at)
+                    ON CONFLICT (record_id) DO NOTHING
+                """), [{
+                    "record_id": p.record_id, "transformation": p.transformation,
+                    "input_ids": list(p.input_ids), "output_ids": list(p.output_ids),
+                    "code_version": p.code_version, "parameters": json.dumps(p.parameters, default=str),
+                    "run_id": manifest.run_id, "created_at": p.timestamp,
+                } for p in provenance])
