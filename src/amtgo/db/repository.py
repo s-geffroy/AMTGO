@@ -50,6 +50,7 @@ class Repository(Protocol):
                           assignments: dict[str, Any]) -> None: ...
     def record_solutions(self, run_id: uuid.UUID, regime_id: str, archive: dict[str, Any]) -> None: ...
     def record_validation(self, run_id: uuid.UUID, report: dict[str, Any]) -> None: ...
+    def record_transitions(self, run_id: uuid.UUID, product: dict[str, Any]) -> None: ...
 
 
 class NullRepository:
@@ -95,6 +96,9 @@ class NullRepository:
         pass
 
     def record_validation(self, run_id: uuid.UUID, report: dict[str, Any]) -> None:
+        pass
+
+    def record_transitions(self, run_id: uuid.UUID, product: dict[str, Any]) -> None:
         pass
 
 
@@ -447,3 +451,23 @@ class PostgresRepository:
                 WHERE run_id = :r
             """), {"r": run_id, "c": report["publication_category"],
                    "stab": json.dumps({"validated": True})})
+
+    def record_transitions(self, run_id: uuid.UUID, product: dict[str, Any]) -> None:
+        from amtgo.utils.canonical import stable_uuid
+
+        rows = [{"id": stable_uuid("transition", [str(run_id), p["path_id"], str(s["step"])]), "r": run_id,
+                 "sol": stable_uuid("solution", [str(run_id), p["target_key"]]), "p": p["path_id"],
+                 "st": s["step"], "a": s["action"], "pl": json.dumps(s["payload"]),
+                 "c": json.dumps({"cost": s["cost"], "uncertainty": s["uncertainty"], "violations": s["violations"]}),
+                 "i": s["irreversibility"], "v": s["value_of_information"], "rank": p["rank"], "f": p["feasible"]}
+                for p in product["paths"] for s in p["steps"]]
+        with self.engine.begin() as cx:
+            for batch in _batches(rows):
+                cx.execute(text("""
+                    INSERT INTO transitions (transition_id, run_id, solution_id, path_id, step, action_type,
+                        action_payload, cost_distribution, irreversibility, value_of_information, path_rank,
+                        path_feasible)
+                    VALUES (:id, :r, :sol, :p, :st, CAST(:a AS transition_action), CAST(:pl AS jsonb),
+                        CAST(:c AS jsonb), :i, :v, :rank, :f)
+                    ON CONFLICT (transition_id) DO NOTHING
+                """), batch)

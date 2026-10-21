@@ -108,7 +108,7 @@ def export_pages_map(run_dir: Path, out: Path) -> dict[str, Any]:
     candidates: dict[str, Any] = {
         "status": RecommendationStatus.NOT_IDENTIFIABLE.value,
         "message": "Aucun run validé : aucun découpage candidat n'existe à ce stade "
-                   "(mesure M3, D/F/I M5, candidats M8, optimiseur M10, gates M11).",
+                   "(mesure M3, D/F/I M5, candidats M8, optimiseur M10, gates M11, Map-R M12).",
         "regime": None, "ontology": None, "scenario": None,
         "no_change_alternative": True,
         "candidates": [],

@@ -1,12 +1,12 @@
-# Run de reference M0-M11 sur le monde synthetique : ingestion, deux familles de maillage x deux
+# Run de reference M0-M12 sur le monde synthetique : ingestion, deux familles de maillage x deux
 # resolutions, mesure, composition sous deux ontologies, D/F/I du statu quo, scenarios, viabilite
 # contextuelle sous quatre regimes, diagnostic S2C, bibliotheque causale estimee et gelee,
 # candidats territoriaux (unites analytiques) et leur stabilite multi-echelle, composition
 # institutionnelle a geometrie fixe, archive de Pareto robuste des candidats, validation et
-# red-team (gates de publication), rapport.
+# red-team (gates de publication), trajectoires Map-R depuis le statu quo, rapport.
 name: synthetic_pilot
 description: >
-  Pilote synthetique M0-M11. Exerce le registre de sources, l'ingestion des
+  Pilote synthetique M0-M12. Exerce le registre de sources, l'ingestion des
   instruments, les maillages H3 et grille LAEA a deux resolutions, la fusion de
   mesure et sa validation, la composition sous deux ontologies fictives concurrentes
   (parts seulement, jamais d'etiquette), D/F/I du statu quo declare, et sa
@@ -14,7 +14,8 @@ description: >
   bibliotheque causale estimee sur des panels fictifs, validee et gelee, et des
   candidats territoriaux generes (unites analytiques, non evaluees), puis des
   leviers institutionnels testes a geometrie fixe, et une archive de Pareto
-  robuste des candidats, validee et attaquee (gates M, C, O, S, R). Aucune recommandation.
+  robuste des candidats, validee et attaquee (gates M, C, O, S, R), et les
+  trajectoires Map-R depuis le statu quo. Aucune recommandation.
 region: synthetic_south_atlantic
 map_mode: R
 constitutional_regime: R1_COMMON_MARKET
@@ -34,6 +35,7 @@ causal_library: causal/library_pilot.yaml
 candidate_model: candidates/pilot_v1.yaml
 composer_model: composer/pilot_v1.yaml
 optimizer_model: optimizer/pilot_v1.yaml
+transition_model: transition/pilot_v1.yaml
 scenario_set:
   - scenarios/s1_baseline.yaml
   - scenarios/s1_stress.yaml

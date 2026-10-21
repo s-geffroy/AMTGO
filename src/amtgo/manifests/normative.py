@@ -83,6 +83,14 @@ class OptimizationRules(_Strict):
         return self
 
 
+class TransitionWeights(_Strict):
+    """Poids de la pénalité de trajectoire (02 §26, 06 §5 « poids de réversibilité ») : λ_I ι + λ_U U − λ_V VOI."""
+
+    lambda_irreversibility: float = Field(ge=0.0)
+    lambda_uncertainty: float = Field(ge=0.0)
+    lambda_voi: float = Field(ge=0.0)
+
+
 class ConnectionWeights(_Strict):
     """κ_c du coût de rupture J_conn (02 §11) : poids normatifs des canaux d'intégration."""
 
@@ -134,6 +142,7 @@ class NormativeManifest(_Strict):
     robustness: RobustnessWeights
     optimization: OptimizationRules
     connection_weights: ConnectionWeights
+    transition: TransitionWeights
     viability: ViabilityThresholds
     consent: ConsentRules
     privacy: PrivacyRules

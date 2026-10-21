@@ -37,6 +37,7 @@ from amtgo.measurement.composition import CompositionManifest
 from amtgo.measurement.manifest import MeasurementManifest
 from amtgo.ontology.model import Ontology, OntologyCrosswalk
 from amtgo.optimization.manifest import OptimizerManifest
+from amtgo.optimization.transition import TransitionManifest
 from amtgo.scenarios.model import Scenario
 from amtgo.utils.canonical import content_hash, stable_uuid
 from amtgo.utils.code_version import code_commit, code_version
@@ -79,6 +80,7 @@ class RunRequest(BaseModel):
     candidate_model: str | None = None
     composer_model: str | None = None
     optimizer_model: str | None = None
+    transition_model: str | None = None
     ontology_set: tuple[str, ...] = ()
     scenario_set: tuple[str, ...] = ()
     seeds: tuple[int, ...] = (0,)
@@ -123,6 +125,7 @@ class RunManifest(BaseModel):
     candidate_model: CandidateManifest | None = None
     composer_model: ComposerManifest | None = None
     optimizer_model: OptimizerManifest | None = None
+    transition_model: TransitionManifest | None = None
     # Couches non encore disponibles : explicitement nulles, jamais inventées.
     solver: dict[str, Any] | None = None
     seeds: tuple[int, ...]
@@ -271,6 +274,12 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         if candidates is None or viability is None or dfi is None:
             raise ConfigurationError("l'optimiseur exige les candidats (M8), la viabilité (M6) et D/F/I (M5)")
 
+    transition = None
+    if request.transition_model:
+        transition = load_model(TransitionManifest, configs_dir / request.transition_model)
+        if optimizer is None or composer is None:
+            raise ConfigurationError("Map-R exige l'archive de Pareto (M10) et le composeur (M9)")
+
     body: dict[str, Any] = {
         "code_commit": code_commit(),
         "code_version": code_version(),
@@ -295,6 +304,7 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         "candidate_model": candidates,
         "composer_model": composer,
         "optimizer_model": optimizer,
+        "transition_model": transition,
         "seeds": request.seeds,
     }
     draft = RunManifest(run_id=uuid.UUID(int=0), manifest_hash="", created_at=utcnow(), **body)

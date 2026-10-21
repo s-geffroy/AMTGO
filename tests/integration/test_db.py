@@ -28,7 +28,7 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
     from amtgo.runs.state import RunStatus
 
     upgrade(db_settings)
-    assert current_revision(db_settings) == "0012"
+    assert current_revision(db_settings) == "0013"
     repo = make_repository(db_settings)
     manifest, _ = submit(db_settings.configs_dir / "runs/synthetic_pilot.yaml", db_settings)
     state = run_to_completion(db_settings, repo, str(manifest.run_id))
@@ -77,6 +77,10 @@ def test_migrations_and_persistence(db_settings: Settings) -> None:
         # M11 : un gate par lettre ; aucune solution ROBUST/CONDITIONAL sans eux (déclencheur).
         assert count("SELECT count(*) FROM validation_gates WHERE run_id = :r") == 5
         assert count("SELECT count(*) FROM solutions WHERE run_id = :r AND stability ? 'validated'") == 15
+        # M12 : chaque étape de trajectoire rattachée à une solution de l'archive.
+        assert count("SELECT count(DISTINCT path_id) FROM transitions WHERE run_id = :r") > 10
+        assert count("SELECT count(*) FROM transitions WHERE run_id = :r AND path_id = 'path:status_quo' "
+                     "AND action_type = 'no_change' AND path_rank = 1") == 1
 
     # M11 : la base refuse une solution « ROBUST » quand un gate du run n'est pas passé.
     from sqlalchemy.exc import DBAPIError

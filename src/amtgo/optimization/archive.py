@@ -80,7 +80,7 @@ def to_solutions(variants: list[Variant], robustness: RobustnessWeights,
         if not v.omega:
             violated.add("aucune évaluation")
         vals: dict[str, float | None] = {}
-        for k in OBJECTIVES:
+        for k in dict.fromkeys((*OBJECTIVES, *objectives)):
             xs = [w[k] for w in v.omega.values() if w.get(k) is not None]
             known = k in objectives and k not in UNKNOWN_OBJECTIVES and xs and len(xs) == len(v.omega)
             vals[k] = robust(xs, robustness) if known else None
@@ -90,15 +90,17 @@ def to_solutions(variants: list[Variant], robustness: RobustnessWeights,
 
 
 def build(variants: list[Variant], eps: dict[str, float], robustness: RobustnessWeights,
-          normative: dict[str, Any], objectives: tuple[str, ...] = OBJECTIVES) -> Archive:
+          normative: dict[str, Any], objectives: tuple[str, ...] = OBJECTIVES,
+          sq_comparison_excludes: tuple[str, ...] = ("J_T",)) -> Archive:
     sols = to_solutions(variants, robustness, objectives)
     eps = {k: x for k, x in eps.items() if k in objectives}
     nondominated_sort(sols, eps)
     certificate = infeasibility_certificate(sols, normative)
     sq = next(s for s in sols if s.family == "STATUS_QUO")
     relation = {v.key: v.relation for v in variants}
-    # Map-R : le changement a un coût ; on compare hors transition.
-    eps_wo_t = {k: x for k, x in eps.items() if k != "J_T"}
+    # Archive M10 : comparaison au statu quo hors transition ; Map-R (M12) la réintègre.
+    # Le changement a un coût : J + C_transition (02 §20).
+    eps_wo_t = {k: x for k, x in eps.items() if k not in sq_comparison_excludes}
     improving, unresolved = [], {}
     for s in sols:
         if not s.feasible or s.baseline or not eps_dominates(s.objectives, sq.objectives, eps_wo_t):

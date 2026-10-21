@@ -1,0 +1,20 @@
+# Trajectoires de transition (M12, Map-R). Parametres de MODELE, PROVISOIRES.
+# Les poids lambda de la penalite de trajectoire sont normatifs (normative/default.yaml).
+transition_id: transition_pilot
+version: "0.1.0"
+description: >
+  Trajectoires depuis le statu quo dans la hierarchie contrefactuelle du prompt §79 :
+  leviers institutionnels echelonnes (prefixes du composeur, reevalues a chaque etape),
+  changement de frontiere vers chaque cible territoriale du front.
+irreversibility:          # iota(a) : part de l'action qu'on ne peut pas defaire (declaree, non estimee)
+  no_change: 0.0
+  rights_enforcement: 0.1
+  institutional_reform: 0.2
+  autonomy: 0.4
+  federation: 0.6
+  border_weakening: 0.6
+  border_change: 0.9
+  sovereignty: 1.0
+reversible_max: 0.3       # au-dela, une etape n'est pas un essai : sa valeur d'information ne compte pas
+path_epsilon: 0.05        # resolution de J_path
+uncertainty_floor: 0.01

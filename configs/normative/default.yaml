@@ -67,3 +67,8 @@ privacy:
     - historical_label
     - group_share
     - route
+
+transition:  # 02 §26 : penalite de trajectoire lambda_I*iota + lambda_U*U - lambda_V*VOI (06 §5)
+  lambda_irreversibility: 1.0  # PROVISOIRE
+  lambda_uncertainty: 0.5      # PROVISOIRE
+  lambda_voi: 0.25             # PROVISOIRE : la valeur d'information ne prime jamais la securite (06 §12)

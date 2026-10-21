@@ -176,6 +176,9 @@ def render_report(
     if candidates is not None and "validation" in candidates:
         a("## Validation & red-team\n")
         _validation_section(a, candidates["validation"])
+    if candidates is not None and "map_r" in candidates:
+        a("## Map-R (régional)\n")
+        _map_r_section(a, candidates["map_r"])
     a("## Stability summary\n")
     if candidates is None:
         a(_NA.format(m="M8+") + "\n")
@@ -666,3 +669,50 @@ def _validation_section(a: Any, v: dict[str, Any]) -> None:
       f"{len(p['attacks'])} attaques bloquées, contrôles bénins publiés : "
       f"{sum(c['released'] for c in p['benign_controls'])}/{len(p['benign_controls'])}. "
       f"Couches publiables telles quelles : {', '.join(p['public_layers']) or 'aucune'}.\n")
+
+
+def _map_r_section(a: Any, m: dict[str, Any]) -> None:
+    w = m["weights"]
+    a("Map-R demande quelle amélioration est réaliste **depuis les institutions présentes** : chaque trajectoire "
+      "part du statu quo, monte la hiérarchie contrefactuelle (§79) sans jamais redescendre, et chaque étape est "
+      "réévaluée. Pénalité de trajectoire (02 §26) : J_path = Σ_t [" f"{w['lambda_irreversibility']}·ι + "
+      f"{w['lambda_uncertainty']}·U − {w['lambda_voi']}·VOI], à côté du vecteur J de l'état final, transition "
+      "comprise. VOI est un indicateur (étape réversible sur un effet non établi), pas une valeur espérée.\n")
+    a(f"**Conclusion : {m['conclusion']}** — premier niveau de la hiérarchie au front : "
+      f"`{m['first_level_on_front']}`. Catégorie de publication : **{m['publication_category']}**.\n")
+    if m["conclusion"] == "STATUS_QUO_NOT_DOMINATED":
+        a("Aucune trajectoire ne fait au moins aussi bien que le statu quo sur tous les objectifs, coût de "
+          "transition compris : rester est sur le front. Les autres trajectoires du front sont des **compromis** "
+          "(elles améliorent certains objectifs et en dégradent d'autres), jamais des recommandations.\n")
+    a("| rang | trajectoire | étapes | faisable | J_path | ρ(J_T) | ρ(J_pkg) | ρ(J_D) | améliore | dégrade |")
+    a("|---|---|---|---|---|---|---|---|---|---|")
+    for p in m["paths"]:
+        o, e = p["objectives"], p["explanation"]
+        steps = " → ".join(s["action"] for s in p["steps"])
+        a(f"| {p['rank'] or '—'} | `{p['name']}` | {steps} | {'oui' if p['feasible'] else '**non**'} | "
+          f"{p['penalty']:.2f} | {_fmt_obj(o.get('J_T'))} | {_fmt_obj(o.get('J_pkg'))} | {_fmt_obj(o.get('J_D'))} | "
+          f"{', '.join(e['improved']) or '—'} | {', '.join(e['worsened']) or '—'} |")
+    a("")
+    a("**Hiérarchie contrefactuelle** (§79) :\n")
+    a("| niveau | action | trajectoires | au front |")
+    a("|---|---|---|---|")
+    for h in m["hierarchy"]:
+        a(f"| {h['level']} | {h['action']} | {len(h['paths'])} | {len(h['on_front'])}"
+          + (f" — {h['note']}" if h["note"] else "") + " |")
+    a("")
+    u = m["urgency"]
+    urgent = sum(u["status_quo_urgent_estimates"].values())
+    a(f"Urgence droits (02 §27) : {urgent} estimation(s) de domination grave urgente au statu quo"
+      + (f" ; trajectoires rendues infaisables : {len(u['paths_made_infeasible'])}." if urgent else
+         " — l'exception ne s'applique pas.")
+      + (f" Options non évaluables (effet inconnu) : {', '.join(m['not_evaluable_options'])}."
+         if m["not_evaluable_options"] else "") + "\n")
+    front = [p for p in m["paths"] if p["rank"] == 1]
+    a("Lecture admise (06 §15), pour chaque trajectoire du front :\n")
+    for p in front:
+        a(f"- `{p['name']}` — {p['statement']}")
+    a("")
+    v = m["valid_as_of"]
+    a(f"Valide à la date du run ({v['run_created_at']}) et des données ({', '.join(v['data_vintages'])}) ; aucune "
+      "conclusion n'est permanente (06 §16). Couche cartographique : "
+      + ("publiée." if m["public_layer"]["published"] else f"**vide** — {m['public_layer']['reason']}.") + "\n")

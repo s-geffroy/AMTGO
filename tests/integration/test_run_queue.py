@@ -146,6 +146,18 @@ def test_synthetic_pilot_end_to_end(settings: Settings) -> None:
         {f"mesh_{m}" for m in ms["meshes"]}  # seuls les maillages sortiraient tels quels
     assert len(va["sensitivity"]["settings"]) == 10 and {a["ablation"] for a in va["ablations"]} >= {"D", "F", "I"}
     assert "Validation & red-team" in report
+    # M12 : Map-R — trajectoires depuis le statu quo, transition comprise ; rien de cartographié.
+    mr = json.loads((d / "artifacts" / "map_r.json").read_text())
+    sq_path = next(p for p in mr["paths"] if p["path_id"] == "path:status_quo")
+    assert sq_path["rank"] == 1 and sq_path["feasible"]  # rester est toujours une option du front
+    assert mr["conclusion"] in ("STATUS_QUO_NOT_DOMINATED", "UNRESOLVED_UNKNOWN_OBJECTIVES")
+    assert mr["hierarchy"][0]["action"] == "no_change" and len(mr["hierarchy"]) == 8
+    assert not mr["public_layer"]["published"] and mr["public_layer"]["features"] == []
+    assert all("consentement politique externe" in p["statement"] for p in mr["paths"])
+    assert {p["family"] for p in mr["paths"]} >= {"STATUS_QUO", "PATH_INSTITUTIONAL", "PATH_TERRITORIAL"}
+    assert "## Map-R (régional)" in report
+    for word in ("devrait devenir", "prouve que", "recommandée"):
+        assert word not in report.lower()
     freeze = json.loads((d / "measurement_freeze.json").read_text())
     assert set(freeze["compositions"]) == set(ms["meshes"])
     assert "Parts seulement" in report
