@@ -244,6 +244,7 @@ def test_pages_export_from_fixture(settings: Settings, ne_mini: Path, tmp_path: 
     assert lines["features"][0]["properties"]["disputed"] is True
     cand = json.loads((out / "candidates.json").read_text())
     assert cand["status"] == "NOT_IDENTIFIABLE" and cand["candidates"] == []
+    assert "aucun run sur données réelles" in cand["message"] and "M3" not in cand["message"]
     assert {layer["id"] for layer in meta["layers"]} >= {"countries", "boundaries", "mesh_mini_h3_r3"}
 
 
@@ -276,6 +277,11 @@ def test_map_c_shallow_end_to_end(settings: Settings) -> None:
     assert not (d / "artifacts" / "map_r.json").exists()  # pas de trajectoires depuis G_0
     report = (d / "report.md").read_text()
     assert "## Map-C-Shallow" in report and "Prime de l'existant" in report and "prouve" not in report
+    # La couche candidats de la carte dit pourquoi elle est vide, lu sur une validation réelle.
+    from amtgo.export.pages_map import candidates_message
+
+    msg = candidates_message(d)
+    assert "catégorie NOT_IDENTIFIABLE" in msg and "M FAILED" in msg and "ROBUST ou CONDITIONAL" in msg
 
 
 def test_continental_composition_end_to_end(settings: Settings) -> None:

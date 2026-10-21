@@ -195,12 +195,15 @@ def ingest_run(manifest: Path, role: list[str], out: Path = Path("/tmp/amtgo-ing
 
 
 @export_app.command("pages-map")
-def export_pages_map_cmd(run_id: str, out: Path) -> None:
+def export_pages_map_cmd(run_id: str, out: Path,
+                         status_from: str | None = typer.Option(
+                             None, help="run dont la validation motive la couche candidats")) -> None:
     """Exporte les couches de la carte publique d'un run terminé."""
     from amtgo.export.pages_map import export_pages_map
     from amtgo.runs.queue import runs_dir
 
-    meta = export_pages_map(runs_dir(get_settings()) / run_id, out)
+    root = runs_dir(get_settings())
+    meta = export_pages_map(root / run_id, out, root / status_from if status_from else None)
     typer.echo(f"{len(meta['layers'])} couches → {out}")
 
 

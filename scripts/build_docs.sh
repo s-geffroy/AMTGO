@@ -15,8 +15,9 @@ mkdir -p "$work/docs/runs/generated" "$work/docs/assets/generated/map"
 for run in synthetic_pilot synthetic_c_shallow pages_africa; do
   rid=$(amtgo run execute "configs/runs/$run.yaml" | tail -n1 | cut -d' ' -f1)
   amtgo export report "$rid" "$work/docs/runs/generated/$run.md"
+  [ "$run" = synthetic_pilot ] && pilot=$rid
   if [ "$run" = pages_africa ]; then
-    amtgo export pages-map "$rid" "$work/docs/assets/generated/map"
+    amtgo export pages-map "$rid" "$work/docs/assets/generated/map" --status-from "$pilot"
   fi
 done
 

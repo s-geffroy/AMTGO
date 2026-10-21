@@ -54,7 +54,8 @@ def _write(out: Path, name: str, payload: Any) -> None:
     write_json_atomic(out / name, json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
 
 
-def export_pages_map(run_dir: Path, out: Path) -> dict[str, Any]:
+def export_pages_map(run_dir: Path, out: Path, status_from: Path | None = None) -> dict[str, Any]:
+    """``status_from`` : run dont la validation (05 §20) motive l'état de la couche candidats."""
     manifest = load_manifest(run_dir)
     if not isinstance(manifest, RunManifest):
         raise ConfigurationError("carte Pages : seul un run régional produit des couches ; un run "
@@ -110,9 +111,9 @@ def export_pages_map(run_dir: Path, out: Path) -> dict[str, Any]:
                        "resolution": definition.resolution})
 
     candidates: dict[str, Any] = {
-        "status": RecommendationStatus.NOT_IDENTIFIABLE.value,
-        "message": "Aucun run validé : aucun découpage candidat n'existe à ce stade "
-                   "(mesure M3, D/F/I M5, candidats M8, optimiseur M10, gates M11, Map-R M12).",
+        "status": (RecommendationStatus.NOT_IDENTIFIABLE.value if status_from is None
+                   else artifacts.read_json(status_from, "artifacts/validation.json")["publication_category"]),
+        "message": candidates_message(status_from),
         "regime": None, "ontology": None, "scenario": None,
         "no_change_alternative": True,
         "candidates": [],
@@ -132,3 +133,21 @@ def export_pages_map(run_dir: Path, out: Path) -> dict[str, Any]:
     }
     _write(out, "index.json", meta)
     return meta
+
+
+RULE = ("Une frontière candidate n'est publiée qu'en catégorie ROBUST ou CONDITIONAL, tous gates passés "
+        "(05 §20) ; rester tel quel (NO_CHANGE) reste toujours une alternative.")
+
+
+def candidates_message(status_from: Path | None) -> str:
+    """Pourquoi la couche candidats est vide, lu sur la validation d'un run réel (jamais un texte figé)."""
+    if status_from is None:
+        return ("Aucune frontière candidate : aucun run sur données réelles n'existe pour l'Afrique, les runs "
+                "actuels portent sur des mondes synthétiques. " + RULE)
+    m = load_manifest(status_from)
+    v = artifacts.read_json(status_from, "artifacts/validation.json")
+    gates = ", ".join(f"{k} {g}" for k, g in v["gates"].items() if g != "PASSED")
+    name = m.request.name
+    return (f"Aucune frontière candidate publiable. Run de référence « {name} » (monde synthétique) : catégorie "
+            f"{v['publication_category']}" + (f", gates non passés : {gates}" if gates else "") + ". " + RULE
+            + " Aucun run sur données réelles n'existe pour l'Afrique.")
