@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -51,12 +52,22 @@ def eps_dominates(a: dict[str, float | None], b: dict[str, float | None], eps: d
     return not_worse and better
 
 
-def nondominated_sort(sols: list[Solution], eps: dict[str, float]) -> None:
-    """Rangs de Pareto (1 = front) des solutions faisables ; les infaisables restent sans rang."""
+def nondominated_sort(sols: list[Solution], eps: dict[str, float],
+                      blocked: Callable[[Solution, Solution], bool] | None = None) -> None:
+    """Rangs de Pareto (1 = front) des solutions faisables ; les infaisables restent sans rang.
+
+    ``blocked(a, b)`` : vrai si une connaissance structurelle sur un objectif inconnu dit que a
+    ne peut pas être meilleur que b sur cet objectif — la dominance de a sur b n'est alors pas
+    établie (M13 : sans quoi ignorer J_P favoriserait mécaniquement les fusions).
+    """
     pool = [s for s in sols if s.feasible]
     rank = 1
+
+    def dominates(o: Solution, s: Solution) -> bool:
+        return eps_dominates(o.objectives, s.objectives, eps) and not (blocked is not None and blocked(o, s))
+
     while pool:
-        front = [s for s in pool if not any(eps_dominates(o.objectives, s.objectives, eps) for o in pool if o is not s)]
+        front = [s for s in pool if not any(dominates(o, s) for o in pool if o is not s)]
         if not front:  # cycle impossible avec une ε-dominance stricte ; garde-fou
             front = pool
         for s in front:

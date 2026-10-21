@@ -1,0 +1,38 @@
+# Map-C-Shallow (M13) sur le monde synthetique : meme chaine que le pilote, sur les deux
+# maillages grille, en mode C_SHALLOW (frontieres actuelles sans privilege juridique).
+name: synthetic_c_shallow
+description: >
+  Contre-factuel contemporain : quelle geometrie institutionnelle serait preferable
+  aujourd'hui si les frontieres actuelles n'avaient aucune priorite juridique ?
+  J_T retire, societe observee conservee. Aucune recommandation.
+region: synthetic_south_atlantic
+map_mode: C_SHALLOW
+constitutional_regime: R1_COMMON_MARKET
+normative_manifest: normative/default.yaml
+sources:
+  - {manifest: sources/synthetic_survey.yaml, roles: [population_measurement, multiscale_validation, composition_measurement], redistribute: true}
+  - {manifest: sources/synthetic_census.yaml, roles: [population_measurement, multiscale_validation, status_quo_geometry, causal_transport_target], redistribute: true}
+  - {manifest: sources/synthetic_historical_map.yaml, roles: [ontology_validation], redistribute: true}
+  - {manifest: sources/synthetic_fiscal.yaml, roles: [viability_inputs], redistribute: true}
+  - {manifest: sources/synthetic_policy_panel.yaml, roles: [causal_estimation], redistribute: true}
+  - {manifest: sources/synthetic_policy_panel_endogenous.yaml, roles: [causal_estimation], redistribute: true}
+measurement_model: measurement/population_v1.yaml
+composition_model: composition/self_id_v1.yaml
+dfi_model: dfi/pilot_v1.yaml
+viability_model: viability/pilot_v1.yaml
+causal_library: causal/library_pilot.yaml
+candidate_model: candidates/pilot_v1.yaml
+composer_model: composer/pilot_v1.yaml
+optimizer_model: optimizer/pilot_v1.yaml
+scenario_set:
+  - scenarios/s1_baseline.yaml
+  - scenarios/s1_stress.yaml
+  - scenarios/s2a_voluntary.yaml
+  - scenarios/s2c_diagnostic.yaml
+ontology_set:
+  - ontologies/synth_self_id.yaml
+  - ontologies/synth_ext_hist.yaml
+mesh_set:
+  - meshes/pilot_grid_l4.yaml
+  - meshes/pilot_grid_l5.yaml
+seeds: [0]

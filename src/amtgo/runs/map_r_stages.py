@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 from amtgo.core.provenance import ProvenanceRecord
 from amtgo.errors import ConfigurationError
-from amtgo.optimization.archive import build
+from amtgo.optimization.archive import build, geometry_relation
 from amtgo.optimization.objectives import OBJECTIVES
 from amtgo.optimization.transition import (
     INSTITUTIONAL_FAMILY,
@@ -89,6 +89,14 @@ def map_r(ctx: StageContext, _: str) -> dict[str, Any]:
     affected = apply_urgency(paths) if any(urgent.values()) else []
 
     pvs = [p.as_variant(nm.transition) for p in paths]
+    # Géométrie de chaque trajectoire : sa cible territoriale, sinon la géométrie actuelle (M13).
+    geometry = {p.path_id: p.target if p.family == TERRITORIAL_FAMILY else sq.key for p in paths}
+    by_geom = {v.key: v for v in vs}
+    for pv in pvs:
+        for other in pvs:
+            ga, gb = geometry[pv.key], geometry[other.key]
+            if pv.key != other.key:
+                pv.relations[other.key] = geometry_relation(by_geom[ga], by_geom[gb], sq.key)
     eps = {**om.epsilon, PATH_OBJECTIVE: tm.path_epsilon}
     objectives = (*OBJECTIVES, PATH_OBJECTIVE)
     a = build(pvs, eps, nm.robustness, normative_parameters(ctx), objectives, sq_comparison_excludes=())

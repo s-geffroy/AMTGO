@@ -33,7 +33,7 @@ from amtgo.optimization.objectives import OBJECTIVES
 from amtgo.privacy.guard import ExportLayer
 from amtgo.privacy.redteam import gate_s
 from amtgo.runs import artifacts
-from amtgo.runs.optimizer_stages import normative_parameters, variants
+from amtgo.runs.optimizer_stages import mode_objectives, normative_parameters, variants
 from amtgo.runs.viability_stages import regimes_evaluated
 from amtgo.utils.canonical import content_hash
 from amtgo.validation import falsification, goodhart
@@ -79,6 +79,7 @@ def _sensitivity(ctx: StageContext, vs: list[Variant], nominal: Archive) -> dict
     assert om is not None
     nm = ctx.manifest.normative_manifest
     norm = normative_parameters(ctx)
+    objs = mode_objectives(ctx)
     eps_max = nm.rights.severe_domination_probability_max
     sp = om.sensitivity
     settings: list[tuple[str, Any, list[Variant], dict[str, float], RobustnessWeights]] = []
@@ -100,7 +101,7 @@ def _sensitivity(ctx: StageContext, vs: list[Variant], nominal: Archive) -> dict
     rows, statuses = [], []
     for name, value, svs, eps, rob in settings:
         ctx.check_stop(f"validation sensibilité {name}")
-        a = build(svs, eps, rob, norm)
+        a = build(svs, eps, rob, norm, objs)
         statuses.append(a.status)
         rows.append({"parameter": name, "value": value, "conclusion": a.conclusion, "front": a.front,
                      "entered_front": sorted(set(a.front) - set(nominal.front)),
@@ -118,7 +119,7 @@ def _regimes(ctx: StageContext, vs: list[Variant], nominal: Archive) -> dict[str
     for r in regimes_evaluated(ctx)[1:]:
         rid = r.regime_id.value
         rvs = [v.with_omega(_regime(rid)) for v in vs]
-        a = build(rvs, om.epsilon, nm.robustness, normative_parameters(ctx))
+        a = build(rvs, om.epsilon, nm.robustness, normative_parameters(ctx), mode_objectives(ctx))
         out[rid] = {"conclusion": a.conclusion, "front": a.front,
                     "conclusion_changed": a.conclusion != nominal.conclusion}
     return {"nominal": ctx.manifest.constitutional_regime.regime_id.value, "alternatives": out,
@@ -127,11 +128,11 @@ def _regimes(ctx: StageContext, vs: list[Variant], nominal: Archive) -> dict[str
 
 
 def multiscale(vs: list[Variant], meshes: list[str], eps: dict[str, float], robustness: RobustnessWeights,
-               normative: dict[str, Any]) -> dict[str, Any]:
+               normative: dict[str, Any], objectives: tuple[str, ...] = OBJECTIVES) -> dict[str, Any]:
     """Archive par maillage seul : une variante au front d'un seul maillage dépend d'une résolution (§45)."""
     per_mesh = {}
     for m in meshes:
-        a = build([v.restricted(_on_mesh(m)) for v in vs], eps, robustness, normative)
+        a = build([v.restricted(_on_mesh(m)) for v in vs], eps, robustness, normative, objectives)
         per_mesh[m] = {"conclusion": a.conclusion, "front": a.front}
     on_front = {v.key: sorted(m for m in meshes if v.key in per_mesh[m]["front"]) for v in vs}
     baseline = {v.key for v in vs if v.baseline}
@@ -150,15 +151,16 @@ def _ablations(ctx: StageContext, vs: list[Variant], nominal: Archive,
     norm = normative_parameters(ctx)
 
     def drop(*ks: str) -> tuple[str, ...]:
-        return tuple(k for k in OBJECTIVES if k not in ks)
+        return tuple(k for k in mode_objectives(ctx) if k not in ks)
 
     plain = RobustnessWeights(cvar_alpha=nm.robustness.cvar_alpha, lambda_tail=0.0, lambda_var=0.0)
+    nominal_objs = mode_objectives(ctx)
     cases: list[tuple[str, str, list[Variant], tuple[str, ...], RobustnessWeights]] = [
         ("D", "J_D et contrainte de droits retirés", [v.with_omega(_no_rights) for v in vs], drop("J_D"),
          nm.robustness),
         ("F", "J_F retiré", vs, drop("J_F"), nm.robustness),
         ("I", "J_conn retiré", vs, drop("J_conn"), nm.robustness),
-        ("uncertainty", "ρ = E (sans queue ni variance)", vs, OBJECTIVES, plain),
+        ("uncertainty", "ρ = E (sans queue ni variance)", vs, nominal_objs, plain),
         ("causal_layer", "objectifs dépendant de la bibliothèque gelée retirés (J_V, J_pkg, J_reif)", vs,
          drop("J_V", "J_pkg", "J_reif"), nm.robustness),
         ("reification", "J_reif retiré", vs, drop("J_reif"), nm.robustness),
@@ -189,7 +191,7 @@ def _goodhart(ctx: StageContext, vs: list[Variant], attacks: list[Variant],
     om = ctx.manifest.optimizer_model
     assert om is not None and om.goodhart is not None
     nm = ctx.manifest.normative_manifest
-    a = build(vs + attacks, om.epsilon, nm.robustness, normative_parameters(ctx))
+    a = build(vs + attacks, om.epsilon, nm.robustness, normative_parameters(ctx), mode_objectives(ctx))
     shapes: dict[str, list[dict[str, float]]] = {}
     for e in evals.values():
         for c in [*e["candidates"], *e["attacks"]]:
@@ -258,12 +260,12 @@ def validation(ctx: StageContext, _: str) -> dict[str, Any]:
     nm = ctx.manifest.normative_manifest
     archive = artifacts.read_json(ctx.run_dir, "artifacts/pareto_archive.json")
     vs, attacks, evals = variants(ctx)
-    nominal = build(vs, om.epsilon, nm.robustness, normative_parameters(ctx))
+    nominal = build(vs, om.epsilon, nm.robustness, normative_parameters(ctx), mode_objectives(ctx))
     channels = next(iter(evals.values()))["channels"]
     sens = _sensitivity(ctx, vs, nominal)
     regimes = _regimes(ctx, vs, nominal)
     ms = multiscale(vs, [d.mesh_id for d in ctx.manifest.mesh_set], om.epsilon, nm.robustness,
-                    normative_parameters(ctx))
+                    normative_parameters(ctx), mode_objectives(ctx))
     ablations = _ablations(ctx, vs, nominal, channels)
     gh: dict[str, Any] = (_goodhart(ctx, vs, attacks, evals) if om.goodhart is not None
                           else {"status": "NOT_RUN", "attacks": []})

@@ -176,6 +176,9 @@ def render_report(
     if candidates is not None and "validation" in candidates:
         a("## Validation & red-team\n")
         _validation_section(a, candidates["validation"])
+    if candidates is not None and "map_c" in candidates:
+        a("## Map-C-Shallow\n")
+        _map_c_section(a, candidates["map_c"])
     if candidates is not None and "map_r" in candidates:
         a("## Map-R (régional)\n")
         _map_r_section(a, candidates["map_r"])
@@ -716,3 +719,31 @@ def _map_r_section(a: Any, m: dict[str, Any]) -> None:
     a(f"Valide à la date du run ({v['run_created_at']}) et des données ({', '.join(v['data_vintages'])}) ; aucune "
       "conclusion n'est permanente (06 §16). Couche cartographique : "
       + ("publiée." if m["public_layer"]["published"] else f"**vide** — {m['public_layer']['reason']}.") + "\n")
+
+
+def _map_c_section(a: Any, m: dict[str, Any]) -> None:
+    a(f"Question : *{m['question']}* — C_legal_legacy = 0 (J_T retiré), X = X_2026 observé (02 §21). "
+      "C'est un contre-factuel **contemporain**, hybride par construction (01 §6) : il conserve "
+      + " ; ".join(m["hybrid"]["kept_from_x2026"]) + ". Retiré : " + " ; ".join(m["hybrid"]["removed"]) + ".\n")
+    g = m["phase_gate"]
+    a(f"**Conclusion : {m['conclusion']}**. Phase 9 : **{g['status']}**"
+      + (f" (gates non passés : {', '.join(f'{k} {v}' for k, v in g['unmet_gates'].items())})"
+         if g["unmet_gates"] else "") + f". Catégorie : **{m['publication_category']}**.\n")
+    sq = m["status_quo"]
+    a(f"Géométrie actuelle, sans privilège : rang **{sq['rank'] or '—'}**"
+      + (" — elle reste au front." if sq["on_front"] else " — elle n'est plus au front.") + "\n")
+    if m["unresolved"]:
+        a("Dominent la géométrie actuelle sur les objectifs connus, sans que les inconnus tranchent : "
+          + ", ".join(f"`{k}` ({', '.join(f'{u} {b}' for u, b in v.items())})" for k, v in m["unresolved"].items())
+          + ".\n")
+    p = m["legacy_premium"]
+    a("**Prime de l'existant** (mêmes évaluations, Map-R conclut "
+      f"{m['map_r_conclusion_same_evaluations']}) : entrent au front sans le coût de transition : "
+      + (", ".join(f"`{k}`" for k in p["enter_without_legacy"]) or "aucune")
+      + " ; en sortent : " + (", ".join(f"`{k}`" for k in p["leave_without_legacy"]) or "aucune") + ".\n")
+    a("Lecture admise, pour chaque géométrie du front :\n")
+    for f in m["front"]:
+        a(f"- `{f['name']}` — {f['statement']}")
+    a("")
+    a(f"Couche cartographique : **vide** — {m['public_layer']['reason']}. Valide à la date du run "
+      f"({m['valid_as_of']['run_created_at']}) et des données ({', '.join(m['valid_as_of']['data_vintages'])}).\n")

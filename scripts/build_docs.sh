@@ -12,7 +12,7 @@ cp mkdocs.yml "$work/"
 export AMTGO_STATE_DIR="${AMTGO_STATE_DIR_DOCS:-$work/state}" AMTGO_DB_HOST=""
 mkdir -p "$work/docs/runs/generated" "$work/docs/assets/generated/map"
 
-for run in synthetic_pilot pages_africa; do
+for run in synthetic_pilot synthetic_c_shallow pages_africa; do
   rid=$(amtgo run execute "configs/runs/$run.yaml" | tail -n1 | cut -d' ' -f1)
   amtgo export report "$rid" "$work/docs/runs/generated/$run.md"
   if [ "$run" = pages_africa ]; then

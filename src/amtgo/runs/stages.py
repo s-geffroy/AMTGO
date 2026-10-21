@@ -33,6 +33,7 @@ from amtgo.runs import (
     composer_stages,
     composition_stages,
     dfi_stages,
+    map_c_stages,
     map_r_stages,
     measure_stages,
     optimizer_stages,
@@ -95,6 +96,8 @@ def plan_steps(manifest: RunManifest) -> list[str]:
         if manifest.optimizer_model is not None:
             steps += [f"evaluate_candidates:{m.mesh_id}" for m in manifest.mesh_set]
             steps += ["pareto", "validation"]
+            if manifest.request.map_mode.value == "C_SHALLOW":
+                steps += ["map_c"]
             if manifest.transition_model is not None:
                 steps += ["map_r"]
     else:
@@ -302,6 +305,8 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
         cand["validation"] = artifacts.read_json(ctx.run_dir, "artifacts/validation.json")
         # La catégorie de publication vient des gates (05 §20-21), jamais d'un défaut optimiste.
         status = RecommendationStatus(cand["validation"]["publication_category"])
+        if ctx.manifest.request.map_mode.value == "C_SHALLOW":
+            cand["map_c"] = artifacts.read_json(ctx.run_dir, "artifacts/map_c_shallow.json")
         if ctx.manifest.transition_model is not None:
             cand["map_r"] = artifacts.read_json(ctx.run_dir, "artifacts/map_r.json")
     causal = None
@@ -324,6 +329,8 @@ def report(ctx: StageContext, _: str) -> dict[str, Any]:
             "ranks": {s["key"]: s["rank"] for s in cand["pareto"]["solutions"]}},
         "validation": None if cand is None or "validation" not in cand else {
             k: cand["validation"][k] for k in ("conclusion", "gates", "publication_category", "release_allowed")},
+        "map_c": None if cand is None or "map_c" not in cand else {
+            k: cand["map_c"][k] for k in ("conclusion", "legacy_premium", "phase_gate")},
         "map_r": None if cand is None or "map_r" not in cand else {
             "conclusion": cand["map_r"]["conclusion"], "first_level_on_front": cand["map_r"]["first_level_on_front"],
             "ranks": {p["path_id"]: p["rank"] for p in cand["map_r"]["paths"]}},
@@ -373,6 +380,7 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "pareto": optimizer_stages.pareto,
     "validation": validation_stages.validation,
     "map_r": map_r_stages.map_r,
+    "map_c": map_c_stages.map_c,
     "report": report,
 }
 

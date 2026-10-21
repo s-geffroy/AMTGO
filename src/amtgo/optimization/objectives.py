@@ -60,6 +60,17 @@ from amtgo.manifests.normative import RightsThresholds
 
 OBJECTIVES = ("J_D", "J_F", "J_conn", "J_V", "J_G", "J_R", "J_P", "J_T", "J_inst", "J_pkg", "J_reif")
 UNKNOWN_OBJECTIVES = ("J_R", "J_P")
+# Termes qui expriment le privilège juridique de la géométrie actuelle (02 §21 : C_legal_legacy).
+LEGACY_OBJECTIVES = ("J_T",)
+
+
+def objectives_for(map_mode: str) -> tuple[str, ...]:
+    """Map-R garde le coût de transition depuis G_0 ; Map-C-Shallow le retire (C_legal_legacy = 0)."""
+    if map_mode == "R":
+        return OBJECTIVES
+    if map_mode == "C_SHALLOW":
+        return tuple(k for k in OBJECTIVES if k not in LEGACY_OBJECTIVES)
+    raise ValueError(f"mode de carte {map_mode!r} : non implémenté (Map-C-Deep : branche de recherche)")
 
 
 class SqRelation(StrEnum):
@@ -90,7 +101,10 @@ def sq_relation(assign: np.ndarray, baseline: np.ndarray) -> SqRelation:
 
 
 def unknown_vs_status_quo(objective: str, relation: SqRelation) -> UnknownBound:
-    """Borne structurelle d'un objectif UNKNOWN face au statu quo (axiome de monotonie de J_P)."""
+    """Borne structurelle d'un objectif UNKNOWN pour une géométrie face à une autre (axiome de J_P).
+
+    ``relation`` : relation de la première à la seconde (face au statu quo, ou par paire, M13).
+    """
     if relation is SqRelation.EQUAL:
         return UnknownBound.EQUAL
     if objective == "J_P":

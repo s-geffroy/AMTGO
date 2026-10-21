@@ -256,3 +256,22 @@ def test_mesh_extent_requires_declared_role(settings: Settings, ne_mini: Path) -
     ne_mini.write_text(yaml.safe_dump(data))
     with pytest.raises(ConfigurationError):
         submit(ne_mini, settings)
+
+
+def test_map_c_shallow_end_to_end(settings: Settings) -> None:
+    """M13 : sans privilège juridique (J_T retiré), la société observée conservée et déclarée hybride."""
+    run_id = _run(settings, "runs/synthetic_c_shallow.yaml")
+    d = runs_dir(settings) / run_id
+    pa = json.loads((d / "artifacts" / "pareto_archive.json").read_text())
+    assert pa["map_mode"] == "C_SHALLOW" and "J_T" not in pa["objectives"]
+    assert pa["legacy_objectives_removed"] == ["J_T"]
+    assert all(s["objectives"]["J_T"] is None for s in pa["solutions"])
+    mc = json.loads((d / "artifacts" / "map_c_shallow.json").read_text())
+    # La géométrie actuelle n'est exclue que par une dominance établie : la fusion ne l'est jamais sur J_P.
+    assert mc["status_quo"]["on_front"]
+    assert mc["phase_gate"]["status"] == "RESEARCH_ONLY" and not mc["release_allowed"]
+    assert not mc["public_layer"]["published"] and mc["hybrid"]["kept_from_x2026"]
+    assert all("non prescriptif" in f["statement"] for f in mc["front"])
+    assert not (d / "artifacts" / "map_r.json").exists()  # pas de trajectoires depuis G_0
+    report = (d / "report.md").read_text()
+    assert "## Map-C-Shallow" in report and "Prime de l'existant" in report and "prouve" not in report

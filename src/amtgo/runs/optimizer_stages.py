@@ -41,6 +41,7 @@ from amtgo.optimization.objectives import (
     evaluate_geometry,
     functional_cut,
     institutional_cost,
+    objectives_for,
     sq_relation,
     transition_share,
     viability_objective,
@@ -225,14 +226,33 @@ def variants(ctx: StageContext) -> tuple[list[Variant], list[Variant], dict[str,
     evals = {d.mesh_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/candidate_evaluation.json")
              for d in ctx.manifest.mesh_set}
     out = []
+    rows_by_key = {}
     for key, v in ens["variants"].items():
         rows = {m: c for m, e in evals.items() for c in e["candidates"]
                 if f"{c['family']}|{content_hash(c['params'])}" == key}
+        rows_by_key[key] = rows
         out.append(_variant(key, v["family"], v["params"], rows))
+    # Relations d'emboîtement par paire (M13) : la même sur tous les maillages, sinon indéterminée.
+    found: dict[tuple[str, str], set[str]] = {}
+    for m in evals:
+        arrays = dict(np.load(io.BytesIO((ctx.run_dir / "fields" / m / "candidates.npz").read_bytes())))
+        assign = {k: arrays[r[m]["candidate_id"]] for k, r in rows_by_key.items() if m in r}
+        for a, xa in assign.items():
+            for b, xb in assign.items():
+                if a != b:
+                    found.setdefault((a, b), set()).add(sq_relation(xa, xb).value)
+    for v in out:
+        v.relations.update({b: SqRelation(r.pop()) if len(r) == 1 else SqRelation.CROSSING
+                            for (a, b), r in found.items() if a == v.key})
     names = sorted({a["family"] for e in evals.values() for a in e["attacks"]})
     attacks = [_variant(n, n, {}, {m: a for m, e in evals.items() for a in e["attacks"] if a["family"] == n})
                for n in names]
     return out, attacks, evals
+
+
+def mode_objectives(ctx: StageContext) -> tuple[str, ...]:
+    """Objectifs du mode de carte du run (Map-R : avec transition ; Map-C-Shallow : sans, 02 §21)."""
+    return objectives_for(ctx.manifest.request.map_mode.value)
 
 
 def normative_parameters(ctx: StageContext) -> dict[str, Any]:
@@ -247,7 +267,8 @@ def pareto(ctx: StageContext, _: str) -> dict[str, Any]:
     nm = ctx.manifest.normative_manifest
     ens = artifacts.read_json(ctx.run_dir, "artifacts/candidate_ensemble.json")
     vs, _attacks, _evals = variants(ctx)
-    arch = build(vs, om.epsilon, nm.robustness, normative_parameters(ctx))
+    objectives = mode_objectives(ctx)
+    arch = build(vs, om.epsilon, nm.robustness, normative_parameters(ctx), objectives)
     details = {}
     for v in vs:
         packages = sorted({w["package"]["option"] or w["package"]["conclusion"]
@@ -278,7 +299,9 @@ def pareto(ctx: StageContext, _: str) -> dict[str, Any]:
                        "rank": s.rank, "feasible": s.feasible,
                        "violated": s.violated, "baseline": s.baseline, "objectives": s.objectives, **details[s.key]}
                       for s in sorted(arch.solutions, key=lambda s: (s.rank or 99, s.key))],
-        "objectives": list(OBJECTIVES), "unknown_objectives": list(UNKNOWN_OBJECTIVES), "epsilon": om.epsilon,
+        "objectives": list(objectives), "unknown_objectives": list(UNKNOWN_OBJECTIVES), "epsilon": om.epsilon,
+        "map_mode": ctx.manifest.request.map_mode.value,
+        "legacy_objectives_removed": [k for k in OBJECTIVES if k not in objectives],
         "robustness": nm.robustness.model_dump(mode="json"), "infeasibility": arch.certificate,
         "benchmark": bench, "gate_o": "PASSED" if gate_o else "FAILED",
         "recommendation_status": "NOT_IDENTIFIABLE",

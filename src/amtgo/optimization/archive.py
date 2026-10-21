@@ -43,6 +43,8 @@ class Variant:
     omega: dict[Omega, dict[str, Any]]  # objectifs et « violations » par ω
     contiguous: bool = True
     relation: SqRelation = SqRelation.CROSSING  # au statu quo, sur tous les maillages
+    # Relation de cette géométrie à chacune des autres (clé → relation), sur tous les maillages (M13).
+    relations: dict[str, SqRelation] = field(default_factory=dict)
 
     @property
     def baseline(self) -> bool:
@@ -94,7 +96,17 @@ def build(variants: list[Variant], eps: dict[str, float], robustness: Robustness
           sq_comparison_excludes: tuple[str, ...] = ("J_T",)) -> Archive:
     sols = to_solutions(variants, robustness, objectives)
     eps = {k: x for k, x in eps.items() if k in objectives}
-    nondominated_sort(sols, eps)
+    unknowns = [u for u in UNKNOWN_OBJECTIVES if u in objectives]
+    by_key = {v.key: v for v in variants}
+    sq_key = next(v.key for v in variants if v.family == "STATUS_QUO")
+
+    def pair_relation(a: str, b: str) -> SqRelation:
+        return geometry_relation(by_key[a], by_key[b], sq_key)
+
+    def blocked(a: Solution, b: Solution) -> bool:
+        return any(unknown_vs_status_quo(u, pair_relation(a.key, b.key)) is UnknownBound.NOT_BETTER for u in unknowns)
+
+    nondominated_sort(sols, eps, blocked)
     certificate = infeasibility_certificate(sols, normative)
     sq = next(s for s in sols if s.family == "STATUS_QUO")
     relation = {v.key: v.relation for v in variants}
@@ -120,3 +132,18 @@ def build(variants: list[Variant], eps: dict[str, float], robustness: Robustness
         conclusion = "NO_TERRITORIAL_CHANGE"
     return Archive(sols, conclusion, sorted(improving), dict(sorted(unresolved.items())), certificate, objectives,
                    {s.key: (s.feasible, s.rank == 1) for s in sols})
+
+
+def _inverse(r: SqRelation) -> SqRelation:
+    return {SqRelation.REFINEMENT: SqRelation.COARSENING, SqRelation.COARSENING: SqRelation.REFINEMENT}.get(r, r)
+
+
+def geometry_relation(a: Variant, b: Variant, sq_key: str) -> SqRelation:
+    """Relation de la géométrie de a à celle de b, à partir des relations connues."""
+    if a.key == b.key:
+        return SqRelation.EQUAL
+    if b.key == sq_key:
+        return a.relation
+    if a.key == sq_key:
+        return _inverse(b.relation)
+    return a.relations.get(b.key, SqRelation.CROSSING)

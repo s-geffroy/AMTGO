@@ -279,6 +279,11 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
         transition = load_model(TransitionManifest, configs_dir / request.transition_model)
         if optimizer is None or composer is None:
             raise ConfigurationError("Map-R exige l'archive de Pareto (M10) et le composeur (M9)")
+        if request.map_mode is not MapMode.R:
+            raise ConfigurationError("les trajectoires depuis G_0 relèvent de Map-R : Map-C-Shallow retire le "
+                                     "privilège juridique de la géométrie actuelle (02 §21)")
+    if request.map_mode is MapMode.C_SHALLOW and optimizer is None:
+        raise ConfigurationError("Map-C-Shallow exige l'archive de Pareto (M10)")
 
     body: dict[str, Any] = {
         "code_commit": code_commit(),
