@@ -45,6 +45,7 @@ nav:
       - Lignée des données: data_lineage.md
       - Modèle de menace: threat_model.md
       - Lacunes: implementation_gaps.md
+      - Cadrage données réelles: CADRAGE_DONNEES_REELLES.md
   - Décisions (ADR): decisions/index.md
   - Milestones:
       - M0 — Bootstrap: milestones/M0_REPORT.md
