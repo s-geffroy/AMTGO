@@ -29,8 +29,8 @@ from amtgo.data.synthetic_world import SyntheticWorld
 from amtgo.errors import InsufficientEvidence
 from amtgo.geo.crs import to_equal_area
 from amtgo.geo.mesh import Mesh
-from amtgo.measurement.engine import FitResult, Prepared, fit_prepared, is_holdout, prepare
-from amtgo.measurement.fusion import predictive
+from amtgo.measurement.engine import FitResult, Prepared, fit_prepared, is_holdout, prepare, prior_for
+from amtgo.measurement.fusion import LogNormalPrior, predictive, sample_prior
 from amtgo.measurement.likelihoods import MeshIndex
 from amtgo.measurement.manifest import LogNormalDensityPrior, MeasurementManifest, RasterLogNormalDensityPrior
 
@@ -186,11 +186,23 @@ def prior_cell_variance(idx: MeshIndex, manifest: MeasurementManifest,
         if prior_density is None:
             raise InsufficientEvidence("prior raster : densités par cellule absentes")
         s2 = p.log_sd**2
-        return np.asarray(idx.area**2 * (np.exp(s2) - 1.0) * np.exp(2 * np.log(prior_density) + s2))
+        return np.asarray(idx.area**2 * (np.exp(s2) - 1.0) * np.exp(2 * (np.log(prior_density) - s2 / 2) + s2))
     if isinstance(p, LogNormalDensityPrior):
         mu, s2 = np.log(p.median_density_per_km2), p.log_sd**2
         return np.asarray(idx.area**2 * (np.exp(s2) - 1.0) * np.exp(2 * mu + s2))
     return np.asarray((p.density_sd_per_km2 * idx.area) ** 2)
+
+
+def prior_total_variance(idx: MeshIndex, manifest: MeasurementManifest, w: np.ndarray,
+                         prior_density: np.ndarray | None = None) -> np.ndarray:
+    """Variance a priori des totaux w @ Z. Prior corrélé : par tirages, la somme des variances serait fausse."""
+    p = manifest.prior
+    if isinstance(p, RasterLogNormalDensityPrior) and p.correlation is not None:
+        prior = prior_for(idx, manifest, prior_density)
+        assert isinstance(prior, LogNormalPrior)
+        s = manifest.sampling
+        return np.asarray((sample_prior(prior, s.n_samples, s.seed + 1) @ w.T).var(axis=0, ddof=1))
+    return np.asarray((w**2) @ prior_cell_variance(idx, manifest, prior_density))
 
 
 def scale_information(samples: np.ndarray, idx: MeshIndex, manifest: MeasurementManifest,
@@ -201,7 +213,7 @@ def scale_information(samples: np.ndarray, idx: MeshIndex, manifest: Measurement
     identifiée par cellule peut l'être sur des agrégats plus larges.
     """
     w = aggregation_weights(idx, polygons_wgs84)
-    prior_var = (w**2) @ prior_cell_variance(idx, manifest, prior_density)
+    prior_var = prior_total_variance(idx, manifest, w, prior_density)
     post_var = (samples @ w.T).var(axis=0, ddof=1)
     return np.asarray(np.clip(1.0 - post_var / np.where(prior_var > 0, prior_var, np.inf), 0.0, 1.0))
 

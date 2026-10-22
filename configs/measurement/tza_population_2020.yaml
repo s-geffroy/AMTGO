@@ -4,7 +4,7 @@
 # doit etre rapportee. Sans enquete (DHS), aucune vraisemblance locale : l'information sous
 # l'echelle regionale vient du seul prior, et la calculabilite le dira.
 model_id: population_worldpop_census_rake
-version: "0.1.0"
+version: "0.2.0"
 variable_id: population_count
 description: >
   Population par cellule, Tanzanie 2020. Prior log-normal independant centre sur la densite
@@ -15,9 +15,16 @@ prior:
   kind: raster_lognormal_density
   source_id: tza_worldpop_2020
   variable_id: population_prior_raster
-  log_sd: 1.0                    # PROVISOIRE : facteur ~2,7 d'erreur de WorldPop a la cellule
+  log_sd: 1.0                    # PROVISOIRE : terme propre a la cellule (facteur ~2,7)
   floor_density_per_km2: 1.0     # PROVISOIRE : aucun bati detecte n'est pas une absence prouvee
   block_pixels: 10               # blocs de 1 km avant affectation aux cellules
+  # Erreur correlee de WorldPop (R2_REPORT, Challenge 1). PROVISOIRES, fixees avant tout run avec
+  # correlation et jamais reglees ensuite sur le holdout. Reserve : le niveau (0,10) a ete choisi APRES
+  # avoir vu l'ecart national WorldPop/recensement (+4,5 % au Ghana) ; il n'est pas independant du holdout.
+  correlation:
+    level_sd: 0.10               # biais de niveau commun : totaux WorldPop/ONU vs recensement, ~quelques %
+    block_km: 50                 # echelle de l'erreur de repartition dasymetrique
+    block_sd: 0.25               # ~25 % d'erreur de repartition a l'echelle de 50 km
 likelihoods:
   - source_id: tza_codps_2020_adm1
     variable_id: population_total_admin1

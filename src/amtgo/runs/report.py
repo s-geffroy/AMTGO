@@ -254,7 +254,7 @@ def render_report(
     if measurement is not None:
         infer.append("population par cellule (statut MODEL), avec intervalles et ratio d'information")
         assume += ["densité homogène à l'intérieur d'une cellule",
-                   "prior de densité indépendant entre cellules (aucune corrélation spatiale)",
+                   _prior_assumption(manifest),
                    "données manquantes ignorables (MAR) : aucun modèle de sélection"]
     a(f"| WE KNOW | {'; '.join(know)} |")
     a(f"| WE INFER | {'; '.join(infer) or '—'} |")
@@ -266,7 +266,7 @@ def render_report(
     if measurement is not None:
         a("- Modèle gaussien sur des comptes : des tirages négatifs sont possibles ; les cellules "
           "concernées au-delà du seuil sont classées D.")
-        a("- Pas de corrélation spatiale a priori : une cellule sans observation garde son prior.")
+        a("- " + _prior_limitation(manifest))
     a("- Les cellules H3 ne s'emboîtent qu'approximativement d'un niveau à l'autre.")
     a("- Les seuils normatifs du manifeste par défaut sont provisoires (gouvernance, 06 §6).")
     return "\n".join(L) + "\n"
@@ -930,3 +930,23 @@ def render_c_deep(manifest: Any, p: dict[str, Any]) -> str:
         a("Les parts de groupes contre-factuelles sont calculées mais **non publiées** (CONTROLLED).\n")
     a(f"Couche cartographique : **vide** — {p['public_layer']['reason']}.\n")
     return "\n".join(L) + "\n"
+
+
+def _correlation(manifest: RunManifest) -> Any:
+    m = manifest.measurement_model
+    return None if m is None else getattr(m.prior, "correlation", None)
+
+
+def _prior_assumption(manifest: RunManifest) -> str:
+    c = _correlation(manifest)
+    if c is None:
+        return "prior de densité indépendant entre cellules (aucune corrélation spatiale)"
+    return (f"erreur du prior en trois facteurs : niveau commun (σ {c.level_sd}), blocs de {c.block_km:g} km "
+            f"(σ {c.block_sd}), terme propre à la cellule ; aucune corrélation sous l'échelle du bloc")
+
+
+def _prior_limitation(manifest: RunManifest) -> str:
+    if _correlation(manifest) is None:
+        return "Pas de corrélation spatiale a priori : une cellule sans observation garde son prior."
+    return ("Corrélation a priori par blocs carrés, sans décroissance continue avec la distance ; le recalage "
+            "sur les marges n'informe pas les facteurs partagés des unités non recalées.")

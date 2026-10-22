@@ -1,6 +1,6 @@
 # R0–R2 — Premières données réelles : Ghana (pilote), Zambie, Malawi, Tanzanie
 
-*Statut : phase 1 (11), prototype de mesure de la population, sur données ouvertes seulement. **Le gate de la phase 1 n'est pas passé** : voir « Challenge ». Rien n'est publié. Décisions : [ADR-0028](../decisions/ADR-0028-donnees-reelles.md) ; cadrage : [données réelles](../CADRAGE_DONNEES_REELLES.md).*
+*Statut : phase 1 (11), prototype de mesure de la population, sur données ouvertes seulement. **Gate de la phase 1 : passé pour la couverture régionale seulement**, après correction du prior (R2b) ; aucune validation infra-régionale indépendante. Le premier diagnostic publié ici était faux (Challenge 1). Rien n'est publié. Décisions : [ADR-0028](../decisions/ADR-0028-donnees-reelles.md) ; cadrage : [données réelles](../CADRAGE_DONNEES_REELLES.md).*
 
 ## Fait
 
@@ -60,14 +60,48 @@ Une source restreinte ne peut lire qu'un chemin sous `/restricted/`, refus au sc
 | `zmb_population_2020` | 10 provinces | 134 s, 582 Mo | 1,078 | 0,85 – 1,08 – 1,42 | H3 1/1 → 0/1 ; grille 0/1 → 0/1 |
 | `tza_population_2020` | 26 marges (dont Zanzibar et Pemba regroupés) | 104 s, 552 Mo | 1,026 | 0,66 – 1,08 – 1,86 | H3 11/11 → 4/11 ; grille 7/11 → 3/11 |
 
+### R2b — Correction du prior
+
+Les tableaux ci-dessus décrivent la **première version** du prior, centrée sur la médiane (voir Challenge 1). Deux changements ont suivi :
+
+- **Centrage sur l'espérance** : μ_i = log ρ̂_i − σ²/2. C'est la correction déterminante.
+- **Erreur corrélée, déclarée** (`correlation` dans le modèle de mesure) : log ρ_i = μ_i + b + u_bloc(i) + e_i.
+  - b : niveau commun, σ 0,10 ;
+  - u : blocs LAEA de 50 km, σ 0,25 ;
+  - e : terme propre à la cellule, σ 1,0.
+  
+  Les blocs sont définis dans l'espace, pas dans le maillage. L'estimation se fait dans l'espace de ces facteurs (Gauss-Newton et Matheron, x = μ + M·z) ; sans corrélation déclarée, M est l'identité et rien ne change.
+
+**Réserves sur les paramètres** : σ = 0,25 et 50 km sont des ordres de grandeur posés a priori. Le niveau (0,10) a en revanche été choisi **après** avoir vu l'écart national WorldPop/recensement : il n'est pas indépendant du holdout.
+
+**Holdout avec le prior corrigé** (centrage et corrélation) :
+
+| run | maillage grossier (H3, grille) | maillage fin (H3, grille) | rms z |
+|---|---|---|---|
+| Ghana 2021 | 2/2, 2/2 | 2/2, 2/2 | 0,06 – 0,13 |
+| Malawi 2023 | 7/7, 7/7 | 7/7, 7/7 | 0,26 – 0,35 |
+| Zambie 2020 | 1/1, 1/1 | 1/1, 1/1 | 0,02 – 0,14 |
+| Tanzanie 2020 | 11/11, 11/11 | 11/11, 11/11 | 0,35 – 0,42 |
+
+**Ce que montrent ces chiffres** :
+- **La couverture ne dépend plus du maillage.**
+- **Les intervalles sont prudents** : rms z vaut 0,02 à 0,42, loin du 1 attendu sous un modèle bien calibré. Les intervalles sont plus larges que les erreurs observées. Au regard de 03 §34, ce sens d'erreur est préférable au sens inverse, mais il est peu informatif.
+- **Calculabilité** : le ratio d'information à 100 km baisse. Pour le Ghana, il passe de 0,80–0,82 à 0,45–0,55, soit la classe C au lieu de B. Le premier prior, biaisé, se croyait mieux informé qu'il ne l'était.
+
+**Ce que la validation ne démontre pas** :
+- elle ne porte que sur l'échelle régionale (2 à 11 unités retenues par pays) ;
+- elle oppose WorldPop à des totaux qui l'ont en partie nourri (Challenge 2) ;
+- elle ne valide rien sous l'échelle des marges.
+
+**Gate de la phase 1** : **passé pour la couverture régionale seulement**. La mesure infra-régionale reste sans validation indépendante, jusqu'à l'arrivée des enquêtes (R3).
+
 ## Challenge
 
-1. **Le prior indépendant rend l'incertitude des agrégats dépendante du maillage.**
-   - **Le mécanisme** : un total régional somme des cellules dont les erreurs a priori sont indépendantes. Son incertitude relative décroît donc comme 1/√n. Plus le maillage est fin, plus l'intervalle prédit est étroit, sans aucune information nouvelle.
-   - **Ce qu'on observe** : sur les quatre pays, la couverture du holdout chute du maillage grossier au maillage fin.
-   - **Pourquoi c'est faux** : les erreurs de WorldPop sont spatialement corrélées, et contiennent au moins un biais de niveau (+4,5 % au Ghana).
-   - **Conséquence** : le gate de la phase 1, *posterior fields validés*, **n'est pas passé**. Le run conclut correctement `NOT_IDENTIFIABLE`, mais ses intervalles sous l'échelle des marges ne sont pas fiables.
-   - **Correction à écrire** : un prior avec une composante commune de niveau et une corrélation spatiale. Elle ne doit pas être réglée sur ce holdout.
+1. **Un prior centré sur la médiane au lieu de l'espérance (erreur corrigée en R2b).**
+   - **Premier diagnostic, faux** : « le prior indépendant rend l'incertitude des agrégats dépendante du maillage ». Il reposait sur ce constat : sur les quatre pays, la couverture du holdout chutait du maillage grossier au maillage fin, avec des z toujours négatifs.
+   - **Cause réelle** : le prior posait log ρ_i ~ N(log ρ̂_i, σ²), donc une **médiane** égale à WorldPop. Or WorldPop estime une **espérance** : ses comptes somment aux totaux. Avec σ² ≈ 1, chaque cellule était gonflée de e^(σ²/2) ≈ 1,65 en espérance. Les maillages fins resserrent les intervalles autour de cette espérance biaisée, ce qui rendait le biais visible.
+   - **Correction** : μ_i = log ρ̂_i − σ²/2. C'est une correction de définition, pas un réglage, mais elle a été **trouvée grâce au holdout** : ce holdout ne peut plus servir de validation indépendante de cette correction.
+   - **Ablation** (centrage seul, prior indépendant) : le holdout couvre déjà tout (Ghana 2/2, Tanzanie 11/11 sur les quatre maillages, rms z de 0,04 à 0,56). La corrélation n'était donc pas la cause.
 2. **Le holdout contre WorldPop n'est pas une validation indépendante.**
    - WorldPop ajuste ses totaux aux estimations des Nations unies, et ses covariables incluent des recensements.
    - L'accord régional à ±6 % au Ghana mesure donc en partie cette circularité.
@@ -81,7 +115,7 @@ Une source restreinte ne peut lire qu'un chemin sous `/restricted/`, refus au sc
 5. **Districts du Ghana.** Le jeu de districts du COD-PS est inutilisable : ancien découpage, sans pcode, total incomplet. Il a été écarté, pas réparé.
 
 ## Manquant
-- **Prior corrélé** (Challenge 1) : condition pour passer le gate de la phase 1.
+- **Validation infra-régionale indépendante** : enquêtes (R3) ; calibration de σ (intervalles prudents, rms z ≪ 1).
 - **Données locales** :
   - les 261 districts du PHC 2021 ;
   - les recensements 2022 de la Zambie et de la Tanzanie ;
@@ -104,3 +138,11 @@ Une source restreinte ne peut lire qu'un chemin sous `/restricted/`, refus au sc
 - **Red-team** (`test_restricted_data.py`) : chemins hors `/restricted/` refusés ; montage, exclusions Git et Docker, aucun fichier suivi.
 - **Suite complète** : 353 tests passés sur 354, plus 3 ignorés dans le conteneur, qui tournent en CI.
   - L'échec venait du test d'export de la carte : il vérifiait l'ancien message « aucun run sur données réelles ». L'assertion a été mise à jour, et le test, les tests des nouveaux modules et le smoke test repassent.
+- **R2b** (`test_correlated_prior.py`) :
+  - structure des facteurs ;
+  - incertitude d'un agrégat stable selon le maillage (alors qu'elle s'effondre sous un prior indépendant) ;
+  - information propagée aux cellules non observées par le niveau commun ;
+  - facteurs identité équivalents au prior indépendant ;
+  - prior centré sur l'espérance du raster.
+  
+  Suite complète : 361 tests passés sur 361, plus 3 ignorés dans le conteneur, qui tournent en CI. Smoke test OK.

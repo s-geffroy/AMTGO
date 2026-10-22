@@ -56,6 +56,21 @@ class LogNormalDensityPrior(_Strict):
     log_sd: float = Field(gt=0)
 
 
+class PriorCorrelation(_Strict):
+    """Erreur du raster décomposée en facteurs (R2_REPORT, Challenge 1).
+
+    log ρ_i = log ρ̂_i + b + u_{B(i)} + e_i, avec b ~ N(0, level_sd²) commun à toutes
+    les cellules (biais de niveau), u_B ~ N(0, block_sd²) par bloc carré LAEA de
+    ``block_km`` (erreur de répartition à méso-échelle), et e_i ~ N(0, log_sd²) propre
+    à la cellule. Les blocs sont définis dans l'espace, pas dans le maillage :
+    l'incertitude d'un agrégat ne dépend plus de la finesse du maillage.
+    """
+
+    level_sd: float = Field(gt=0)
+    block_km: float = Field(gt=0)
+    block_sd: float = Field(gt=0)
+
+
 class RasterLogNormalDensityPrior(_Strict):
     """log ρ_i ~ N(log ρ̂_i, σ²), ρ̂_i lue sur un raster de population (WorldPop) agrégé à la cellule.
 
@@ -72,6 +87,8 @@ class RasterLogNormalDensityPrior(_Strict):
     floor_density_per_km2: float = Field(gt=0)
     # Pixels agrégés par bloc avant l'affectation aux cellules (lecture par bandes, mémoire bornée).
     block_pixels: int = Field(ge=1, le=100)
+    # Sans corrélation déclarée, l'erreur est indépendante entre cellules (``log_sd`` seul).
+    correlation: PriorCorrelation | None = None
 
 
 PriorSpec = GaussianDensityPrior | LogNormalDensityPrior | RasterLogNormalDensityPrior

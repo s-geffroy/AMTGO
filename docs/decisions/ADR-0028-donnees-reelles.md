@@ -80,3 +80,10 @@
 
 ## Conséquences
 Voir le rapport [R1–R2](../milestones/R2_REPORT.md) pour les résultats du run `gha_population_2021`.
+
+## Révision R2b — 2026-10-22 : centrage et corrélation du prior
+- **Erreur corrigée** : la première version centrait la **médiane** du prior sur WorldPop. WorldPop estime une espérance, ce qui gonflait chaque cellule de e^(σ²/2) ≈ 1,65. Désormais μ_i = log ρ̂_i − σ²/2.
+- **Erreur corrélée, optionnelle et déclarée** (`correlation`) : un niveau commun, des blocs LAEA de taille fixe et un terme propre à la cellule. L'estimation se fait dans l'espace des facteurs latents (x = μ + M·z). Sans corrélation déclarée, M est l'identité et le comportement est inchangé.
+- **Variance a priori des agrégats** (information selon l'échelle) : sous prior corrélé, elle est calculée par tirages, et non comme une somme de variances.
+- **Résultat** : couverture complète du holdout régional dans les quatre pays, quel que soit le maillage. Les intervalles sont prudents (rms z de 0,02 à 0,42).
+- **Attribution** : l'ablation montre que le centrage seul suffit à rétablir la couverture. La corrélation est retenue pour une raison théorique : l'incertitude des agrégats ne doit pas dépendre de la finesse du maillage (test `test_correlated_prior.py`). Les données ne permettent pas de trancher. Le détail est dans le [rapport](../milestones/R2_REPORT.md), section R2b et Challenge 1.

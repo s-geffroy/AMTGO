@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, time
 
 import numpy as np
+from scipy import sparse
 
 from amtgo.data.observations import Observation
 from amtgo.errors import InsufficientEvidence
@@ -54,6 +55,24 @@ class Selection:
         return [r for r in self.rows if r.source_id in keep]
 
 
+def factor_mixing(mesh_index: MeshIndex, block_km: float) -> tuple[sparse.csr_matrix, int]:
+    """M_x (N × (1 + B + N)) : facteur de niveau commun, bloc LAEA du centroïde, terme propre.
+
+    Les blocs sont des carrés de ``block_km`` ancrés à l'origine de la projection : deux
+    maillages du même domaine partagent les mêmes blocs. Une cellule à cheval sur deux
+    blocs va entièrement à celui de son centroïde.
+    """
+    n = len(mesh_index)
+    side = block_km * 1000.0
+    keys = [(int(np.floor(g.centroid.x / side)), int(np.floor(g.centroid.y / side))) for g in mesh_index.geoms]
+    block_of = {k: b for b, k in enumerate(sorted(set(keys)))}
+    nb = len(block_of)
+    rows = np.repeat(np.arange(n), 3)
+    cols = np.column_stack([np.zeros(n, dtype=int), 1 + np.array([block_of[k] for k in keys]),
+                            1 + nb + np.arange(n)]).ravel()
+    return sparse.csr_matrix((np.ones(3 * n), (rows, cols)), shape=(n, 1 + nb + n)), nb
+
+
 def prior_for(mesh_index: MeshIndex, manifest: MeasurementManifest,
               prior_density: np.ndarray | None = None) -> GaussianPrior | LogNormalPrior:
     """``prior_density`` : densité médiane par cellule, lue sur le raster (prior raster uniquement)."""
@@ -61,8 +80,18 @@ def prior_for(mesh_index: MeshIndex, manifest: MeasurementManifest,
     if isinstance(p, RasterLogNormalDensityPrior):
         if prior_density is None or len(prior_density) != len(mesh_index):
             raise InsufficientEvidence("prior raster : densités par cellule absentes ou d'un autre maillage")
-        return LogNormalPrior(log_mean=np.log(prior_density), log_var=np.full(len(mesh_index), p.log_sd**2),
-                              area=mesh_index.area)
+        n = len(mesh_index)
+        # Le raster estime une ESPÉRANCE (ses comptes somment aux totaux) : E[ρ_i] = ρ̂_i impose
+        # μ_i = log ρ̂_i − σ²/2. Centrer la médiane sur ρ̂ gonflerait chaque cellule de e^{σ²/2} (R2_REPORT).
+        if p.correlation is None:
+            v = np.full(n, p.log_sd**2)
+            return LogNormalPrior(log_mean=np.log(prior_density) - v / 2, log_var=v, area=mesh_index.area)
+        c = p.correlation
+        mixing, n_blocks = factor_mixing(mesh_index, c.block_km)
+        z_var = np.concatenate([[c.level_sd**2], np.full(n_blocks, c.block_sd**2), np.full(n, p.log_sd**2)])
+        marginal = np.full(n, c.level_sd**2 + c.block_sd**2 + p.log_sd**2)
+        return LogNormalPrior(log_mean=np.log(prior_density) - marginal / 2, log_var=marginal,
+                              area=mesh_index.area, mixing=mixing, z_var=z_var)
     if isinstance(p, GaussianDensityPrior):
         return GaussianPrior(mean=p.density_mean_per_km2 * mesh_index.area,
                              var=(p.density_sd_per_km2 * mesh_index.area) ** 2)

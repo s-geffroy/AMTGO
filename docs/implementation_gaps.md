@@ -40,4 +40,4 @@ jamais remplies par un coefficient inventé :
 - **Zambie, Tanzanie** : recensements 2022 non trouvés sous une forme lisible par machine. Les marges sont des projections (statut M).
 - **Malawi** : tableaux du recensement 2018 publiés en xlsx (HDX). L'adapter manque ; les marges sont des projections 2023 (statut M).
 - **Erreur des recensements** : déclarée (PROVISOIRE), en attendant les taux de couverture des enquêtes post-censitaires.
-- **Prior de population** : indépendant entre cellules. L'incertitude des agrégats dépend alors du maillage, et le holdout des régions échoue sur les maillages fins (R2_REPORT). Un prior corrigeant ce point (biais de niveau commun, corrélation spatiale) reste à écrire.
+- **Prior de population** : centré sur l'espérance de WorldPop, avec une erreur corrélée déclarée (R2b). Ses intervalles sont prudents (rms z ≪ 1 au holdout régional) ; σ n'est pas calibré, et rien n'est validé sous l'échelle des marges sans enquête.

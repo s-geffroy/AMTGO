@@ -124,11 +124,31 @@ GN_MAX_HALVINGS = 30
 
 @dataclass(frozen=True)
 class LogNormalPrior:
-    """x_i = log ρ_i ~ N(μ_i, σ_i²) ; Z_i = A_i e^{x_i}."""
+    """x_i = log ρ_i ~ N(μ_i, σ_i²) ; Z_i = A_i e^{x_i}.
+
+    Avec ``mixing`` (M_x, N × K) et ``z_var`` (K) : x = μ + M_x z, z ~ N(0, diag(z_var)),
+    des facteurs latents indépendants dont certains sont partagés entre cellules
+    (corrélation a priori). ``log_var`` reste la variance marginale de chaque x_i.
+    Sans ``mixing``, M_x est l'identité et z_var = log_var (prior indépendant).
+    """
 
     log_mean: np.ndarray  # (N,)
     log_var: np.ndarray  # (N,)
     area: np.ndarray  # (N,) km²
+    mixing: sparse.csr_matrix | None = None
+    z_var: np.ndarray | None = None
+
+    def factors(self) -> tuple[sparse.csr_matrix, np.ndarray]:
+        if self.mixing is None or self.z_var is None:
+            return sparse.identity(len(self.log_mean), format="csr"), self.log_var
+        return self.mixing, self.z_var
+
+
+def sample_prior(prior: LogNormalPrior, n_samples: int, seed: int) -> np.ndarray:
+    """(S, N) tirages a priori de Z, corrélations comprises."""
+    mx, vz = prior.factors()
+    z0 = np.random.default_rng(seed).standard_normal((n_samples, len(vz))) * np.sqrt(vz)
+    return np.asarray(prior.area * np.exp(prior.log_mean + (mx @ z0.T).T))
 
 
 @dataclass(frozen=True)
@@ -140,16 +160,19 @@ class LaplaceInfo:
 
 def fuse_lognormal(prior: LogNormalPrior, rows: list[DesignRow], n_samples: int, seed: int
                    ) -> tuple[Posterior, LaplaceInfo]:
-    """MAP par Gauss-Newton puis approximation de Laplace dans l'espace log.
+    """MAP par Gauss-Newton puis approximation de Laplace, dans l'espace des facteurs latents.
 
-    Modèle : y = W ρ + ε avec W_oj = h_oj A_j (h_oj est le coefficient de Z_j). On
-    linéarise f(x) = W e^x autour de l'itéré courant ; à la convergence, la
-    postérieure de x est gaussienne (Laplace) et les tirages suivent la règle de
-    Matheron appliquée au modèle linéarisé au mode. Z = A e^x est positif.
+    Modèle : y = W ρ + ε avec W_oj = h_oj A_j (h_oj est le coefficient de Z_j), et
+    x = log ρ = μ + M_x z, z ~ N(0, diag(v_z)). On linéarise f(z) = W e^{μ + M_x z}
+    autour de l'itéré courant ; à la convergence, la postérieure de z est gaussienne
+    (Laplace) et les tirages suivent la règle de Matheron appliquée au modèle
+    linéarisé au mode. Z = A e^x est positif. Pour un prior indépendant, M_x = I.
     """
     n = len(prior.log_mean)
+    mx, vz = prior.factors()
     rng = np.random.default_rng(seed)
-    x0_samples = prior.log_mean + rng.standard_normal((n_samples, n)) * np.sqrt(prior.log_var)
+    z0_samples = rng.standard_normal((n_samples, len(vz))) * np.sqrt(vz)
+    x0_samples = prior.log_mean + (mx @ z0_samples.T).T
     prior_z = GaussianPrior(prior.area * np.exp(prior.log_mean + prior.log_var / 2),
                             (prior.area**2) * (np.exp(prior.log_var) - 1) * np.exp(2 * prior.log_mean + prior.log_var))
     if not rows:
@@ -160,32 +183,34 @@ def fuse_lognormal(prior: LogNormalPrior, rows: list[DesignRow], n_samples: int,
     w = _sparse_design(rows, n).multiply(prior.area[None, :]).tocsr()  # W_oj = h_oj A_j
     y = np.array([row.y for row in rows])
     r = np.array([row.r for row in rows])
-    v0 = prior.log_var
     mu = prior.log_mean
 
-    def objective(xv: np.ndarray) -> float:
-        res = y - w @ np.exp(xv)
-        return float(0.5 * np.sum(res**2 / r) + 0.5 * np.sum((xv - mu) ** 2 / v0))
+    def objective(zv: np.ndarray) -> float:
+        res = y - w @ np.exp(mu + mx @ zv)
+        return float(0.5 * np.sum(res**2 / r) + 0.5 * np.sum(zv**2 / vz))
+
+    def jacobian(zv: np.ndarray) -> tuple[np.ndarray, sparse.csr_matrix]:
+        rho = np.exp(mu + mx @ zv)
+        return rho, (w.multiply(rho[None, :]) @ mx).tocsr()  # jacobienne de f en z
 
     def innovation_matrix(j: sparse.csr_matrix) -> np.ndarray:
-        # S = J V₀ Jᵀ + R, formé en creux : chaque EA ne touche qu'une dizaine de cellules.
-        return np.asarray((j.multiply(v0[None, :]) @ j.T).toarray()) + np.diag(r)
+        # S = J V_z Jᵀ + R, formé en creux : chaque EA ne touche qu'une dizaine de cellules.
+        return np.asarray((j.multiply(vz[None, :]) @ j.T).toarray()) + np.diag(r)
 
-    x = mu.copy()
-    fx = objective(x)
+    zc = np.zeros(len(vz))
+    fx = objective(zc)
     converged, step, it = False, np.inf, 0
     for it in range(1, GN_MAX_ITER + 1):  # noqa: B007
-        rho = np.exp(x)
-        j = w.multiply(rho[None, :]).tocsr()  # jacobienne de f en x
+        rho, j = jacobian(zc)
         s = innovation_matrix(j)
-        pseudo = y - w @ rho + j @ (x - mu)
-        d = mu + v0 * (j.T @ np.linalg.solve(s, pseudo)) - x  # direction de Gauss-Newton
+        pseudo = y - w @ rho + j @ zc
+        d = vz * (j.T @ np.linalg.solve(s, pseudo)) - zc  # direction de Gauss-Newton
         # Gradient de l'objectif MAP, pour la condition d'Armijo.
-        grad = -(j.T @ ((y - w @ rho) / r)) + (x - mu) / v0
+        grad = -(j.T @ ((y - w @ rho) / r)) + zc / vz
         slope = float(grad @ d)
         t = 1.0
         for _ in range(GN_MAX_HALVINGS):
-            cand = x + t * d
+            cand = zc + t * d
             fc = objective(cand)
             if np.isfinite(fc) and fc <= fx + GN_ARMIJO * t * slope:
                 break
@@ -193,27 +218,28 @@ def fuse_lognormal(prior: LogNormalPrior, rows: list[DesignRow], n_samples: int,
         else:
             break  # aucun pas acceptable : non convergé, rapporté comme tel
         step = float(np.max(np.abs(t * d)))
-        x, fx = cand, fc
+        zc, fx = cand, fc
         if step < GN_TOL:
             converged = True
             break
 
-    rho = np.exp(x)
-    j = w.multiply(rho[None, :]).tocsr()
+    rho, j = jacobian(zc)
     s = innovation_matrix(j)
     chol = np.linalg.cholesky(s)
 
     def solve(b: np.ndarray) -> np.ndarray:
         return np.linalg.solve(chol.T, np.linalg.solve(chol, b))
 
-    jd = np.asarray(j.toarray())  # (M, N), dense : M × N reste modeste
-    # diag(K S⁻¹ Kᵀ) = v₀² · diag(Jᵀ S⁻¹ J)
-    var_x = np.maximum(v0 - v0**2 * np.einsum("mn,mn->n", jd, solve(jd)), 1e-300)
-    # Matheron au mode : pseudo-observation ỹ = y − f(x̂) + J x̂.
-    y_tilde = y - w @ rho + j @ x
+    jd = np.asarray(j.toarray())  # (M, K), dense : M × K reste modeste
+    # Variance a posteriori de x_i : diag(M_x V_z M_xᵀ) − diag(B S⁻¹ Bᵀ), B = M_x V_z Jᵀ (N × M).
+    b = np.asarray((mx.multiply(vz[None, :]) @ j.T).toarray())
+    var_x = np.maximum(prior.log_var - np.einsum("nm,mn->n", b, solve(b.T)), 1e-300)
+    # Matheron au mode : pseudo-observation ỹ = y − f(ẑ) + J ẑ.
+    y_tilde = y - w @ rho + j @ zc
     eps = rng.standard_normal((n_samples, len(rows))) * np.sqrt(r)
-    innov = y_tilde[None, :] - (j @ x0_samples.T).T - eps  # (S, M)
-    x_samples = x0_samples + (solve(innov.T).T @ jd) * v0[None, :]
+    innov = y_tilde[None, :] - (j @ z0_samples.T).T - eps  # (S, M)
+    z_samples = z0_samples + (solve(innov.T).T @ jd) * vz[None, :]
+    x_samples = mu + (mx @ z_samples.T).T
     z = prior.area * np.exp(x_samples)
     # Le ratio d'information est défini dans l'espace où le prior est posé (log).
     post = Posterior(z.mean(axis=0), z.var(axis=0, ddof=1), z, prior_z, len(rows),
