@@ -1,0 +1,99 @@
+# Ghana, recensement PHC 2021 : population totale des districts (MMDA), lue sur le StatsBank de GSS
+# (API PxWeb, tableau population_table.px, tous ages, toutes localites, deux sexes). Sert a valider
+# la mesure SOUS l'echelle des marges regionales (A1, ADR-0029) : jamais une marge du meme run.
+# Ecarts de decoupage declares, jamais devines :
+# - le tableau est plat : pays, 16 regions et sous-metropoles (STMA-, AMA-, KMA-...) sont retires,
+#   sinon une metropole et ses sous-metropoles seraient comptees deux fois ;
+# - Guan (Oti), detache de Jasikan, n'a pas de polygone COD-AB (260 polygones pour 261 districts) :
+#   les deux totaux sont fusionnes sur le polygone de Jasikan ;
+# - orthographes divergentes entre GSS et COD-AB : alias explicites.
+# La somme des districts retenus doit egaler le total national publie (30 832 019).
+# Licence : le StatsBank n'affiche aucune condition de reutilisation et aucune source ouverte des 261
+# districts n'existe (HDX : ancien decoupage seulement). Redistribution NON supposee : zone
+# RESTRICTED_LOCAL, fichier depose sous restricted/ (ADR-0028), hors Git et hors sorties publiques.
+# Origine du fichier : POST JSON sur l'API PxWeb
+#   https://statsbank.statsghana.gov.gh/api/v1/en/PHC%202021%20StatsBank/Population/population_table.px
+#   {"query": Age="All ages", Locality="All Locality Types", Education="Total", Sex="Both sexes",
+#    Geographic_Area=all ; "response": {"format": "csv"}}, telecharge le 2026-10-22.
+source_id: gha_census_2021_adm2
+name: Ghana PHC 2021 - population par district (StatsBank GSS)
+provider: Ghana Statistical Service (StatsBank, PHC 2021)
+release: "2021-adm2-statsbank-2026-10-22"
+url: https://statsbank.statsghana.gov.gh/
+citation: "Ghana Statistical Service, 2021 Population and Housing Census, StatsBank (population_table.px), consulte le 2026-10-22."
+license:
+  license_id: GSS-PUBLIC-STATISTICS
+  name: Statistiques publiques du Ghana Statistical Service (citation requise)
+  url: https://statsbank.statsghana.gov.gh/
+  redistribution: false
+  commercial_use: false
+  attribution_required: true
+access: open
+data_zone: RESTRICTED_LOCAL
+privacy_class: CONTROLLED
+roles:
+  allowed: [multiscale_validation, population_measurement]
+  forbidden: [group_territory_inference]
+method: Denombrement exhaustif (nuit de reference du 27 juin 2021), totaux de district publies.
+temporal_start: 2021-06-27
+temporal_end: 2021-06-27
+default_evidence_status: D
+quality:
+  source_reliability: 0.9
+  spatial_precision: 0.7
+  temporal_precision: 1.0
+  construct_validity: 0.9
+  representativeness: 1.0
+  license_usability: 0.6
+  privacy_usability: 1.0
+retrieval:
+  kind: local
+  adapter: admin_table
+  resources:
+    - name: gha_phc2021_population_district.csv
+      path: /restricted/gha/gha_phc2021_population_district.csv
+      sha256: 07b9d47c51f217e35dca0a20d6e45b8ceb139cf1f24072eef012cf2b51c6dfc3
+    # Memes polygones que gha_codab_admin (260 districts), meme sha256, copies sous restricted/.
+    - name: gha_admin_boundaries.geojson.zip
+      path: /restricted/gha/gha_admin_boundaries.geojson.zip
+      sha256: fbc2a72af2bfc928045031aff76e36fab49dea48e858a4ac640d7070d2dc1e22
+  parameters:
+    variable: population_total_admin2
+    table: {resource: gha_phc2021_population_district.csv, name_field: Geographic_Area, total_field: Both sexes}
+    boundaries: {resource: gha_admin_boundaries.geojson.zip, member: gha_admin2.geojson,
+                 code_field: adm2_pcode, name_field: adm2_name}
+    join: name
+    exclude_rows: [Ghana, Western, Central, Greater Accra, Volta, Eastern, Ashanti, Western North, Ahafo,
+                   Bono, Bono East, Oti, Northern, Savannah, North East, Upper East, Upper West]
+    # Sous-metropoles : sigle de la metropole suivi d'un tiret (STMA-Takoradi, AMA-Ablekuma South...).
+    exclude_rows_matching: ["^[A-Z]{2,5}-"]
+    # Retires des deux cotes : sigle final entre parentheses, puis statut (Municipal, Metropolitan...).
+    strip_patterns: ['\s*\([^)]*\)\s*$', '\s+(Municipal|Metropolitan Area|Metropolitan|Metropolis)\s*$']
+    aliases:
+      Cape Cape: Cape Coast                       # coquille du StatsBank
+      Mfantsiman: Mfantseman
+      Twifo Heman Lower Denkyira: Twifo Hemang Lower Denkyira
+      Twifo Ati Morkwa: Twifo Atti-Morkwa
+      Adentan: Adenta
+      Okaikoi North: Okaikwei North
+      Ningo-Prampram: Ningo/Prampram
+      Agortime-Ziope: Agotime Ziope
+      Asene Manso Akroso: Asene Akroso Manso
+      Akwapim South: Akwapem South
+      Akwapim North: Akwapem North
+      Denkyembuor: Denkyembour
+      Akyemansa: Akyem Mansa
+      Lower Manya Krobo: Lower Manya
+      Upper Manya Krobo: Upper Manya
+      Akrofuom: Adansi Akrofuom
+      Bosomtwi: Bosomtwe
+      Sekyere Afram Plains: Sekyere Afram Plains North
+      Dormaa Central: Dormaa
+      Sagnarigu: Sagnerigu
+      Bolgatanga East: Bolga East
+      Kasena Nankana: Kasena Nankana East
+    merge:
+      Jasikan: [Jasikan, Guan]
+    expected_total: 30832019
+    # PROVISOIRE : meme erreur de couverture declaree que les totaux regionaux (PES non integree).
+    relative_error: 0.02

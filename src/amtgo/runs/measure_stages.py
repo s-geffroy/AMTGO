@@ -11,18 +11,21 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from shapely import wkt
 
 from amtgo.core.enums import PrivacyClass
 from amtgo.core.provenance import ProvenanceRecord
 from amtgo.data.ingestion import read_observations
 from amtgo.data.observations import Observation
 from amtgo.errors import ConfigurationError, ProvenanceError
+from amtgo.geo.crs import to_equal_area
+from amtgo.measurement import benchmark as bm
 from amtgo.measurement import fields as fields_mod
 from amtgo.measurement import raster_prior as raster_prior_mod
 from amtgo.measurement import validation
-from amtgo.measurement.engine import ROLE_MEASUREMENT, fit, require_observations
+from amtgo.measurement.engine import ROLE_MEASUREMENT, fit, prepare, require_observations
 from amtgo.measurement.likelihoods import MeshIndex
-from amtgo.measurement.manifest import MeasurementManifest, RasterLogNormalDensityPrior
+from amtgo.measurement.manifest import MeasurementManifest, ObservationUse, RasterLogNormalDensityPrior
 from amtgo.runs import artifacts
 from amtgo.utils.canonical import content_hash, file_sha256
 
@@ -187,6 +190,74 @@ def compare_fields(ctx: StageContext, _: str) -> dict[str, Any]:
                   "reference_scale_information": info, **validation.compare_across_meshes(per_mesh)}
     artifacts.write_json(ctx.run_dir, "artifacts/fields_comparison.json", result)
     return {"count": len(ctx.manifest.mesh_set)}
+
+
+def _benchmark_inputs(ctx: StageContext, mesh_id: str) -> tuple[Any, ...]:
+    m = _manifest(ctx)
+    spec = m.benchmark
+    if spec is None:
+        raise ConfigurationError("aucun benchmark dans ce modèle de mesure")
+    mesh = artifacts.read_mesh(ctx.run_dir, mesh_id)
+    obs, slugs, roles, _, _ = _inputs(ctx)
+    prep = prepare(mesh, obs, m, slugs, roles, prior_density(ctx, mesh_id))
+    units = bm.Units.from_observations(read_observations(ctx.observations_path(spec.source_id)), spec.variable_id)
+    return m, spec, mesh, obs, prep, units
+
+
+def benchmark(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
+    """Variantes d'erreur du prior notées sur des totaux plus fins que les marges (A1) ; reprenable par variante."""
+    m, spec, mesh, obs, prep, units = _benchmark_inputs(ctx, mesh_id)
+    density = prep.prior_density
+    assert density is not None
+    idx = prep.index
+    w = validation.aggregation_weights(idx, units.geoms)
+    groups = bm.unit_groups(idx, units.geoms)
+    unit_cells = np.array([to_equal_area(g).area / 1e6 for g in units.geoms]) / float(np.median(idx.area))
+    small = unit_cells < spec.min_cells_per_unit
+    margin_ids = {lk.source_id for lk in m.likelihoods if lk.use is ObservationUse.MARGIN}
+    slug_of = {str(s.manifest.source_uuid): s.manifest.source_id for s in ctx.manifest.data_manifest}
+    margins = [o for o in obs if slug_of.get(o.source_id) in margin_ids and o.value is not None and o.geometry_wkt]
+    det = bm.deterministic_check(idx, density, w, units, [wkt.loads(o.geometry_wkt or "") for o in margins],
+                                 np.array([o.value.mean for o in margins if o.value is not None]))
+    done = 0
+    for v in spec.variants:
+        name = f"fields/{mesh_id}/benchmark/{v.variant_id}.json"
+        key = content_hash([v, mesh.cells_hash, m.content_hash])
+        if (ctx.run_dir / name).exists() and artifacts.read_json(ctx.run_dir, name).get("key") == key:
+            done += 1
+            continue  # reprise : variante déjà notée sur ce maillage
+        ctx.check_stop(f"benchmark {mesh_id} {v.variant_id}")
+        res = bm.score_variant(prep, density, v, units, w, groups, small, spec)
+        artifacts.write_json(ctx.run_dir, name, {"key": key, **res})
+        done += 1
+    artifacts.write_json(ctx.run_dir, f"fields/{mesh_id}/benchmark/units.json", {
+        "codes": units.codes, "folds": bm.cv_folds(units.geoms, spec.cv_block_km).tolist(),
+        "small": small.tolist(), "cells_per_unit_median": float(np.median(unit_cells)),
+        "units_without_cell_centroid": int(len(units.codes) - len(set(groups[groups >= 0].tolist()))),
+        "deterministic": det})
+    return {"count": done,
+            "detail": f"{len(units.codes)} unités, {int(small.sum())} sous {spec.min_cells_per_unit} cellules"}
+
+
+def benchmark_summary(ctx: StageContext, _: str) -> dict[str, Any]:
+    spec = _manifest(ctx).benchmark
+    if spec is None:
+        raise ConfigurationError("aucun benchmark dans ce modèle de mesure")
+    per_mesh: dict[str, Any] = {}
+    for d in ctx.manifest.mesh_set:
+        u = artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/benchmark/units.json")
+        results = {v.variant_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/benchmark/{v.variant_id}.json")
+                   for v in spec.variants}
+        per_mesh[d.mesh_id] = {
+            "units": len(u["codes"]), "small_units": int(sum(u["small"])),
+            "cells_per_unit_median": u["cells_per_unit_median"], "deterministic": u["deterministic"],
+            "variants": {vid: {"all": r["all"], "units_ge_min_cells": r["units_ge_min_cells"]}
+                         for vid, r in results.items()},
+            "cv": bm.cross_validate(results, np.asarray(u["folds"]), spec)}
+    gate = bm.gate_a1({mid: v["cv"] for mid, v in per_mesh.items()}, spec)
+    artifacts.write_json(ctx.run_dir, "artifacts/population_benchmark.json",
+                         {"per_mesh": per_mesh, "gate_a1": gate, "selection_score": spec.selection_score})
+    return {"detail": f"gate_A1={'PASSED' if gate['passed'] else 'FAILED'}"}
 
 
 def measurement_freeze(ctx: StageContext, _: str) -> dict[str, Any]:

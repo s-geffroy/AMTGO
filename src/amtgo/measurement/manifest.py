@@ -142,6 +142,57 @@ class ComputabilitySpec(_Strict):
         return self
 
 
+class BlockScale(_Strict):
+    block_km: float = Field(gt=0)
+    sd: float = Field(gt=0)
+
+
+class ErrorModel(_Strict):
+    """Une décomposition déclarée de l'erreur log du raster, comparée par le benchmark (A1, ADR-0029).
+
+    log ρ_i = μ_i + b + Σ_s u_{s,B_s(i)} + v_{U(i)} + e_i : niveau commun (``level_sd``),
+    blocs LAEA à plusieurs échelles (``scales``), effet par unité de validation
+    (``unit_sd`` : modèle hiérarchique administratif) et terme propre (``log_sd``).
+    Le centrage sur l'espérance du raster est commun à toutes les variantes.
+    """
+
+    variant_id: str = Field(pattern=r"^[a-z0-9][a-z0-9_]{1,40}$")
+    log_sd: float = Field(gt=0)
+    level_sd: float = Field(default=0.0, ge=0)
+    scales: tuple[BlockScale, ...] = ()
+    unit_sd: float | None = Field(default=None, gt=0)
+
+
+class PopulationBenchmark(_Strict):
+    """Benchmark du modèle spatial de population sur des totaux plus fins que les marges (A1).
+
+    Les variantes, les niveaux, la règle de sélection et le gate sont déclarés AVANT
+    le run. Sélection et évaluation se font sur des moitiés spatiales distinctes
+    (validation croisée en damier de blocs LAEA) : une variante n'est jamais notée
+    sur les unités qui l'ont fait retenir.
+    """
+
+    source_id: str
+    variable_id: str
+    variants: tuple[ErrorModel, ...] = Field(min_length=2)
+    levels: tuple[float, ...] = (0.5, 0.8, 0.95)
+    cv_block_km: float = Field(gt=0)
+    selection_score: Literal["log_score", "crps"]
+    # Gate A1 : à chaque niveau, couverture ≥ niveau − tolérance (pas de surconfiance systématique).
+    max_coverage_shortfall: float = Field(ge=0, lt=1)
+    # Unités plus petites que ce nombre de cellules médianes : strate rapportée à part (MAUP).
+    min_cells_per_unit: float = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _coherent(self) -> Self:
+        ids = [v.variant_id for v in self.variants]
+        if len(set(ids)) != len(ids):
+            raise ValueError("benchmark : identifiants de variantes dupliqués")
+        if not all(0 < lv < 1 for lv in self.levels):
+            raise ValueError("benchmark : niveaux hors ]0, 1[")
+        return self
+
+
 class MeasurementManifest(_Strict):
     model_id: str
     version: str
@@ -154,6 +205,7 @@ class MeasurementManifest(_Strict):
     sampling: SamplingSpec
     validation: ValidationSpec
     computability: ComputabilitySpec
+    benchmark: PopulationBenchmark | None = None
 
     @model_validator(mode="after")
     def _unique_sources(self) -> Self:
@@ -166,6 +218,12 @@ class MeasurementManifest(_Strict):
                     raise ValueError(f"{lk.source_id} : seule une vraisemblance area_total peut servir de marge")
                 if not isinstance(self.prior, LogNormalDensityPrior | RasterLogNormalDensityPrior):
                     raise ValueError("les marges exigent un prior positif (log-normal)")
+        if self.benchmark is not None:
+            if not isinstance(self.prior, RasterLogNormalDensityPrior):
+                raise ValueError("benchmark : réservé au prior raster (variantes de son erreur)")
+            if self.benchmark.source_id in ids:
+                raise ValueError(f"benchmark : {self.benchmark.source_id} est aussi une vraisemblance "
+                                 "(validation non indépendante)")
         return self
 
     @property

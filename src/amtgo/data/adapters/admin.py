@@ -20,6 +20,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import unicodedata
 import zipfile
 from collections.abc import Iterator
@@ -75,6 +76,13 @@ def normalize_name(name: str) -> str:
     """Nom comparable : sans accents ni casse, tirets et espaces multiples ramenés à un espace."""
     s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
     return " ".join(s.replace("-", " ").replace("_", " ").casefold().split())
+
+
+def clean_name(name: str, patterns: list[str]) -> str:
+    """Nom débarrassé des motifs déclarés (suffixes de statut, sigles entre parenthèses), puis normalisé."""
+    for p in patterns:
+        name = re.sub(p, "", name)
+    return normalize_name(name)
 
 
 def _validity(manifest: SourceManifest) -> tuple[datetime, datetime | None]:
@@ -135,20 +143,23 @@ def join_table(units: dict[str, tuple[str, BaseGeometry]], rows: list[dict[str, 
         lookup = {code: [code] for code in units}
     else:
         key_f = table["name_field"]
-        aliases = {normalize_name(k): normalize_name(v) for k, v in (params.get("aliases") or {}).items()}
+        # Motifs retirés des DEUX côtés (tableau et polygones) avant comparaison.
+        patterns: list[str] = params.get("strip_patterns") or []
+        aliases = {clean_name(k, patterns): clean_name(v, patterns) for k, v in (params.get("aliases") or {}).items()}
         # Suffixes de nommage du tableau (« X District ») retirés avant comparaison aux polygones.
         suffixes = [normalize_name(s) for s in params.get("strip_suffixes") or []]
         keys = {}
         for r in rows:
-            k = normalize_name(str(r[key_f]))
+            k = clean_name(str(r[key_f]), patterns)
             for s in suffixes:
                 if k.endswith(" " + s):
                     k = k[: -len(s) - 1]
             keys[aliases.get(k, k)] = r
-        merges = {normalize_name(k): [normalize_name(x) for x in v] for k, v in (params.get("merge") or {}).items()}
+        merges = {clean_name(k, patterns): [clean_name(x, patterns) for x in v]
+                  for k, v in (params.get("merge") or {}).items()}
         lookup = {}
         for code, (name, _) in units.items():
-            n = normalize_name(name)
+            n = clean_name(name, patterns)
             # Les fusions nomment des lignes du tableau (alias appliqués) ; sinon, le nom du polygone.
             lookup[code] = [aliases.get(x, x) for x in merges[n]] if n in merges else [n]
     if len(keys) != len(rows):
@@ -166,6 +177,33 @@ def join_table(units: dict[str, tuple[str, BaseGeometry]], rows: list[dict[str, 
         raise ConfigurationError(f"jointure tableau-polygones incomplète : polygones sans total {missing}, "
                                  f"lignes sans polygone {orphans} (déclarer 'aliases' ou 'merge')")
     return by_unit
+
+
+def exclude_rows(rows: list[dict[str, str]], params: dict[str, Any]) -> tuple[list[dict[str, str]], int]:
+    """Retire les lignes d'agrégats déclarées (pays, régions, sous-métropoles) avant la jointure.
+
+    Un tableau plat mêle souvent plusieurs niveaux : sans exclusion, une métropole et
+    ses sous-métropoles seraient comptées deux fois. Chaque nom exclu doit exister
+    (une exclusion qui ne correspond à rien est une erreur de manifeste).
+    """
+    names = [normalize_name(x) for x in params.get("exclude_rows") or []]
+    regexes = [re.compile(x) for x in params.get("exclude_rows_matching") or []]
+    if not names and not regexes:
+        return rows, 0
+    key_f = params["table"].get("name_field") or params["table"]["code_field"]
+    found: set[str] = set()
+    kept = []
+    for r in rows:
+        raw = str(r[key_f])
+        n = normalize_name(raw)
+        if n in names:
+            found.add(n)
+        elif not any(rx.search(raw) for rx in regexes):
+            kept.append(r)
+    missing = sorted(set(names) - found)
+    if missing:
+        raise ConfigurationError(f"exclusions déclarées absentes du tableau : {missing}")
+    return kept, len(rows) - len(kept)
 
 
 def group_units(units: dict[str, tuple[str, BaseGeometry]],
@@ -204,8 +242,13 @@ class AdminTableAdapter(PinnedFileMixin):
         check_declared_license(manifest, files)
         units = group_units(read_units(files, p["boundaries"]), p.get("group_boundaries"))
         raw = _read_bytes(files, p["table"]["resource"], p["table"].get("member")).decode("utf-8-sig")
-        rows = list(csv.DictReader(io.StringIO(raw)))
+        rows, n_excluded = exclude_rows(list(csv.DictReader(io.StringIO(raw))), p)
         joined = join_table(units, rows, p)
+        expected = p.get("expected_total")
+        total = sum(t for t, _ in joined.values())
+        if expected is not None and total != float(expected):
+            raise ConfigurationError(f"{manifest.source_id} : somme des unités {total:.0f} ≠ total déclaré "
+                                     f"{expected} (exclusions ou fusions à revoir)")
         common = _common(manifest, recorded_at)
         variable = p["variable"]
         for code, (total, parts) in sorted(joined.items()):
@@ -216,5 +259,5 @@ class AdminTableAdapter(PinnedFileMixin):
                 id=Observation.make_id(common["source_id"], variable, code, common["valid_from"]),
                 variable_id=variable, support_type=SupportType.ADMIN, geometry_wkt=geom.wkt, admin_code=code,
                 value=UncertainValue(mean=total, std=rel * total, distribution_type=DistributionType.NORMAL),
-                attributes={"name": name, "table_rows": parts}, **common,
+                attributes={"name": name, "table_rows": parts, "table_rows_excluded": n_excluded}, **common,
             )

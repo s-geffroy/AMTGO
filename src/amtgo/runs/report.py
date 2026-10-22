@@ -336,6 +336,43 @@ def _measurement_section(a: Any, manifest: RunManifest, m: dict[str, Any]) -> No
         a(f"**Comparaison entre maillages** (totaux des {cmp_['polygons']} cellules d'une grille de "
           f"référence de 100 km, indépendante des marges, reconstruits depuis chaque maillage) : "
           f"écart standardisé maximal **{cmp_['max_abs_z']:.2f}**.\n")
+    if m.get("benchmark") is not None:
+        _benchmark_section(a, manifest, m["benchmark"])
+
+
+def _benchmark_section(a: Any, manifest: RunManifest, b: dict[str, Any]) -> None:
+    mm = manifest.measurement_model
+    assert mm is not None and mm.benchmark is not None
+    spec = mm.benchmark
+    levels = [f"{lv:g}" for lv in spec.levels]
+    a("### Benchmark du modèle spatial (A1)\n")
+    a(f"Variantes de l'erreur du prior ajustées sur les mêmes marges, notées sur les totaux de "
+      f"`{spec.source_id}`, plus fins que les marges et jamais utilisés par l'ajustement. Seuls des "
+      f"agrégats sont rapportés. Score de sélection : `{spec.selection_score}` (plus faible = préféré), "
+      f"choisi sur une moitié d'un damier de blocs de {spec.cv_block_km:g} km et évalué sur l'autre.\n")
+    a("| maillage | variante | couverture " + " / ".join(levels) + " | CRPS relatif | score log | rms z (log) "
+      "| z moyen | idem, unités ≥ seuil de cellules : couverture |")
+    a("|---|---|---|---|---|---|---|---|")
+    for mid, pm in b["per_mesh"].items():
+        for vid, v in pm["variants"].items():
+            al, big = v["all"], v["units_ge_min_cells"]
+            cov = " / ".join(_pct(al["coverage"][lv]) for lv in levels)
+            cov_big = " / ".join(_pct(big["coverage"][lv]) for lv in levels) if big.get("n") else "—"
+            a(f"| {mid} | `{vid}` | {cov} | {al['crps_rel']:.3f} | {al['log_score']:.2f} | "
+              f"{al['rms_z_log']:.2f} | {al['mean_z_log']:+.2f} | {cov_big} ({big.get('n', 0)}) |")
+    a("")
+    a("**Raster seul, recalé sur les marges** (erreur log aux unités, ordre de grandeur empirique, "
+      "jamais utilisé pour régler les variantes) : " + "; ".join(
+          f"`{mid}` médiane |log| {pm['deterministic']['median_abs_log_error']:.2f}, "
+          f"p90 {pm['deterministic']['p90_abs_log_error']:.2f}"
+          for mid, pm in b["per_mesh"].items()) + ".\n")
+    a("**Validation croisée spatiale** : " + "; ".join(
+        f"`{mid}` " + (" / ".join(f"moitié {f['selection_half']} → `{f['retained']}`" for f in pm["cv"]["folds"])
+                       if pm["cv"].get("status") == "done" else "non disponible")
+        for mid, pm in b["per_mesh"].items()) + ".\n")
+    g = b["gate_a1"]
+    a(f"**Gate A1 : {'passé' if g['passed'] else 'non passé'}**" + (
+        "." if g["passed"] else " — " + " ; ".join(g["reasons"]) + ".") + "\n")
 
 
 def _composition_section(a: Any, manifest: RunManifest, comp: dict[str, Any]) -> None:

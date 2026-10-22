@@ -4,7 +4,7 @@
 # doit etre rapportee. Sans enquete (DHS), aucune vraisemblance locale : l'information sous
 # l'echelle regionale vient du seul prior, et la calculabilite le dira.
 model_id: population_worldpop_census_rake
-version: "0.2.0"
+version: "0.3.0"
 variable_id: population_count
 description: >
   Population par cellule, Ghana 2021. Prior log-normal independant centre sur la densite
@@ -46,3 +46,26 @@ computability:
   b_min: 0.6
   c_min: 0.3
   max_negative_sample_fraction: 0.05
+# Benchmark A1 (ADR-0029) : variantes de l'erreur du prior, notees sur les 260 totaux de district du
+# PHC 2021 (jamais une marge). Variantes, niveaux, regle de selection et gate fixes AVANT tout run du
+# benchmark. Apres recalage exact sur les regions, le niveau commun et tout effet regional s'annulent :
+# seules comptent les composantes infra-regionales. Non testes, et declares comme tels : SPDE et
+# processus gaussien (memoire du worker), BYM2 (non implemente ; les blocs multi-echelles en tiennent
+# lieu, sous ce nom).
+benchmark:
+  source_id: gha_census_2021_adm2
+  variable_id: population_total_admin2
+  levels: [0.5, 0.8, 0.95]
+  cv_block_km: 100               # damier de blocs de 100 km : deux moities spatiales
+  selection_score: log_score
+  max_coverage_shortfall: 0.10   # gate : couverture >= niveau - 0,10 a chaque niveau
+  min_cells_per_unit: 4          # districts de moins de 4 cellules : strate rapportee a part
+  variants:
+    - {variant_id: indep_s100, log_sd: 1.0}
+    - {variant_id: indep_s050, log_sd: 0.5}
+    - {variant_id: laea50_s100, log_sd: 1.0, level_sd: 0.10, scales: [{block_km: 50, sd: 0.25}]}
+    - {variant_id: laea50_s050, log_sd: 0.5, level_sd: 0.10, scales: [{block_km: 50, sd: 0.25}]}
+    - {variant_id: laea50_s030, log_sd: 0.3, level_sd: 0.10, scales: [{block_km: 50, sd: 0.25}]}
+    - {variant_id: district_s050, log_sd: 0.5, level_sd: 0.10, unit_sd: 0.25}
+    - {variant_id: multiscale_s050, log_sd: 0.5, level_sd: 0.10,
+       scales: [{block_km: 25, sd: 0.15}, {block_km: 50, sd: 0.15}, {block_km: 100, sd: 0.15}]}

@@ -53,6 +53,8 @@ ROLE_CAUSAL_ESTIMATION = "causal_estimation"
 ROLE_CAUSAL_TARGET = "causal_transport_target"
 # Rôle requis pour qu'un raster modélisé (WorldPop) serve de prior de densité, jamais d'observation.
 ROLE_POPULATION_PRIOR = "population_prior"
+# Rôle requis pour que des totaux plus fins que les marges servent au benchmark de mesure (A1).
+ROLE_MULTISCALE_VALIDATION = "multiscale_validation"
 
 
 class SourceUse(BaseModel):
@@ -340,6 +342,11 @@ def _check_measurement(m: MeasurementManifest, sources: list[ResolvedSource]) ->
                                      f"déclarée avec le rôle {ROLE_POPULATION_PRIOR!r}")
         if prior.source_id in {lk.source_id for lk in m.likelihoods}:
             raise ConfigurationError(f"mesure : {prior.source_id} ne peut pas être à la fois prior et observation")
+    if m.benchmark is not None:
+        s = by_id.get(m.benchmark.source_id)
+        if s is None or ROLE_MULTISCALE_VALIDATION not in s.use.roles:
+            raise ConfigurationError(f"benchmark : la source {m.benchmark.source_id} doit être une source du run "
+                                     f"déclarée avec le rôle {ROLE_MULTISCALE_VALIDATION!r}")
     synthetic = [s.manifest for s in sources if s.manifest.retrieval.kind is RetrievalKind.SYNTHETIC]
     if synthetic:
         from amtgo.data.adapters.synthetic import world_of

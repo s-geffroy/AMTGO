@@ -16,6 +16,8 @@ sources:
   - {manifest: sources/gha_codab_admin.yaml, roles: [status_quo_geometry, analysis_extent], redistribute: false}
   - {manifest: sources/gha_census_2021_adm1.yaml, roles: [population_measurement, multiscale_validation], redistribute: false}
   - {manifest: sources/gha_worldpop_2021.yaml, roles: [population_prior], redistribute: false}
+  # Totaux de district (A1) : validation seulement, jamais marge ni vraisemblance de ce run.
+  - {manifest: sources/gha_census_2021_adm2.yaml, roles: [multiscale_validation], redistribute: false}
 measurement_model: measurement/gha_population_2021.yaml
 mesh_set:
   - meshes/gha_h3_r5.yaml

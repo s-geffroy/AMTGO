@@ -78,6 +78,9 @@ def plan_steps(manifest: RunManifest) -> list[str]:
         steps += [f"measure:{m.mesh_id}" for m in manifest.mesh_set]
         steps += [f"validate_measurement:{m.mesh_id}" for m in manifest.mesh_set]
         steps += ["compare_fields"]
+        if manifest.measurement_model.benchmark is not None:
+            steps += [f"benchmark:{m.mesh_id}" for m in manifest.mesh_set]
+            steps += ["benchmark_summary"]
         if manifest.composition_model is not None:
             steps += [f"measure_composition:{m.mesh_id}" for m in manifest.mesh_set]
             steps += ["ontology_ensemble"]
@@ -260,6 +263,9 @@ def _measurement_summary(ctx: StageContext) -> dict[str, Any]:
         viability = {"per_mesh": {d.mesh_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/viability.json")
                                   for d in ctx.manifest.mesh_set},
                      "ensemble": artifacts.read_json(ctx.run_dir, "artifacts/viability_ensemble.json")}
+    benchmark = None
+    if ctx.manifest.measurement_model is not None and ctx.manifest.measurement_model.benchmark is not None:
+        benchmark = artifacts.read_json(ctx.run_dir, "artifacts/population_benchmark.json")
     freeze = artifacts.read_json(ctx.run_dir, "measurement_freeze.json")
     outputs = {
         "freeze_hash": freeze["freeze_hash"],
@@ -275,8 +281,11 @@ def _measurement_summary(ctx: StageContext) -> dict[str, Any]:
                 for sid, by_r in v["assessments"].items()}
             for k, v in sorted(viability["per_mesh"].items())},
     }
+    if benchmark is not None:
+        outputs["a1_gate"] = {"passed": benchmark["gate_a1"]["passed"], "retained": benchmark["gate_a1"]["retained"]}
     return {"per_mesh": per_mesh, "comparison": comparison, "freeze": freeze, "computability": worst,
-            "outputs": outputs, "composition": composition, "dfi": dfi, "viability": viability}
+            "outputs": outputs, "composition": composition, "dfi": dfi, "viability": viability,
+            "benchmark": benchmark}
 
 
 def report(ctx: StageContext, _: str) -> dict[str, Any]:
@@ -364,6 +373,8 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "measure": measure_stages.measure,
     "validate_measurement": measure_stages.validate_measurement,
     "compare_fields": measure_stages.compare_fields,
+    "benchmark": measure_stages.benchmark,
+    "benchmark_summary": measure_stages.benchmark_summary,
     "measure_composition": composition_stages.measure_composition,
     "ontology_ensemble": composition_stages.ontology_ensemble,
     "measurement_freeze": measure_stages.measurement_freeze,

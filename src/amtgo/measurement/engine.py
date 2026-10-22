@@ -55,22 +55,77 @@ class Selection:
         return [r for r in self.rows if r.source_id in keep]
 
 
-def factor_mixing(mesh_index: MeshIndex, block_km: float) -> tuple[sparse.csr_matrix, int]:
-    """M_x (N × (1 + B + N)) : facteur de niveau commun, bloc LAEA du centroïde, terme propre.
-
-    Les blocs sont des carrés de ``block_km`` ancrés à l'origine de la projection : deux
-    maillages du même domaine partagent les mêmes blocs. Une cellule à cheval sur deux
-    blocs va entièrement à celui de son centroïde.
-    """
-    n = len(mesh_index)
+def _block_ids(mesh_index: MeshIndex, block_km: float) -> np.ndarray:
+    """Bloc LAEA du centroïde de chaque cellule (carrés ancrés à l'origine de la projection)."""
     side = block_km * 1000.0
     keys = [(int(np.floor(g.centroid.x / side)), int(np.floor(g.centroid.y / side))) for g in mesh_index.geoms]
     block_of = {k: b for b, k in enumerate(sorted(set(keys)))}
-    nb = len(block_of)
-    rows = np.repeat(np.arange(n), 3)
-    cols = np.column_stack([np.zeros(n, dtype=int), 1 + np.array([block_of[k] for k in keys]),
-                            1 + nb + np.arange(n)]).ravel()
-    return sparse.csr_matrix((np.ones(3 * n), (rows, cols)), shape=(n, 1 + nb + n)), nb
+    return np.array([block_of[k] for k in keys])
+
+
+def error_mixing(mesh_index: MeshIndex, level: bool, scales_km: list[float],
+                 groups: np.ndarray | None = None) -> tuple[sparse.csr_matrix, list[int]]:
+    """M_x : [niveau commun] + blocs de chaque échelle + [unité] + terme propre ; tailles par composante.
+
+    Deux maillages du même domaine partagent les mêmes blocs. Une cellule à cheval sur
+    deux blocs va entièrement à celui de son centroïde. ``groups`` : unité de chaque
+    cellule (−1 : hors de toute unité, sans effet d'unité).
+    """
+    n = len(mesh_index)
+    rows, cols, sizes, offset = [], [], [], 0
+    if level:
+        rows.append(np.arange(n))
+        cols.append(np.zeros(n, dtype=int))
+        sizes.append(1)
+        offset = 1
+    for km in scales_km:
+        ids = _block_ids(mesh_index, km)
+        rows.append(np.arange(n))
+        cols.append(offset + ids)
+        sizes.append(int(ids.max()) + 1)
+        offset += sizes[-1]
+    if groups is not None:
+        inside = np.flatnonzero(groups >= 0)
+        rows.append(inside)
+        cols.append(offset + groups[inside])
+        sizes.append(int(groups.max()) + 1 if len(inside) else 0)
+        offset += sizes[-1]
+    rows.append(np.arange(n))
+    cols.append(offset + np.arange(n))
+    sizes.append(n)
+    r, c = np.concatenate(rows), np.concatenate(cols)
+    return sparse.csr_matrix((np.ones(len(r)), (r, c)), shape=(n, offset + n)), sizes
+
+
+def factor_mixing(mesh_index: MeshIndex, block_km: float) -> tuple[sparse.csr_matrix, int]:
+    """M_x (N × (1 + B + N)) : facteur de niveau commun, bloc LAEA du centroïde, terme propre."""
+    mixing, sizes = error_mixing(mesh_index, True, [block_km])
+    return mixing, sizes[1]
+
+
+def raster_error_prior(mesh_index: MeshIndex, prior_density: np.ndarray, log_sd: float, level_sd: float = 0.0,
+                       scales: list[tuple[float, float]] | None = None,
+                       groups: np.ndarray | None = None, unit_sd: float | None = None) -> LogNormalPrior:
+    """Prior log-normal centré sur l'ESPÉRANCE du raster, avec l'erreur décomposée en facteurs.
+
+    Le raster estime une espérance (ses comptes somment aux totaux) : E[ρ_i] = ρ̂_i impose
+    μ_i = log ρ̂_i − σ_i²/2, σ_i² étant la variance marginale. Centrer la médiane sur ρ̂
+    gonflerait chaque cellule de e^{σ²/2} (R2_REPORT). Une composante d'écart-type nul est omise.
+    """
+    n = len(mesh_index)
+    scales = scales or []
+    unit = unit_sd if groups is not None else None
+    if level_sd == 0 and not scales and unit is None:
+        v = np.full(n, log_sd**2)
+        return LogNormalPrior(log_mean=np.log(prior_density) - v / 2, log_var=v, area=mesh_index.area)
+    mixing, sizes = error_mixing(mesh_index, level_sd > 0, [km for km, _ in scales],
+                                 groups if unit is not None else None)
+    sds = ([level_sd] if level_sd > 0 else []) + [sd for _, sd in scales] + ([unit] if unit is not None else [])
+    z_var = np.concatenate([np.full(k, sd**2) for k, sd in zip(sizes[:-1], sds, strict=True)]
+                           + [np.full(n, log_sd**2)])
+    marginal = np.asarray(mixing.multiply(mixing) @ z_var).ravel()
+    return LogNormalPrior(log_mean=np.log(prior_density) - marginal / 2, log_var=marginal,
+                          area=mesh_index.area, mixing=mixing, z_var=z_var)
 
 
 def prior_for(mesh_index: MeshIndex, manifest: MeasurementManifest,
@@ -80,18 +135,10 @@ def prior_for(mesh_index: MeshIndex, manifest: MeasurementManifest,
     if isinstance(p, RasterLogNormalDensityPrior):
         if prior_density is None or len(prior_density) != len(mesh_index):
             raise InsufficientEvidence("prior raster : densités par cellule absentes ou d'un autre maillage")
-        n = len(mesh_index)
-        # Le raster estime une ESPÉRANCE (ses comptes somment aux totaux) : E[ρ_i] = ρ̂_i impose
-        # μ_i = log ρ̂_i − σ²/2. Centrer la médiane sur ρ̂ gonflerait chaque cellule de e^{σ²/2} (R2_REPORT).
-        if p.correlation is None:
-            v = np.full(n, p.log_sd**2)
-            return LogNormalPrior(log_mean=np.log(prior_density) - v / 2, log_var=v, area=mesh_index.area)
         c = p.correlation
-        mixing, n_blocks = factor_mixing(mesh_index, c.block_km)
-        z_var = np.concatenate([[c.level_sd**2], np.full(n_blocks, c.block_sd**2), np.full(n, p.log_sd**2)])
-        marginal = np.full(n, c.level_sd**2 + c.block_sd**2 + p.log_sd**2)
-        return LogNormalPrior(log_mean=np.log(prior_density) - marginal / 2, log_var=marginal,
-                              area=mesh_index.area, mixing=mixing, z_var=z_var)
+        if c is None:
+            return raster_error_prior(mesh_index, prior_density, p.log_sd)
+        return raster_error_prior(mesh_index, prior_density, p.log_sd, c.level_sd, [(c.block_km, c.block_sd)])
     if isinstance(p, GaussianDensityPrior):
         return GaussianPrior(mean=p.density_mean_per_km2 * mesh_index.area,
                              var=(p.density_sd_per_km2 * mesh_index.area) ** 2)
@@ -181,14 +228,17 @@ def prepare(mesh: Mesh, observations: list[Observation], manifest: MeasurementMa
 
 
 def fit_prepared(prep: Prepared, keep_sources: set[str] | None = None,
-                 exclude_ids: set[str] | None = None) -> FitResult:
+                 exclude_ids: set[str] | None = None,
+                 prior: GaussianPrior | LogNormalPrior | None = None) -> FitResult:
+    """``prior`` : remplace le prior du manifeste (variantes du benchmark A1 seulement)."""
     rows = prep.selection.rows
     if keep_sources is not None:
         rows = prep.selection.subset(keep_sources)
     if exclude_ids:
         rows = [r for r in rows if r.observation_id not in exclude_ids]
     s = prep.manifest.sampling
-    prior = prior_for(prep.index, prep.manifest, prep.prior_density)
+    if prior is None:
+        prior = prior_for(prep.index, prep.manifest, prep.prior_density)
     margin_sources = {lk.source_id for lk in prep.manifest.likelihoods if lk.use is ObservationUse.MARGIN}
     margins = [r for r in rows if r.source_id in margin_sources]
     rows = [r for r in rows if r.source_id not in margin_sources]

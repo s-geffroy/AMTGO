@@ -25,13 +25,15 @@ from amtgo.runs.state import RunStatus
 from amtgo.utils.canonical import file_sha256
 
 TOTALS = {"TT01": 400_000.0, "TT02": 150_000.0}
+# Districts fictifs (benchmark A1) : quatre carrés de 1° par région, parts inégales des totaux régionaux.
+SHARES = (0.4, 0.3, 0.2, 0.1)
 
 
 def _square(x: float, y: float) -> dict:
     return {"type": "Polygon", "coordinates": [[[x, y], [x + 2, y], [x + 2, y + 2], [x, y + 2], [x, y]]]}
 
 
-def _write_inputs(data: Path) -> tuple[Path, Path, Path]:
+def _write_inputs(data: Path) -> tuple[Path, Path, Path, Path]:
     import rasterio
     from rasterio.transform import from_origin
 
@@ -39,9 +41,21 @@ def _write_inputs(data: Path) -> tuple[Path, Path, Path]:
         {"type": "Feature", "properties": {"pcode": "TT01", "name": "Nord"}, "geometry": _square(-25.0, -24.0)},
         {"type": "Feature", "properties": {"pcode": "TT02", "name": "Sud"}, "geometry": _square(-25.0, -26.0)},
     ]}
+    districts, rows = [], []
+    for code, (x0, y0) in (("TT01", (-25.0, -24.0)), ("TT02", (-25.0, -26.0))):
+        for k, (dx, dy) in enumerate(((0, 0), (1, 0), (0, 1), (1, 1))):
+            geom = {"type": "Polygon", "coordinates": [[[x0 + dx, y0 + dy], [x0 + dx + 1, y0 + dy],
+                                                         [x0 + dx + 1, y0 + dy + 1], [x0 + dx, y0 + dy + 1],
+                                                         [x0 + dx, y0 + dy]]]}
+            districts.append({"type": "Feature", "properties": {"pcode": f"{code}{k}", "name": f"{code}{k}"},
+                              "geometry": geom})
+            rows.append(f"{code}{k},{code}{k},{int(TOTALS[code] * SHARES[k])}\n")
     z = data / "bnd.zip"
     with zipfile.ZipFile(z, "w") as zf:
         zf.writestr("adm1.geojson", json.dumps(regions))
+        zf.writestr("adm2.geojson", json.dumps({"type": "FeatureCollection", "features": districts}))
+    table2 = data / "pop2.csv"
+    table2.write_text("PCODE,NAME,T_TL\n" + "".join(rows))
     table = data / "pop.csv"
     table.write_text("PCODE,NAME,T_TL\n" + "".join(f"{k},{k},{int(v)}\n" for k, v in TOTALS.items()))
     rng = np.random.default_rng(11)
@@ -51,7 +65,7 @@ def _write_inputs(data: Path) -> tuple[Path, Path, Path]:
     with rasterio.open(tif, "w", driver="GTiff", height=400, width=200, count=1, dtype="float32",
                        crs="EPSG:4326", transform=from_origin(-25.0, -22.0, 0.01, 0.01)) as dst:
         dst.write(raster.astype("float32"), 1)
-    return z, table, tif
+    return z, table, tif, table2
 
 
 def _source(sid: str, adapter: str, files: list[Path], params: dict, status: str, roles: list[str],
@@ -75,7 +89,7 @@ def _source(sid: str, adapter: str, files: list[Path], params: dict, status: str
 def real_format_run(configs_dir: Path, tmp_path: Path) -> str:
     data = tmp_path / "real_format"
     data.mkdir()
-    z, table, tif = _write_inputs(data)
+    z, table, tif, table2 = _write_inputs(data)
     layer = {"resource": "bnd.zip", "member": "adm1.geojson", "code_field": "pcode", "name_field": "name"}
     sources = {
         "tt_admin": _source("tt_admin", "admin_boundaries", [z],
@@ -87,6 +101,10 @@ def real_format_run(configs_dir: Path, tmp_path: Path) -> str:
             "boundaries": layer}, "D", ["population_measurement", "multiscale_validation"]),
         "tt_worldpop": _source("tt_worldpop", "worldpop", [tif], {"variable": "population_prior_raster"}, "M",
                                ["population_prior"], ["population_measurement"]),
+        "tt_districts": _source("tt_districts", "admin_table", [table2, z], {
+            "variable": "population_total_admin2", "relative_error": 0.02, "join": "code",
+            "table": {"resource": "pop2.csv", "code_field": "PCODE", "name_field": "NAME", "total_field": "T_TL"},
+            "boundaries": dict(layer, member="adm2.geojson")}, "D", ["multiscale_validation"]),
     }
     for sid, raw in sources.items():
         (configs_dir / "sources" / f"{sid}.yaml").write_text(yaml.safe_dump(raw, sort_keys=False))
@@ -94,6 +112,7 @@ def real_format_run(configs_dir: Path, tmp_path: Path) -> str:
     measurement["prior"].update(source_id="tt_worldpop", block_pixels=2)
     measurement["likelihoods"][0]["source_id"] = "tt_census"
     measurement["sampling"]["n_samples"] = 60
+    measurement["benchmark"].update(source_id="tt_districts", variable_id="population_total_admin2")
     (configs_dir / "measurement" / "tt_population.yaml").write_text(yaml.safe_dump(measurement))
     for mid, res in (("tt_grid_l5", 5), ("tt_grid_l6", 6)):
         (configs_dir / "meshes" / f"{mid}.yaml").write_text(yaml.safe_dump({
@@ -105,7 +124,8 @@ def real_format_run(configs_dir: Path, tmp_path: Path) -> str:
                sources=[{"manifest": "sources/tt_admin.yaml", "roles": ["status_quo_geometry", "analysis_extent"]},
                         {"manifest": "sources/tt_census.yaml",
                          "roles": ["population_measurement", "multiscale_validation"]},
-                        {"manifest": "sources/tt_worldpop.yaml", "roles": ["population_prior"]}])
+                        {"manifest": "sources/tt_worldpop.yaml", "roles": ["population_prior"]},
+                        {"manifest": "sources/tt_districts.yaml", "roles": ["multiscale_validation"]}])
     (configs_dir / "runs" / "tt_population.yaml").write_text(yaml.safe_dump(run))
     return "runs/tt_population.yaml"
 
@@ -124,8 +144,16 @@ def test_real_format_population_run(settings: Settings, real_format_run: str) ->
         assert abs(totals.mean() - sum(TOTALS.values())) / sum(TOTALS.values()) < 0.01
         val = artifacts.read_json(d, f"fields/{mesh_id}/validation.json")
         assert val["calibration"]["status"] == "not_available"  # pas de vérité sur données réelles
+    bench = artifacts.read_json(d, "artifacts/population_benchmark.json")
+    for mesh_id in ("tt_grid_l5", "tt_grid_l6"):
+        pm = bench["per_mesh"][mesh_id]
+        assert pm["units"] == 8 and set(pm["variants"]) == {"indep_s100", "indep_s050", "laea50_s100", "laea50_s050",
+                                                              "laea50_s030", "district_s050", "multiscale_s050"}
+        assert pm["cv"]["status"] == "done"
+    assert isinstance(bench["gate_a1"]["passed"], bool)  # le gate conclut, dans un sens ou dans l'autre
     report = (d / "report.md").read_text()
     assert "NOT_IDENTIFIABLE" in report
+    assert "Benchmark du modèle spatial (A1)" in report
     assert not (d / "artifacts" / "validation.json").exists()  # aucun candidat, aucun gate de publication
 
 

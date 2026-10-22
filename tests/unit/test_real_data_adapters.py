@@ -18,6 +18,7 @@ import pytest
 from amtgo.data.adapters.admin import (
     AdminBoundariesAdapter,
     AdminTableAdapter,
+    exclude_rows,
     group_units,
     join_table,
     normalize_name,
@@ -212,3 +213,34 @@ def test_group_boundaries_one_declared_margin() -> None:
     assert geom.area == pytest.approx(sum(g.area for _, g in units.values()))
     with pytest.raises(ConfigurationError, match="introuvables"):
         group_units(units, {"X": ["North West", "Atlantis"]})
+
+
+def test_flat_table_exclusions_and_patterns_on_both_sides() -> None:
+    """Tableau plat (StatsBank) : agrégats et sous-métropoles retirés, statuts retirés des deux côtés."""
+    rows = [{"N": "Pays", "T": "20"}, {"N": "North-West Metropolitan Area (NWMA)", "T": "10"},
+            {"N": "NWMA-Centre", "T": "6"}, {"N": "NWMA-Port", "T": "4"}, {"N": "Mbeya Municipal", "T": "10"}]
+    params = {"table": {"code_field": "N", "name_field": "N", "total_field": "T"}, "join": "name",
+              "exclude_rows": ["Pays"], "exclude_rows_matching": ["^[A-Z]{2,5}-"],
+              "strip_patterns": [r"\s*\([^)]*\)\s*$", r"\s+(Municipal|Metropolitan Area)\s*$"]}
+    kept, n = exclude_rows(rows, params)
+    assert n == 3  # la métropole n'est pas comptée deux fois avec ses sous-métropoles
+    out = join_table(_units(), kept, params)
+    assert out["TT01"][0] == 10.0 and out["TT02"][0] == 10.0
+    with pytest.raises(ConfigurationError, match="absentes du tableau"):
+        exclude_rows(rows, {**params, "exclude_rows": ["Pays", "Inexistant"]})
+
+
+def test_expected_total_guards_exclusions(tmp_path: Path) -> None:
+    geo = tmp_path / "b.geojson"
+    geo.write_text(json.dumps(regions_fc()))
+    csv_path = tmp_path / "t.csv"
+    csv_path.write_text("P,N,T\nTT01,a,1000\nTT02,b,500\n")
+    params = {"variable": "population_total_admin1", "relative_error": 0.05, "expected_total": 1500,
+              "table": {"resource": "t.csv", "code_field": "P", "name_field": "N", "total_field": "T"},
+              "boundaries": {"resource": "b.geojson", "code_field": "pcode", "name_field": "name"}}
+    files = {"t.csv": csv_path, "b.geojson": geo}
+    res = [{"name": "t.csv", "path": str(csv_path)}, {"name": "b.geojson", "path": str(geo)}]
+    assert len(list(AdminTableAdapter().normalize(manifest("admin_table", res, params), files, NOW))) == 2
+    wrong = manifest("admin_table", res, {**params, "expected_total": 1600})
+    with pytest.raises(ConfigurationError, match="total déclaré"):
+        list(AdminTableAdapter().normalize(wrong, files, NOW))
