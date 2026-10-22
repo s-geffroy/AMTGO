@@ -17,6 +17,10 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
 # voit tous les coeurs de l'hote : sans ce reglage, OpenBLAS lance un thread par coeur
 # qui s'attendent activement sur un seul CPU (x200 sur une resolution 300x300).
 
+# libexpat1 : requise par le GDAL embarque dans les wheels de rasterio (absente de l'image slim).
+RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Dependances d'abord, depuis le lockfile : la couche reste en cache tant que

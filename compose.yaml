@@ -27,6 +27,9 @@ services:
       - db_password
     volumes:
       - state:/state
+      # Donnees sous licence nominative (DHS, Afrobarometer geocode...) : hors Git, hors
+      # image, en lecture seule (ADR-0028). Le repertoire doit exister (sinon Docker le cree en root).
+      - ./restricted:/restricted:ro
     depends_on:
       db:
         condition: service_healthy
@@ -96,6 +99,9 @@ services:
       - db_password
     volumes:
       - state:/state
+      # Donnees sous licence nominative (DHS, Afrobarometer geocode...) : hors Git, hors
+      # image, en lecture seule (ADR-0028). Le repertoire doit exister (sinon Docker le cree en root).
+      - ./restricted:/restricted:ro
       - ./src:/app/src:ro
       - ./tests:/app/tests:ro
       - ./configs:/app/configs:ro

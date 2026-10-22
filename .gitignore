@@ -20,3 +20,7 @@ spec/
 site/
 docs/assets/generated/
 docs/runs/generated/
+
+# Donnees restreintes (licences nominatives) : jamais dans Git (ADR-0028).
+restricted/*
+!restricted/README.md

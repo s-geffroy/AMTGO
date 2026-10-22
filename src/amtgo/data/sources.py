@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -22,6 +22,9 @@ from amtgo.core.quality import QualityVector
 from amtgo.data.licenses import License
 from amtgo.errors import DataLicenseError, ForbiddenSourceRole
 from amtgo.utils.canonical import content_hash, stable_uuid
+
+# Point de montage, en lecture seule, du répertoire des données restreintes (ADR-0028).
+RESTRICTED_ROOT = PurePosixPath("/restricted")
 
 
 class AccessLevel(StrEnum):
@@ -138,6 +141,14 @@ class SourceManifest(BaseModel):
             # Une source restreinte n'est jamais téléchargée vers un chemin du dépôt ; elle est
             # déposée localement par une personne autorisée (prompt §68).
             raise ValueError("seules les sources OPEN_CORE peuvent être récupérées par http")
+        if self.data_zone is not DataZone.OPEN_CORE and self.retrieval.kind is RetrievalKind.LOCAL:
+            # Fichiers sous licence nominative : uniquement dans le dépôt restreint monté en
+            # lecture seule, jamais dans le code, l'image ou un chemin versionné (ADR-0028).
+            for r in self.retrieval.resources:
+                p = PurePosixPath(r.path or "")
+                if not p.is_absolute() or RESTRICTED_ROOT not in p.parents or ".." in p.parts:
+                    raise ValueError(f"ressource {r.name!r} : une source {self.data_zone.value} se lit "
+                                     f"sous {RESTRICTED_ROOT}/, pas à {r.path!r}")
         if self.default_evidence_status is EvidenceStatus.HISTORICAL and not self.historical_context:
             raise ValueError("source historique sans historical_context (01 §29)")
         return self
