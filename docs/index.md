@@ -49,6 +49,7 @@ pas un échec.
 | M13 | Map-C-Shallow : contre-factuel contemporain sans privilège juridique, prime de l'existant | fait |
 | M14 | coordination continentale : composition des produits Map-R régionaux par couches d'interface | fait |
 | M15 | Map-C-Deep : branche de recherche séparée (11 phase 11), SCM historique sur monde synthétique, non prescriptif | fait (recherche) |
+| R0–R2 | données réelles, phase 1 : répertoire restreint, limites et totaux administratifs, WorldPop en prior ; Ghana 2021 (population seule), Zambie, Malawi, Tanzanie préparés | fait (gate de phase 1 non passé) |
 
 La mesure de population du pilote synthétique est validée contre la vérité :
 non identifiée à la maille de la cellule, identifiée à 100 km. La composition

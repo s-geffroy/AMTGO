@@ -33,3 +33,11 @@ jamais remplies par un coefficient inventé :
 | stockage objet S3/MinIO | les fichiers de run sous `/state` suffisent au prototype | après profilage |
 | licence du projet | décision du porteur du projet | — |
 | seuils normatifs du manifeste par défaut | provisoires, décision de gouvernance | — |
+
+## Données réelles (ADR-0028)
+
+- **Ghana** : population des 261 districts du recensement 2021 non disponible sous une forme lisible par machine (PDF ou microdonnées sur demande). Seules les 16 régions servent de marges.
+- **Zambie, Tanzanie** : recensements 2022 non trouvés sous une forme lisible par machine. Les marges sont des projections (statut M).
+- **Malawi** : tableaux du recensement 2018 publiés en xlsx (HDX). L'adapter manque ; les marges sont des projections 2023 (statut M).
+- **Erreur des recensements** : déclarée (PROVISOIRE), en attendant les taux de couverture des enquêtes post-censitaires.
+- **Prior de population** : indépendant entre cellules. L'incertitude des agrégats dépend alors du maillage, et le holdout des régions échoue sur les maillages fins (R2_REPORT). Un prior corrigeant ce point (biais de niveau commun, corrélation spatiale) reste à écrire.

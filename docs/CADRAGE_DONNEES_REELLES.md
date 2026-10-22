@@ -1,6 +1,6 @@
 # Cadrage — passage aux données réelles
 
-*Statut : **proposition**, 2026-10-22. Rien n'est implémenté ; six décisions (§10) attendent le porteur du projet. Ce document deviendra un ADR une fois ces décisions prises.*
+*Statut : **décisions en partie prises**, mise à jour du 2026-10-22. Région : Ghana ; rasterio accepté ; stockage `restricted/` accepté (voir [ADR-0028](decisions/ADR-0028-donnees-reelles.md)). Afrobarometer R9 géocodé demandé par le porteur (délai annoncé : deux semaines) ; demande DHS non encore confirmée. Restent ouvertes : le comité de gouvernance (décision 4) et les licences à partage à l'identique (décision 6). Lots R0 à R2 réalisés ([rapport](milestones/R2_REPORT.md)).*
 
 ## 1. Où en est le projet
 

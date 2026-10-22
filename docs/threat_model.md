@@ -56,3 +56,15 @@ Deux contrôles bénins doivent sortir, un maillage en PUBLIC et une population 
 - k et la liste des proxies sont un **choix déclaré** (03 §25 : pas de seuil universel), en attente du comité de gouvernance (06).
 - La différenciation est traitée de façon conservatrice : un attribut, un support. Un calcul exact des cellules reconstructibles entre supports emboîtés reste à faire.
 - Aucune couche de population ou de groupe n'est exportée : la carte publique ne porte que pays et maillages.
+
+## Données restreintes (ADR-0028)
+
+| mesure | effet |
+|---|---|
+| `restricted/` hors Git et hors image, monté en lecture seule dans `worker` et `cli` seulement | pas de fuite par le dépôt public ni par l'image |
+| une source `RESTRICTED_LOCAL` ou `SENSITIVE` ne lit qu'un chemin sous `/restricted/` (refus au schéma) | pas de chemin vers le code, `/state` ou un `..` |
+| droits sur l'hôte : 2750 et ACL en lecture pour l'uid du conteneur, rien pour les autres | accès limité au projet |
+| contenu jamais affiché dans une conversation, un log ou un rapport ; seuls des agrégats non sensibles en sortent | pas de fuite vers un service tiers |
+| red-team `test_restricted_data.py` | montage, exclusions et chemins vérifiés en CI |
+
+Non couvert : chiffrement au repos, et compatibilité des sauvegardes du VPS avec les licences (à vérifier avant le dépôt du premier fichier).
