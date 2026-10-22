@@ -122,6 +122,7 @@ Les tableaux ci-dessus décrivent la **première version** du prior, centrée su
   - un adapter xlsx pour le recensement 2018 du Malawi ;
   - le taux de couverture des enquêtes post-censitaires (PES).
 - **R3** : DHS et Afrobarometer R9, en attente d'accès ; composition ; exclusion de la zone de conflit du nord-est du Ghana.
+- **Feuille de route révisée** ([ADR-0029](../decisions/ADR-0029-elg-seg-gates-feuille-de-route.md)) : A1 (benchmark du modèle de population, validé sur les districts du PHC 2021), A2, B1 (PHC Ghana 2021), B2, puis langue et géographie avant le Gate E.
 
 ## Tests
 - **Unitaires** (`test_real_data_adapters.py`) :

@@ -32,3 +32,4 @@ Chaque ambiguïté ou incohérence de la spécification tranchée pendant l'impl
 | [ADR-0026](ADR-0026-continental-coordination.md) | Coordination continentale par composition, sans solve monolithique (M14) | accepté |
 | [ADR-0027](ADR-0027-map-c-deep.md) | Map-C-Deep : branche de recherche, SCM historique sur monde synthétique (M15) | accepté |
 | [ADR-0028](ADR-0028-donnees-reelles.md) | Données réelles : pilote Ghana, données restreintes, WorldPop en prior (lots R0–R2) | accepté |
+| [ADR-0029](ADR-0029-elg-seg-gates-feuille-de-route.md) | ELG-Seg descriptif, gates E et P, feuille de route des données réelles | accepté |
