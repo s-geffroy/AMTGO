@@ -1,0 +1,6 @@
+# Tanzanie, grille carree LAEA, 400 km / 2^5 de cote. Maillage d analyse, pas une proposition.
+mesh_id: tza_grid_l5
+family: grid_laea
+resolution: 5
+grid_base_km: 400
+extent: {kind: source_union, source_id: tza_geoboundaries_adm1, variable_id: admin1_polygon}

@@ -1,0 +1,5 @@
+# Malawi, H3 resolution 5. Maillage d analyse, pas une proposition.
+mesh_id: mwi_h3_r5
+family: h3
+resolution: 5
+extent: {kind: source_union, source_id: mwi_geoboundaries_adm2, variable_id: admin2_polygon}

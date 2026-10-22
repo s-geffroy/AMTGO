@@ -1,0 +1,60 @@
+# Tanzanie : population par region, COD-PS 2020 (UNFPA). PROJECTION fondee sur le recensement 2012 :
+# statut M. Le recensement 2022 n'a pas ete trouve sous forme lisible par machine.
+source_id: tza_codps_2020_adm1
+name: Tanzania COD-PS 2020 - population par region (projection)
+provider: UNFPA (HDX, cod-ps-tza)
+release: "2020-adm1-v2"
+url: https://data.humdata.org/dataset/cod-ps-tza
+citation: "UNFPA, Tanzania subnational population statistics 2020 (v2), via OCHA HDX cod-ps-tza, CC BY-IGO."
+license:
+  license_id: CC-BY-IGO
+  name: Creative Commons Attribution for Intergovernmental Organisations
+  url: https://creativecommons.org/licenses/by/3.0/igo/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [population_measurement, multiscale_validation]
+  forbidden: [group_territory_inference]
+method: Projection demographique par region a partir du recensement 2012.
+temporal_start: 2020-01-01
+temporal_end: 2020-12-31
+default_evidence_status: M
+quality: {source_reliability: 0.6, spatial_precision: 0.4, temporal_precision: 0.4, construct_validity: 0.6,
+          representativeness: 1.0, license_usability: 0.9, privacy_usability: 1.0}
+retrieval:
+  kind: http
+  adapter: admin_table
+  resources:
+    - name: tza_admpop_adm1_2020_v2.csv
+      url: https://data.humdata.org/dataset/fcd33248-774d-4be2-aa16-86b10519330e/resource/89dd7ca4-4b73-4725-8ac8-0e0ef78d4fbd/download/tza_admpop_adm1_2020_v2.csv
+      sha256: a169336a559aab36dafe50ff7a82bfb9c4d9e76c3f950e176d5e59c8bfa36e78
+    - name: geoBoundaries-TZA-ADM1.geojson
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/TZA/ADM1/geoBoundaries-TZA-ADM1.geojson
+      sha256: 02ffe153dc2809c78b364349cd696f0176a84413d0bb11a0b1083d5b2aa2e14e
+    - name: geoBoundaries-TZA-ADM1-metaData.json
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/TZA/ADM1/geoBoundaries-TZA-ADM1-metaData.json
+      sha256: 414576fe4c7d21007bf6a73a6a061fc0a9cbf3943727f86cb37789de33a8e73b
+  parameters:
+    variable: population_total_admin1
+    table: {resource: tza_admpop_adm1_2020_v2.csv, code_field: ADM1_PCODE, name_field: ADM1_EN, total_field: T_TL}
+    boundaries: {resource: geoBoundaries-TZA-ADM1.geojson, code_field: shapeID, name_field: shapeName}
+    license_check: {resource: geoBoundaries-TZA-ADM1-metaData.json, field: boundaryLicense,
+                    expected: "Open Data Commons Open Database License 1.0"}
+    join: name
+    aliases:
+      "COAST": "Pwani"
+    # Les cinq regions de Zanzibar et Pemba (230 a 850 km2) tiennent chacune dans une ou deux cellules :
+    # une seule marge, declaree. Perte de resolution assumee, sans quoi le recalage exact n'a pas de solution.
+    group_boundaries:
+      "Zanzibar et Pemba": ["North Pemba", "South Pemba", "Zanzibar North", "Zanzibar South & Central",
+                            "Zanzibar Urban/West"]
+    # Polygones de 2015 : Songwe (creee en 2016) est encore dans Mbeya.
+    merge:
+      "Mbeya": ["MBEYA", "SONGWE"]
+      "Zanzibar et Pemba": ["PEMBA NORTH", "PEMBA SOUTH", "ZANZIBAR NORTH", "ZANZIBAR CENTRAL/SOUTH",
+                            "ZANZIBAR URBAN/WEST"]
+    relative_error: 0.10   # PROVISOIRE : projection a 8 ans

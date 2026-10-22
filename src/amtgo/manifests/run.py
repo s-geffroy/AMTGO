@@ -51,6 +51,8 @@ ROLE_VIABILITY = "viability_inputs"
 # Rôles des sources de la bibliothèque causale (M7) : panels estimés, contexte cible du transport.
 ROLE_CAUSAL_ESTIMATION = "causal_estimation"
 ROLE_CAUSAL_TARGET = "causal_transport_target"
+# Rôle requis pour qu'un raster modélisé (WorldPop) serve de prior de densité, jamais d'observation.
+ROLE_POPULATION_PRIOR = "population_prior"
 
 
 class SourceUse(BaseModel):
@@ -321,6 +323,7 @@ def resolve_request(request: RunRequest, configs_dir: Path) -> RunManifest:
 def _check_measurement(m: MeasurementManifest, sources: list[ResolvedSource]) -> None:
     from amtgo.data.sources import RetrievalKind
     from amtgo.measurement.engine import ROLE_MEASUREMENT
+    from amtgo.measurement.manifest import RasterLogNormalDensityPrior
 
     by_id = {s.manifest.source_id: s for s in sources}
     for lk in m.likelihoods:
@@ -329,6 +332,14 @@ def _check_measurement(m: MeasurementManifest, sources: list[ResolvedSource]) ->
             raise ConfigurationError(f"mesure : la source {lk.source_id} n'est pas dans le run")
         if ROLE_MEASUREMENT not in s.use.roles:
             raise ConfigurationError(f"mesure : rôle {ROLE_MEASUREMENT!r} non déclaré pour {lk.source_id}")
+    prior = m.prior
+    if isinstance(prior, RasterLogNormalDensityPrior):
+        s = by_id.get(prior.source_id)
+        if s is None or ROLE_POPULATION_PRIOR not in s.use.roles:
+            raise ConfigurationError(f"mesure : le prior raster {prior.source_id} doit être une source du run "
+                                     f"déclarée avec le rôle {ROLE_POPULATION_PRIOR!r}")
+        if prior.source_id in {lk.source_id for lk in m.likelihoods}:
+            raise ConfigurationError(f"mesure : {prior.source_id} ne peut pas être à la fois prior et observation")
     synthetic = [s.manifest for s in sources if s.manifest.retrieval.kind is RetrievalKind.SYNTHETIC]
     if synthetic:
         from amtgo.data.adapters.synthetic import world_of

@@ -56,7 +56,25 @@ class LogNormalDensityPrior(_Strict):
     log_sd: float = Field(gt=0)
 
 
-PriorSpec = GaussianDensityPrior | LogNormalDensityPrior
+class RasterLogNormalDensityPrior(_Strict):
+    """log ρ_i ~ N(log ρ̂_i, σ²), ρ̂_i lue sur un raster de population (WorldPop) agrégé à la cellule.
+
+    Le raster est un produit modélisé (statut M) : il sert de *prior*, jamais
+    d'observation (03 §5). Une cellule où le raster ne place personne reçoit le
+    plancher, pas zéro : le prior reste positif et l'absence d'habitat détecté
+    n'est pas une absence prouvée.
+    """
+
+    kind: Literal["raster_lognormal_density"]
+    source_id: str
+    variable_id: str
+    log_sd: float = Field(gt=0)
+    floor_density_per_km2: float = Field(gt=0)
+    # Pixels agrégés par bloc avant l'affectation aux cellules (lecture par bandes, mémoire bornée).
+    block_pixels: int = Field(ge=1, le=100)
+
+
+PriorSpec = GaussianDensityPrior | LogNormalDensityPrior | RasterLogNormalDensityPrior
 
 
 class ObservationUse(StrEnum):
@@ -129,7 +147,7 @@ class MeasurementManifest(_Strict):
             if lk.use is ObservationUse.MARGIN:
                 if lk.model is not LikelihoodModel.AREA_TOTAL:
                     raise ValueError(f"{lk.source_id} : seule une vraisemblance area_total peut servir de marge")
-                if not isinstance(self.prior, LogNormalDensityPrior):
+                if not isinstance(self.prior, LogNormalDensityPrior | RasterLogNormalDensityPrior):
                     raise ValueError("les marges exigent un prior positif (log-normal)")
         return self
 

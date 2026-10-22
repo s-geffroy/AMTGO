@@ -1,0 +1,41 @@
+# Malawi : districts (ADM2, 28), geoBoundaries gbOpen (source NSO Malawi / OCHA ROSEA, 2020).
+source_id: mwi_geoboundaries_adm2
+name: geoBoundaries gbOpen MWI ADM2
+provider: geoBoundaries (William & Mary geoLab), source National Statistics Office of Malawi, OCHA ROSEA
+release: "gbOpen-9469f09"
+url: https://www.geoboundaries.org/
+citation: "Runfola et al. (2020), geoBoundaries. MWI ADM2, commit 9469f09. CC BY 3.0 IGO."
+license:
+  license_id: CC-BY-3.0-IGO
+  name: Creative Commons Attribution 3.0 Intergovernmental Organisations
+  url: https://creativecommons.org/licenses/by/3.0/igo/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [status_quo_geometry, analysis_extent]
+  forbidden: [legal_boundary_truth, group_territory_inference]
+method: Limites administratives officielles harmonisees par geoBoundaries.
+temporal_start: 2020-01-01
+default_evidence_status: P
+quality: {source_reliability: 0.8, spatial_precision: 0.7, temporal_precision: 0.7, construct_validity: 0.8,
+          representativeness: 1.0, license_usability: 0.9, privacy_usability: 1.0}
+retrieval:
+  kind: http
+  adapter: admin_boundaries
+  resources:
+    - name: geoBoundaries-MWI-ADM2.geojson
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/MWI/ADM2/geoBoundaries-MWI-ADM2.geojson
+      sha256: 5fe9b6313ee3eaf6d2b8a4579b7a7fa75dc1b16b9324a436f5a359da23527ea6
+    - name: geoBoundaries-MWI-ADM2-metaData.json
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/MWI/ADM2/geoBoundaries-MWI-ADM2-metaData.json
+      sha256: d5abb851b1817e42b5f40eed1e61735d8330d5f10f222f5f4018f0659038f16b
+  parameters:
+    license_check: {resource: geoBoundaries-MWI-ADM2-metaData.json, field: boundaryLicense,
+                    expected: "Creative Commons Attribution 3.0 Intergovernmental Organisations (CC BY 3.0 IGO)"}
+    layers:
+      - {resource: geoBoundaries-MWI-ADM2.geojson, variable: admin2_polygon, level: 2,
+         code_field: shapeID, name_field: shapeName}

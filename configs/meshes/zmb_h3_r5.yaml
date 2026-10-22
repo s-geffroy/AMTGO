@@ -1,0 +1,5 @@
+# Zambie, H3 resolution 5. Maillage d analyse, pas une proposition.
+mesh_id: zmb_h3_r5
+family: h3
+resolution: 5
+extent: {kind: source_union, source_id: zmb_geoboundaries_adm1, variable_id: admin1_polygon}

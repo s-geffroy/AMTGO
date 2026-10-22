@@ -139,15 +139,19 @@ RULE = ("Une frontière candidate n'est publiée qu'en catégorie ROBUST ou COND
         "(05 §20) ; rester tel quel (NO_CHANGE) reste toujours une alternative.")
 
 
+# État des données réelles (ADR-0028), à tenir à jour avec les runs réels de la file.
+REAL_DATA_STATUS = ("Sur données réelles, seul existe un prototype de mesure de la population (Ghana 2021, "
+                    "phase 1) : il ne génère aucune frontière candidate et n'est pas publié.")
+
+
 def candidates_message(status_from: Path | None) -> str:
     """Pourquoi la couche candidats est vide, lu sur la validation d'un run réel (jamais un texte figé)."""
     if status_from is None:
-        return ("Aucune frontière candidate : aucun run sur données réelles n'existe pour l'Afrique, les runs "
-                "actuels portent sur des mondes synthétiques. " + RULE)
+        return "Aucune frontière candidate. " + REAL_DATA_STATUS + " " + RULE
     m = load_manifest(status_from)
     v = artifacts.read_json(status_from, "artifacts/validation.json")
     gates = ", ".join(f"{k} {g}" for k, g in v["gates"].items() if g != "PASSED")
     name = m.request.name
     return (f"Aucune frontière candidate publiable. Run de référence « {name} » (monde synthétique) : catégorie "
             f"{v['publication_category']}" + (f", gates non passés : {gates}" if gates else "") + ". " + RULE
-            + " Aucun run sur données réelles n'existe pour l'Afrique.")
+            + " " + REAL_DATA_STATUS)

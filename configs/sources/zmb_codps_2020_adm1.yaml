@@ -1,0 +1,50 @@
+# Zambie : population par province, COD-PS 2020 (UNFPA). PROJECTION fondee sur le recensement
+# 2010, pas un denombrement : statut M. Le recensement 2022 n'a pas ete trouve sous forme lisible
+# par machine ; il remplacera cette source quand il le sera.
+source_id: zmb_codps_2020_adm1
+name: Zambia COD-PS 2020 - population par province (projection)
+provider: UNFPA (HDX, cod-ps-zmb)
+release: "2020-adm1-v2"
+url: https://data.humdata.org/dataset/cod-ps-zmb
+citation: "UNFPA, Zambia subnational population statistics 2020 (v2), via OCHA HDX cod-ps-zmb, CC BY."
+license:
+  license_id: CC-BY-4.0
+  name: Creative Commons Attribution International
+  url: https://creativecommons.org/licenses/by/4.0/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [population_measurement, multiscale_validation]
+  forbidden: [group_territory_inference]
+method: Projection demographique par province a partir du recensement 2010.
+temporal_start: 2020-01-01
+temporal_end: 2020-12-31
+default_evidence_status: M
+quality: {source_reliability: 0.6, spatial_precision: 0.4, temporal_precision: 0.5, construct_validity: 0.6,
+          representativeness: 1.0, license_usability: 1.0, privacy_usability: 1.0}
+retrieval:
+  kind: http
+  adapter: admin_table
+  resources:
+    - name: zmb_admpop_adm1_2020_v2.csv
+      url: https://data.humdata.org/dataset/eade6bae-9be6-43f4-bbf0-75c49ccecb2e/resource/ed9e753b-5dc6-4d96-9e9d-a44764d60280/download/zmb_admpop_adm1_2020_v2.csv
+      sha256: e2b1e77992fbc7db7d76ab4580e1b68ecc1da5c47a5fc5a7cdd0a35a37f18fc2
+    - name: geoBoundaries-ZMB-ADM1.geojson
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/ZMB/ADM1/geoBoundaries-ZMB-ADM1.geojson
+      sha256: f2b286f907101f669c6a8eea2ded1322cc166b3a071467116d85078841069078
+    - name: geoBoundaries-ZMB-ADM1-metaData.json
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/ZMB/ADM1/geoBoundaries-ZMB-ADM1-metaData.json
+      sha256: dd3fcbc07b4b7ae59064e5755cc18c5574da935272df0266126f169c676601d5
+  parameters:
+    variable: population_total_admin1
+    table: {resource: zmb_admpop_adm1_2020_v2.csv, code_field: ADM1_CODE, name_field: ADM1_EN, total_field: T_TL}
+    boundaries: {resource: geoBoundaries-ZMB-ADM1.geojson, code_field: shapeID, name_field: shapeName}
+    license_check: {resource: geoBoundaries-ZMB-ADM1-metaData.json, field: boundaryLicense,
+                    expected: "Creative Commons Attribution 4.0 International (CC BY 4.0)"}
+    join: name
+    # PROVISOIRE : erreur d'une projection a 10 ans, declaree, pas mesuree.
+    relative_error: 0.08

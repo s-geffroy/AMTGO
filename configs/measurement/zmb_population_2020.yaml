@@ -1,0 +1,41 @@
+# Zambie 2020 : population par cellule. Prior log-normal centre sur WorldPop (produit modelise),
+# recale sur les totaux administratifs (marges : projections, statut M). Premier modele sur donnees reelles
+# (ADR-0028). Tous les parametres sont des parametres de MODELE, PROVISOIRES, et leur sensibilite
+# doit etre rapportee. Sans enquete (DHS), aucune vraisemblance locale : l'information sous
+# l'echelle regionale vient du seul prior, et la calculabilite le dira.
+model_id: population_worldpop_census_rake
+version: "0.1.0"
+variable_id: population_count
+description: >
+  Population par cellule, Zambie 2020. Prior log-normal independant centre sur la densite
+  WorldPop 2020 agregee a la cellule, recalage exact de chaque tirage sur les totaux
+  administratifs (projections) tires selon leur erreur declaree.
+target_period: {start: 2020-01-01, end: 2020-12-31}
+prior:
+  kind: raster_lognormal_density
+  source_id: zmb_worldpop_2020
+  variable_id: population_prior_raster
+  log_sd: 1.0                    # PROVISOIRE : facteur ~2,7 d'erreur de WorldPop a la cellule
+  floor_density_per_km2: 1.0     # PROVISOIRE : aucun bati detecte n'est pas une absence prouvee
+  block_pixels: 10               # blocs de 1 km avant affectation aux cellules
+likelihoods:
+  - source_id: zmb_codps_2020_adm1
+    variable_id: population_total_admin1
+    model: area_total
+    use: margin
+    variance_inflation: 1.0
+quality_gates:
+  min_construct_validity: 0.5
+  min_privacy_usability: 0.5
+  min_license_usability: 0.5
+sampling:
+  n_samples: 200
+  seed: 7
+  interval_level: 0.9
+validation:
+  holdout_fraction: 0.2
+computability:
+  a_min: 0.9
+  b_min: 0.6
+  c_min: 0.3
+  max_negative_sample_fraction: 0.05

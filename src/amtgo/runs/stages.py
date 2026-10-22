@@ -73,6 +73,8 @@ def plan_steps(manifest: RunManifest) -> list[str]:
     steps += [f"build_mesh:{m.mesh_id}" for m in manifest.mesh_set]
     steps += ["multiscale_check"]
     if manifest.measurement_model is not None:
+        if manifest.measurement_model.prior.kind == "raster_lognormal_density":
+            steps += [f"raster_prior:{m.mesh_id}" for m in manifest.mesh_set]
         steps += [f"measure:{m.mesh_id}" for m in manifest.mesh_set]
         steps += [f"validate_measurement:{m.mesh_id}" for m in manifest.mesh_set]
         steps += ["compare_fields"]
@@ -358,6 +360,7 @@ STAGES: dict[str, Callable[[StageContext, str], dict[str, Any]]] = {
     "ingest": ingest,
     "build_mesh": build_mesh,
     "multiscale_check": multiscale_check,
+    "raster_prior": measure_stages.raster_prior,
     "measure": measure_stages.measure,
     "validate_measurement": measure_stages.validate_measurement,
     "compare_fields": measure_stages.compare_fields,

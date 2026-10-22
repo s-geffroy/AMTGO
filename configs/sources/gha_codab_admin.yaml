@@ -1,0 +1,48 @@
+# Ghana : limites administratives communes (COD-AB, OCHA / Ghana Statistical Service), regions
+# (ADM1, 16) et districts (ADM2, 260). Statu quo et emprise d'analyse ; ni frontiere juridique,
+# ni territoire de groupe. Cadrage donnees reelles, ADR-0028.
+source_id: gha_codab_admin
+name: Ghana - Subnational Administrative Boundaries (COD-AB)
+provider: OCHA / Ghana Statistical Service (HDX, cod-ab-gha)
+release: "v01-2021-03-08"
+url: https://data.humdata.org/dataset/cod-ab-gha
+citation: "Ghana Statistical Service (GSS), via OCHA HDX, cod-ab-gha v01 (valid_on 2021-03-08), CC BY-IGO."
+license:
+  license_id: CC-BY-IGO
+  name: Creative Commons Attribution for Intergovernmental Organisations
+  url: https://creativecommons.org/licenses/by/3.0/igo/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [status_quo_geometry, analysis_extent]
+  forbidden: [legal_boundary_truth, group_territory_inference]
+method: Limites administratives officielles numerisees, harmonisees par OCHA (codes pcode).
+temporal_start: 2021-03-08
+temporal_note: Date de validite declaree par la source (valid_on) ; aucune date de fin.
+default_evidence_status: P
+quality:
+  # Evaluation provisoire des mainteneurs AMTGO, pas une mesure.
+  source_reliability: 0.8
+  spatial_precision: 0.7
+  temporal_precision: 0.8
+  construct_validity: 0.8
+  representativeness: 1.0
+  license_usability: 0.9
+  privacy_usability: 1.0
+retrieval:
+  kind: http
+  adapter: admin_boundaries
+  resources:
+    - name: gha_admin_boundaries.geojson.zip
+      url: https://data.humdata.org/dataset/dc4c17cf-59d9-478c-b2b7-acd889241194/resource/c8d647a7-f396-4108-9fe4-cf7b31731a73/download/gha_admin_boundaries.geojson.zip
+      sha256: fbc2a72af2bfc928045031aff76e36fab49dea48e858a4ac640d7070d2dc1e22
+  parameters:
+    layers:
+      - {resource: gha_admin_boundaries.geojson.zip, member: gha_admin1.geojson, variable: admin1_polygon,
+         level: 1, code_field: adm1_pcode, name_field: adm1_name}
+      - {resource: gha_admin_boundaries.geojson.zip, member: gha_admin2.geojson, variable: admin2_polygon,
+         level: 2, code_field: adm2_pcode, name_field: adm2_name}

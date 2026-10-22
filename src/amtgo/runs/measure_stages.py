@@ -18,12 +18,13 @@ from amtgo.data.ingestion import read_observations
 from amtgo.data.observations import Observation
 from amtgo.errors import ConfigurationError, ProvenanceError
 from amtgo.measurement import fields as fields_mod
+from amtgo.measurement import raster_prior as raster_prior_mod
 from amtgo.measurement import validation
 from amtgo.measurement.engine import ROLE_MEASUREMENT, fit, require_observations
 from amtgo.measurement.likelihoods import MeshIndex
-from amtgo.measurement.manifest import MeasurementManifest
+from amtgo.measurement.manifest import MeasurementManifest, RasterLogNormalDensityPrior
 from amtgo.runs import artifacts
-from amtgo.utils.canonical import content_hash
+from amtgo.utils.canonical import content_hash, file_sha256
 
 if TYPE_CHECKING:
     from amtgo.runs.stages import StageContext
@@ -58,12 +59,61 @@ def _inputs(ctx: StageContext) -> tuple[list[Observation], dict[str, str], set[s
     return observations, uuid_to_slug, roles, sorted(hashes), PrivacyClass.most_restrictive(classes)
 
 
+def _raster_prior_spec(ctx: StageContext) -> RasterLogNormalDensityPrior | None:
+    p = _manifest(ctx).prior
+    return p if isinstance(p, RasterLogNormalDensityPrior) else None
+
+
+def raster_prior(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
+    """Densité a priori par cellule lue sur le raster épinglé (WorldPop), par bandes."""
+    spec = _raster_prior_spec(ctx)
+    if spec is None:
+        raise ConfigurationError("aucun prior raster dans ce modèle de mesure")
+    resolved = next(s for s in ctx.manifest.data_manifest if s.manifest.source_id == spec.source_id)
+    rasters = [o for o in read_observations(ctx.observations_path(spec.source_id))
+               if o.variable_id == spec.variable_id and o.raster_ref]
+    if len(rasters) != 1:
+        raise ConfigurationError(f"prior raster : une observation {spec.variable_id} attendue, {len(rasters)} trouvées")
+    assert rasters[0].raster_ref is not None
+    name, _, sha = rasters[0].raster_ref.partition("@")
+    path = ctx.cache_dir / spec.source_id / resolved.manifest.release / name
+    if not path.exists() or file_sha256(path) != sha:
+        raise ProvenanceError(f"prior raster : {name} absent du cache ou différent de {sha[:19]}")
+    mesh = artifacts.read_mesh(ctx.run_dir, mesh_id)
+    idx = MeshIndex(mesh)
+    cells = raster_prior_mod.cell_totals(path, idx, spec.block_pixels, ctx.should_stop)
+    density = raster_prior_mod.prior_density(cells, idx, spec.floor_density_per_km2)
+    summary = raster_prior_mod.summary(cells, idx, spec.floor_density_per_km2)
+    artifacts.write_json(ctx.run_dir, f"fields/{mesh_id}/prior.json", {
+        "source_id": spec.source_id, "raster_ref": rasters[0].raster_ref, "cells_hash": mesh.cells_hash,
+        "summary": summary, "density_per_km2": [float(d) for d in density]})
+    record = ProvenanceRecord.create(
+        "measurement.raster_prior", [rasters[0].raster_ref, f"mesh:{mesh_id}:{mesh.cells_hash}"],
+        [f"prior:{mesh_id}:{content_hash([float(d) for d in density])}"],
+        parameters={"block_pixels": spec.block_pixels, "floor_density_per_km2": spec.floor_density_per_km2},
+        run_id=ctx.manifest.run_id)
+    artifacts.write_provenance(ctx.run_dir, [record])
+    ctx.repo.record_provenance([record])
+    return {"count": summary["cells"], "detail": f"plancher {summary['cells_at_floor']}"}
+
+
+def prior_density(ctx: StageContext, mesh_id: str) -> np.ndarray | None:
+    """Densités du prior raster de ce maillage (None si le prior n'est pas un raster)."""
+    if _raster_prior_spec(ctx) is None:
+        return None
+    meta = artifacts.read_json(ctx.run_dir, f"fields/{mesh_id}/prior.json")
+    mesh = artifacts.read_mesh(ctx.run_dir, mesh_id)
+    if meta["cells_hash"] != mesh.cells_hash:
+        raise ProvenanceError(f"prior raster {mesh_id} calculé sur un autre maillage")
+    return np.asarray(meta["density_per_km2"], dtype=float)
+
+
 def measure(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
     m = _manifest(ctx)
     mesh = artifacts.read_mesh(ctx.run_dir, mesh_id)
     obs, slugs, roles, hashes, privacy = _inputs(ctx)
     ctx.check_stop(f"measure {mesh_id}")
-    result = fit(mesh, obs, m, slugs, roles)
+    result = fit(mesh, obs, m, slugs, roles, prior_density(ctx, mesh_id))
     require_observations(result.selection)
     meta, rows = fields_mod.build_field(result, mesh_id, mesh.cells_hash, m, content_hash(hashes), privacy,
                                         str(ctx.manifest.run_id))
@@ -83,7 +133,7 @@ def validate_measurement(ctx: StageContext, mesh_id: str) -> dict[str, Any]:
     m = _manifest(ctx)
     mesh = artifacts.read_mesh(ctx.run_dir, mesh_id)
     obs, slugs, roles, _, _ = _inputs(ctx)
-    vctx = validation.FitContext.build(mesh, obs, m, slugs, roles)
+    vctx = validation.FitContext.build(mesh, obs, m, slugs, roles, prior_density(ctx, mesh_id))
     manifests = [s.manifest for s in ctx.manifest.data_manifest if s.manifest.source_id in slugs.values()]
     out: dict[str, Any] = {}
     for name, fn in (("holdout", validation.holdout_check), ("ablation", validation.ablation),
@@ -129,7 +179,7 @@ def compare_fields(ctx: StageContext, _: str) -> dict[str, Any]:
             idx = MeshIndex(mesh)
             samples = fields_mod.read_field(ctx.run_dir, d.mesh_id)[2]
             per_mesh[d.mesh_id] = validation.district_totals(samples, idx, polys)
-            ratios = validation.scale_information(samples, idx, m, polys)
+            ratios = validation.scale_information(samples, idx, m, polys, prior_density(ctx, d.mesh_id))
             info[d.mesh_id] = {"median": float(np.median(ratios)),
                                "computability": fields_mod.cell_class(
                                    float(np.median(ratios)), 0.0, m.computability).value}

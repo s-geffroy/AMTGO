@@ -1,0 +1,25 @@
+# Premier run sur donnees reelles (cadrage donnees reelles, lots R1-R2, ADR-0028) : Ghana 2021,
+# population seule. Ni composition, ni D/F/I, ni candidats : la phase 1 (11) est un prototype de
+# mesure, sans optimisation politique. Sorties CONTROLLED au plus pres des sources ; rien n'est
+# publie sur la carte.
+name: gha_population_2021
+description: >
+  Ghana 2021, prototype de mesure de la population : limites COD-AB (statu quo et emprise),
+  totaux regionaux du recensement 2021 (marges), WorldPop 2021 en prior de densite, deux
+  familles de maillage a deux resolutions, validation (holdout des regions) et calculabilite.
+  Aucune composition, aucun candidat, aucune recommandation.
+region: ghana
+map_mode: R
+constitutional_regime: R0_CURRENT_LIKE
+normative_manifest: normative/default.yaml
+sources:
+  - {manifest: sources/gha_codab_admin.yaml, roles: [status_quo_geometry, analysis_extent], redistribute: false}
+  - {manifest: sources/gha_census_2021_adm1.yaml, roles: [population_measurement, multiscale_validation], redistribute: false}
+  - {manifest: sources/gha_worldpop_2021.yaml, roles: [population_prior], redistribute: false}
+measurement_model: measurement/gha_population_2021.yaml
+mesh_set:
+  - meshes/gha_h3_r5.yaml
+  - meshes/gha_h3_r6.yaml
+  - meshes/gha_grid_l5.yaml
+  - meshes/gha_grid_l6.yaml
+seeds: [0]

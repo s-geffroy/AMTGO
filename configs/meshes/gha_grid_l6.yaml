@@ -1,0 +1,6 @@
+# Ghana, grille carree LAEA, 400 km / 2^6 de cote. Maillage d analyse, pas une proposition.
+mesh_id: gha_grid_l6
+family: grid_laea
+resolution: 6
+grid_base_km: 400
+extent: {kind: source_union, source_id: gha_codab_admin, variable_id: admin1_polygon}

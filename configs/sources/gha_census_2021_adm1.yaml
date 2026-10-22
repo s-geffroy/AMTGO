@@ -1,0 +1,55 @@
+# Ghana, recensement de la population et de l'habitat 2021 (PHC 2021) : population totale des 16
+# regions, via le COD-PS d'HDX. Le total national (30 832 019) et la somme des regions egalent les
+# resultats publies du recensement : statut D. Le tableau des districts du meme jeu (216 lignes,
+# ancien decoupage, sans pcode, total incomplet) est ecarte : les districts restent une lacune.
+source_id: gha_census_2021_adm1
+name: Ghana PHC 2021 - population par region (COD-PS)
+provider: Ghana Statistical Service / UNFPA (HDX, cod-ps-gha)
+release: "2021-adm1-2024-01-19"
+url: https://data.humdata.org/dataset/cod-ps-gha
+citation: "Ghana Statistical Service, 2021 Population and Housing Census, via UNFPA / OCHA HDX cod-ps-gha, CC BY-IGO."
+license:
+  license_id: CC-BY-IGO
+  name: Creative Commons Attribution for Intergovernmental Organisations
+  url: https://creativecommons.org/licenses/by/3.0/igo/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [population_measurement, multiscale_validation, causal_transport_target]
+  forbidden: [group_territory_inference]
+method: Denombrement exhaustif (nuit de reference du 27 juin 2021), totaux regionaux publies.
+temporal_start: 2021-06-27
+temporal_end: 2021-06-27
+default_evidence_status: D
+quality:
+  source_reliability: 0.9
+  spatial_precision: 0.5
+  temporal_precision: 1.0
+  construct_validity: 0.9
+  representativeness: 1.0
+  license_usability: 0.9
+  privacy_usability: 1.0
+retrieval:
+  kind: http
+  adapter: admin_table
+  resources:
+    - name: gha_admpop_adm1_2021.csv
+      url: https://data.humdata.org/dataset/d618e616-dfbc-4993-9eac-0b484b5cd2b4/resource/eadada3f-4156-48c3-85bb-88f6a17b3dba/download/gha_admpop_adm1_2021.csv
+      sha256: 87e9b6e6221e0cfbb3b857d93f2cecb6699648f1e8be7dfab6359214fa8920e6
+    # Memes polygones que gha_codab_admin, pour la jointure par pcode.
+    - name: gha_admin_boundaries.geojson.zip
+      url: https://data.humdata.org/dataset/dc4c17cf-59d9-478c-b2b7-acd889241194/resource/c8d647a7-f396-4108-9fe4-cf7b31731a73/download/gha_admin_boundaries.geojson.zip
+      sha256: fbc2a72af2bfc928045031aff76e36fab49dea48e858a4ac640d7070d2dc1e22
+  parameters:
+    variable: population_total_admin1
+    table: {resource: gha_admpop_adm1_2021.csv, code_field: ADM1_PCODE, name_field: ADM1_EN, total_field: T_TL}
+    boundaries: {resource: gha_admin_boundaries.geojson.zip, member: gha_admin1.geojson,
+                 code_field: adm1_pcode, name_field: adm1_name}
+    join: code
+    # PROVISOIRE : erreur de couverture declaree, pas mesuree. A remplacer par le taux de
+    # couverture de l'enquete post-censitaire (PES) du PHC 2021.
+    relative_error: 0.02

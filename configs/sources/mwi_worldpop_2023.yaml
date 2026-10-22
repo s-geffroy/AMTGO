@@ -1,0 +1,37 @@
+# WorldPop, population maillee a 100 m, Malawi 2023, contrainte au bati (R2025A). Produit MODELISE : prior
+# de densite seulement, jamais observation, jamais identite (03 §5). Memes reserves que pour le Ghana
+# (totaux ajustes aux estimations des Nations unies : pas une validation independante).
+source_id: mwi_worldpop_2023
+name: WorldPop Malawi 2023, 100 m, contrainte (R2025A)
+provider: WorldPop, University of Southampton
+release: "R2025A-v1-2023"
+url: https://hub.worldpop.org/
+citation: "WorldPop (www.worldpop.org), Global2 2015-2030 constrained 100 m, R2025A v1, Malawi 2023. CC BY 4.0."
+license:
+  license_id: CC-BY-4.0
+  name: Creative Commons Attribution 4.0 International
+  url: https://creativecommons.org/licenses/by/4.0/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [population_prior]
+  forbidden: [population_measurement, group_territory_inference, identity_inference]
+method: Redistribution dasymetrique (foret aleatoire) des totaux sur le bati detecte.
+temporal_start: 2023-01-01
+temporal_end: 2023-12-31
+default_evidence_status: M
+quality: {source_reliability: 0.7, spatial_precision: 0.8, temporal_precision: 0.6, construct_validity: 0.5,
+          representativeness: 0.8, license_usability: 1.0, privacy_usability: 1.0}
+retrieval:
+  kind: http
+  adapter: worldpop
+  resources:
+    - name: mwi_pop_2023_CN_100m_R2025A_v1.tif
+      url: https://data.worldpop.org/GIS/Population/Global_2015_2030/R2025A/2023/MWI/v1/100m/constrained/mwi_pop_2023_CN_100m_R2025A_v1.tif
+      sha256: e3aaf4d5cfbf8d28084c1e737ba67da661dae6b93904a0bbf7d816cd3b2cfbd0
+  parameters:
+    variable: population_prior_raster

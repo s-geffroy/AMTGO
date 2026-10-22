@@ -1,0 +1,55 @@
+# Malawi : population par district, COD-PS 2023 (NSO Malawi). PROJECTION fondee sur le recensement
+# 2018 : statut M. Les tableaux du recensement 2018 (serie A) existent en xlsx sur HDX ; ils
+# remplaceront cette source (adapter xlsx a ecrire). Les 4 villes sont fusionnees dans leur district.
+source_id: mwi_codps_2023_adm2
+name: Malawi COD-PS 2023 - population par district (projection)
+provider: National Statistics Office of Malawi (HDX, cod-ps-mwi)
+release: "2023-adm2"
+url: https://data.humdata.org/dataset/cod-ps-mwi
+citation: "National Statistics Office of Malawi, population projections 2023, via OCHA HDX cod-ps-mwi, CC BY-IGO."
+license:
+  license_id: CC-BY-IGO
+  name: Creative Commons Attribution for Intergovernmental Organisations
+  url: https://creativecommons.org/licenses/by/3.0/igo/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [population_measurement, multiscale_validation]
+  forbidden: [group_territory_inference]
+method: Projection demographique par district a partir du recensement 2018.
+temporal_start: 2023-01-01
+temporal_end: 2023-12-31
+default_evidence_status: M
+quality: {source_reliability: 0.7, spatial_precision: 0.6, temporal_precision: 0.6, construct_validity: 0.7,
+          representativeness: 1.0, license_usability: 0.9, privacy_usability: 1.0}
+retrieval:
+  kind: http
+  adapter: admin_table
+  resources:
+    - name: mwi_admpop_adm2_2023.csv
+      url: https://data.humdata.org/dataset/8ceb03ac-2272-447f-8887-39cfc4d78b59/resource/28082779-76b1-49cb-bc4a-61efb19a7e1b/download/mwi_admpop_adm2_2023.csv
+      sha256: a9b8ad2c10270dc550fe8bb8c1ada6588bec47af0bbf194fae9b044273952fa0
+    - name: geoBoundaries-MWI-ADM2.geojson
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/MWI/ADM2/geoBoundaries-MWI-ADM2.geojson
+      sha256: 5fe9b6313ee3eaf6d2b8a4579b7a7fa75dc1b16b9324a436f5a359da23527ea6
+    - name: geoBoundaries-MWI-ADM2-metaData.json
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/MWI/ADM2/geoBoundaries-MWI-ADM2-metaData.json
+      sha256: d5abb851b1817e42b5f40eed1e61735d8330d5f10f222f5f4018f0659038f16b
+  parameters:
+    variable: population_total_admin2
+    table: {resource: mwi_admpop_adm2_2023.csv, code_field: ADM2_PCODE, name_field: ADM2_FR, total_field: T_TL}
+    boundaries: {resource: geoBoundaries-MWI-ADM2.geojson, code_field: shapeID, name_field: shapeName}
+    license_check: {resource: geoBoundaries-MWI-ADM2-metaData.json, field: boundaryLicense,
+                    expected: "Creative Commons Attribution 3.0 Intergovernmental Organisations (CC BY 3.0 IGO)"}
+    join: name
+    strip_suffixes: ["District"]
+    merge:
+      "Lilongwe": ["Lilongwe City", "Lilongwe Rural"]
+      "Blantyre": ["Blantyre City", "Blantyre Rural"]
+      "Zomba": ["Zomba City", "Zomba"]
+      "Mzimba": ["Mzimba", "Mzuzu City"]
+    relative_error: 0.05   # PROVISOIRE : projection a 5 ans

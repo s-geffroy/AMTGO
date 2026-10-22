@@ -1,0 +1,26 @@
+# PREPARE, pas encore une reference : Tanzanie 2020, population seule (cadrage donnees reelles, ADR-0028).
+# Les marges sont des PROJECTIONS (statut M), faute de recensement recent lisible par machine.
+# Meme structure que gha_population_2021 ; aucune composition, aucun candidat.
+# Les regions insulaires (Zanzibar, Pemba, 230 a 850 km2) tiennent dans une cellule : sans leur
+# regroupement en une marge (declare dans tza_codps_2020_adm1), le recalage exact echoue (signale).
+name: tza_population_2020
+description: >
+  Tanzanie 2020, prototype de mesure de la population : limites geoBoundaries (statu quo et emprise),
+  totaux administratifs projetes (marges, statut M), WorldPop 2020 en prior de densite, deux
+  familles de maillage a deux resolutions, validation et calculabilite. Aucune composition,
+  aucun candidat, aucune recommandation.
+region: tanzania
+map_mode: R
+constitutional_regime: R0_CURRENT_LIKE
+normative_manifest: normative/default.yaml
+sources:
+  - {manifest: sources/tza_geoboundaries_adm1.yaml, roles: [status_quo_geometry, analysis_extent], redistribute: false}
+  - {manifest: sources/tza_codps_2020_adm1.yaml, roles: [population_measurement, multiscale_validation], redistribute: false}
+  - {manifest: sources/tza_worldpop_2020.yaml, roles: [population_prior], redistribute: false}
+measurement_model: measurement/tza_population_2020.yaml
+mesh_set:
+  - meshes/tza_h3_r4.yaml
+  - meshes/tza_h3_r5.yaml
+  - meshes/tza_grid_l4.yaml
+  - meshes/tza_grid_l5.yaml
+seeds: [0]

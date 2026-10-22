@@ -38,6 +38,7 @@ from amtgo.measurement.manifest import (
     LikelihoodSpec,
     MeasurementManifest,
     ObservationUse,
+    RasterLogNormalDensityPrior,
 )
 
 ROLE_MEASUREMENT = "population_measurement"
@@ -53,8 +54,15 @@ class Selection:
         return [r for r in self.rows if r.source_id in keep]
 
 
-def prior_for(mesh_index: MeshIndex, manifest: MeasurementManifest) -> GaussianPrior | LogNormalPrior:
+def prior_for(mesh_index: MeshIndex, manifest: MeasurementManifest,
+              prior_density: np.ndarray | None = None) -> GaussianPrior | LogNormalPrior:
+    """``prior_density`` : densité médiane par cellule, lue sur le raster (prior raster uniquement)."""
     p = manifest.prior
+    if isinstance(p, RasterLogNormalDensityPrior):
+        if prior_density is None or len(prior_density) != len(mesh_index):
+            raise InsufficientEvidence("prior raster : densités par cellule absentes ou d'un autre maillage")
+        return LogNormalPrior(log_mean=np.log(prior_density), log_var=np.full(len(mesh_index), p.log_sd**2),
+                              area=mesh_index.area)
     if isinstance(p, GaussianDensityPrior):
         return GaussianPrior(mean=p.density_mean_per_km2 * mesh_index.area,
                              var=(p.density_sd_per_km2 * mesh_index.area) ** 2)
@@ -124,6 +132,7 @@ class Prepared:
     index: MeshIndex
     selection: Selection
     manifest: MeasurementManifest
+    prior_density: np.ndarray | None = None
 
 
 @dataclass(frozen=True)
@@ -135,10 +144,11 @@ class FitResult:
 
 
 def prepare(mesh: Mesh, observations: list[Observation], manifest: MeasurementManifest,
-            source_uuid_to_slug: dict[str, str], measurement_sources: set[str]) -> Prepared:
+            source_uuid_to_slug: dict[str, str], measurement_sources: set[str],
+            prior_density: np.ndarray | None = None) -> Prepared:
     idx = MeshIndex(mesh)
     sel = select_observations(observations, manifest, idx, source_uuid_to_slug, measurement_sources)
-    return Prepared(idx, sel, manifest)
+    return Prepared(idx, sel, manifest, prior_density)
 
 
 def fit_prepared(prep: Prepared, keep_sources: set[str] | None = None,
@@ -149,7 +159,7 @@ def fit_prepared(prep: Prepared, keep_sources: set[str] | None = None,
     if exclude_ids:
         rows = [r for r in rows if r.observation_id not in exclude_ids]
     s = prep.manifest.sampling
-    prior = prior_for(prep.index, prep.manifest)
+    prior = prior_for(prep.index, prep.manifest, prep.prior_density)
     margin_sources = {lk.source_id for lk in prep.manifest.likelihoods if lk.use is ObservationUse.MARGIN}
     margins = [r for r in rows if r.source_id in margin_sources]
     rows = [r for r in rows if r.source_id not in margin_sources]
@@ -162,8 +172,10 @@ def fit_prepared(prep: Prepared, keep_sources: set[str] | None = None,
 
 
 def fit(mesh: Mesh, observations: list[Observation], manifest: MeasurementManifest,
-        source_uuid_to_slug: dict[str, str], measurement_sources: set[str]) -> FitResult:
-    return fit_prepared(prepare(mesh, observations, manifest, source_uuid_to_slug, measurement_sources))
+        source_uuid_to_slug: dict[str, str], measurement_sources: set[str],
+        prior_density: np.ndarray | None = None) -> FitResult:
+    return fit_prepared(prepare(mesh, observations, manifest, source_uuid_to_slug, measurement_sources,
+                                prior_density))
 
 
 def require_observations(sel: Selection) -> None:

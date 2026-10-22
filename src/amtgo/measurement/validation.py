@@ -26,12 +26,13 @@ from shapely.strtree import STRtree
 from amtgo.data.observations import Observation
 from amtgo.data.sources import RetrievalKind, SourceManifest
 from amtgo.data.synthetic_world import SyntheticWorld
+from amtgo.errors import InsufficientEvidence
 from amtgo.geo.crs import to_equal_area
 from amtgo.geo.mesh import Mesh
 from amtgo.measurement.engine import FitResult, Prepared, fit_prepared, is_holdout, prepare
 from amtgo.measurement.fusion import predictive
 from amtgo.measurement.likelihoods import MeshIndex
-from amtgo.measurement.manifest import LogNormalDensityPrior, MeasurementManifest
+from amtgo.measurement.manifest import LogNormalDensityPrior, MeasurementManifest, RasterLogNormalDensityPrior
 
 
 def _z(level: float) -> float:
@@ -53,8 +54,9 @@ class FitContext:
 
     @classmethod
     def build(cls, mesh: Mesh, observations: list[Observation], manifest: MeasurementManifest,
-              uuid_to_slug: dict[str, str], measurement_sources: set[str]) -> FitContext:
-        return cls(prepare(mesh, observations, manifest, uuid_to_slug, measurement_sources))
+              uuid_to_slug: dict[str, str], measurement_sources: set[str],
+              prior_density: np.ndarray | None = None) -> FitContext:
+        return cls(prepare(mesh, observations, manifest, uuid_to_slug, measurement_sources, prior_density))
 
 
 def holdout_check(ctx: FitContext) -> dict[str, Any]:
@@ -176,9 +178,15 @@ def district_totals(samples: np.ndarray, idx: MeshIndex, polygons_wgs84: list[An
     return np.asarray(samples @ aggregation_weights(idx, polygons_wgs84).T)
 
 
-def prior_cell_variance(idx: MeshIndex, manifest: MeasurementManifest) -> np.ndarray:
+def prior_cell_variance(idx: MeshIndex, manifest: MeasurementManifest,
+                        prior_density: np.ndarray | None = None) -> np.ndarray:
     """Variance a priori de Z par cellule, dans l'espace des comptes."""
     p = manifest.prior
+    if isinstance(p, RasterLogNormalDensityPrior):
+        if prior_density is None:
+            raise InsufficientEvidence("prior raster : densités par cellule absentes")
+        s2 = p.log_sd**2
+        return np.asarray(idx.area**2 * (np.exp(s2) - 1.0) * np.exp(2 * np.log(prior_density) + s2))
     if isinstance(p, LogNormalDensityPrior):
         mu, s2 = np.log(p.median_density_per_km2), p.log_sd**2
         return np.asarray(idx.area**2 * (np.exp(s2) - 1.0) * np.exp(2 * mu + s2))
@@ -186,14 +194,14 @@ def prior_cell_variance(idx: MeshIndex, manifest: MeasurementManifest) -> np.nda
 
 
 def scale_information(samples: np.ndarray, idx: MeshIndex, manifest: MeasurementManifest,
-                      polygons_wgs84: list[Any]) -> np.ndarray:
+                      polygons_wgs84: list[Any], prior_density: np.ndarray | None = None) -> np.ndarray:
     """Ratio d'information des totaux de polygones : 1 − var_post(T) / var_prior(T).
 
     Montre *à quelle échelle* la mesure est informative : une population non
     identifiée par cellule peut l'être sur des agrégats plus larges.
     """
     w = aggregation_weights(idx, polygons_wgs84)
-    prior_var = (w**2) @ prior_cell_variance(idx, manifest)
+    prior_var = (w**2) @ prior_cell_variance(idx, manifest, prior_density)
     post_var = (samples @ w.T).var(axis=0, ddof=1)
     return np.asarray(np.clip(1.0 - post_var / np.where(prior_var > 0, prior_var, np.inf), 0.0, 1.0))
 

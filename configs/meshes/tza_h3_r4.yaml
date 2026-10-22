@@ -1,0 +1,5 @@
+# Tanzanie, H3 resolution 4. Maillage d analyse, pas une proposition.
+mesh_id: tza_h3_r4
+family: h3
+resolution: 4
+extent: {kind: source_union, source_id: tza_geoboundaries_adm1, variable_id: admin1_polygon}

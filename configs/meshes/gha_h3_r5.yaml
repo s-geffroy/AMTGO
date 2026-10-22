@@ -1,0 +1,5 @@
+# Ghana, H3 resolution 5. Maillage d analyse, pas une proposition.
+mesh_id: gha_h3_r5
+family: h3
+resolution: 5
+extent: {kind: source_union, source_id: gha_codab_admin, variable_id: admin1_polygon}

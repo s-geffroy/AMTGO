@@ -1,0 +1,6 @@
+# Zambie, grille carree LAEA, 400 km / 2^4 de cote. Maillage d analyse, pas une proposition.
+mesh_id: zmb_grid_l4
+family: grid_laea
+resolution: 4
+grid_base_km: 400
+extent: {kind: source_union, source_id: zmb_geoboundaries_adm1, variable_id: admin1_polygon}

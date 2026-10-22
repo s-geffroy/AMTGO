@@ -1,0 +1,43 @@
+# Zambie : provinces (ADM1, 10), geoBoundaries gbOpen (source Zambia Data Hub, 2020). Licence lue
+# dans les metadonnees de la frontiere et comparee a celle-ci (licences mixtes dans gbOpen).
+source_id: zmb_geoboundaries_adm1
+name: geoBoundaries gbOpen ZMB ADM1
+provider: geoBoundaries (William & Mary geoLab), source Zambia Data Hub
+release: "gbOpen-9469f09"
+url: https://www.geoboundaries.org/
+citation: "Runfola et al. (2020), geoBoundaries, PLOS ONE 15(4): e0231866. ZMB ADM1, commit 9469f09. CC BY 4.0."
+license:
+  license_id: CC-BY-4.0
+  name: Creative Commons Attribution 4.0 International
+  url: https://creativecommons.org/licenses/by/4.0/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [status_quo_geometry, analysis_extent]
+  forbidden: [legal_boundary_truth, group_territory_inference]
+method: Limites administratives harmonisees par geoBoundaries.
+temporal_start: 2020-01-01
+temporal_note: Annee representee declaree par geoBoundaries (boundaryYearRepresented).
+default_evidence_status: P
+quality: {source_reliability: 0.7, spatial_precision: 0.7, temporal_precision: 0.6, construct_validity: 0.8,
+          representativeness: 1.0, license_usability: 1.0, privacy_usability: 1.0}
+retrieval:
+  kind: http
+  adapter: admin_boundaries
+  resources:
+    - name: geoBoundaries-ZMB-ADM1.geojson
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/ZMB/ADM1/geoBoundaries-ZMB-ADM1.geojson
+      sha256: f2b286f907101f669c6a8eea2ded1322cc166b3a071467116d85078841069078
+    - name: geoBoundaries-ZMB-ADM1-metaData.json
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/ZMB/ADM1/geoBoundaries-ZMB-ADM1-metaData.json
+      sha256: dd3fcbc07b4b7ae59064e5755cc18c5574da935272df0266126f169c676601d5
+  parameters:
+    license_check: {resource: geoBoundaries-ZMB-ADM1-metaData.json, field: boundaryLicense,
+                    expected: "Creative Commons Attribution 4.0 International (CC BY 4.0)"}
+    layers:
+      - {resource: geoBoundaries-ZMB-ADM1.geojson, variable: admin1_polygon, level: 1,
+         code_field: shapeID, name_field: shapeName}

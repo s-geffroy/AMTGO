@@ -1,0 +1,44 @@
+# Tanzanie : regions (ADM1, 30), geoBoundaries gbOpen (source OpenStreetMap, 2015 : avant la creation
+# de Songwe en 2016). Licence ODbL (partage a l'identique) : couche interne, aucune publication
+# derivee sans decision (cadrage, decision 6).
+source_id: tza_geoboundaries_adm1
+name: geoBoundaries gbOpen TZA ADM1
+provider: geoBoundaries (William & Mary geoLab), source OpenStreetMap
+release: "gbOpen-9469f09"
+url: https://www.geoboundaries.org/
+citation: "Runfola et al. (2020), geoBoundaries. TZA ADM1, commit 9469f09. Donnees (c) contributeurs OpenStreetMap, ODbL 1.0."
+license:
+  license_id: ODbL-1.0
+  name: Open Data Commons Open Database License 1.0
+  url: https://opendatacommons.org/licenses/odbl/1-0/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [status_quo_geometry, analysis_extent]
+  forbidden: [legal_boundary_truth, group_territory_inference]
+method: Limites administratives OpenStreetMap harmonisees par geoBoundaries.
+temporal_start: 2015-01-01
+temporal_note: Annee representee 2015 ; Mbeya inclut l'actuelle region de Songwe.
+default_evidence_status: P
+quality: {source_reliability: 0.6, spatial_precision: 0.6, temporal_precision: 0.4, construct_validity: 0.7,
+          representativeness: 1.0, license_usability: 0.7, privacy_usability: 1.0}
+retrieval:
+  kind: http
+  adapter: admin_boundaries
+  resources:
+    - name: geoBoundaries-TZA-ADM1.geojson
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/TZA/ADM1/geoBoundaries-TZA-ADM1.geojson
+      sha256: 02ffe153dc2809c78b364349cd696f0176a84413d0bb11a0b1083d5b2aa2e14e
+    - name: geoBoundaries-TZA-ADM1-metaData.json
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/TZA/ADM1/geoBoundaries-TZA-ADM1-metaData.json
+      sha256: 414576fe4c7d21007bf6a73a6a061fc0a9cbf3943727f86cb37789de33a8e73b
+  parameters:
+    license_check: {resource: geoBoundaries-TZA-ADM1-metaData.json, field: boundaryLicense,
+                    expected: "Open Data Commons Open Database License 1.0"}
+    layers:
+      - {resource: geoBoundaries-TZA-ADM1.geojson, variable: admin1_polygon, level: 1,
+         code_field: shapeID, name_field: shapeName}
