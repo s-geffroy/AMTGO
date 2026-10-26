@@ -84,6 +84,10 @@ ensemble. Ne bricole jamais les labels a la main.
   root, un worker qui tourne en utilisateur non privilegie -- le cas ici -- lit
   `permission denied`. Poser `0444` sur le fichier ; sur l'hote, c'est le
   repertoire (0700 root) qui protege.
+- Un secret se pose avec `sudo appctl secret set <nom>` -- mais la valeur, ce
+  n'est pas toi qui la tapes. Donne la commande a l'humain, qui la lance dans
+  son terminal (saisie masquee). `sudo appctl secret list` montre ce qui
+  existe ; aucune commande ne relit une valeur, et c'est voulu.
 
 ## Donnees
 
