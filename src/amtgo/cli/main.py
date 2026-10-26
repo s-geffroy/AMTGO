@@ -19,6 +19,7 @@ validate_app = typer.Typer(no_args_is_help=True, help="Validation : mondes synth
 scenario_app = typer.Typer(no_args_is_help=True, help="Scénarios (S1, S2A, S2C diagnostic agrégé).")
 candidates_app = typer.Typer(no_args_is_help=True, help="Candidats territoriaux (unités analytiques).")
 causal_app = typer.Typer(no_args_is_help=True, help="Bibliothèque causale : validation, lecture d'un gel.")
+benchmark_app = typer.Typer(no_args_is_help=True, help="Benchmarks combinés entre runs (gate A1b).")
 app.add_typer(run_app, name="run")
 app.add_typer(db_app, name="db")
 app.add_typer(source_app, name="source")
@@ -28,6 +29,7 @@ app.add_typer(validate_app, name="validate")
 app.add_typer(scenario_app, name="scenario")
 app.add_typer(causal_app, name="causal")
 app.add_typer(candidates_app, name="candidates")
+app.add_typer(benchmark_app, name="benchmark")
 
 
 def _resolve(path: Path) -> Path:
@@ -237,3 +239,41 @@ def validate_worlds(out: Path | None = None) -> None:
     typer.echo(text)
     if not all(ok for _, ok, _ in all_checks(nm.rights, weights, regimes, nm.viability)):
         raise typer.Exit(1)
+
+
+@benchmark_app.command("gate-a1b")
+def benchmark_gate_a1b(run_ids: list[str],
+                       removed: list[str] = typer.Option([], help="pays=raison : pays déclaré inutilisable")) -> None:  # noqa: B008
+    """Gate A1b (ADR-0029 § 6) combiné sur les runs de test, un par pays ; écrit /state/benchmarks/a1b_gate.json."""
+    import json
+
+    from amtgo.measurement.benchmark import gate_a1b
+    from amtgo.runs import artifacts
+    from amtgo.runs.queue import runs_dir
+
+    settings = get_settings()
+    countries: dict[str, dict[str, object]] = {}
+    for rid in run_ids:
+        d = runs_dir(settings) / rid
+        region = json.loads((d / "manifest.json").read_text())["request"]["region"]
+        b = json.loads((d / "artifacts" / "population_benchmark.json").read_text())
+        if b.get("gate_rule") != "a1b":
+            raise typer.BadParameter(f"run {rid} : benchmark sans règle a1b")
+        if region in countries:
+            raise typer.BadParameter(f"pays {region} présent deux fois")
+        countries[region] = {**b["a1b_evidence"], "run_id": rid}
+    for item in removed:
+        country, _, reason = item.partition("=")
+        if not reason or country in countries:
+            raise typer.BadParameter(f"--removed {item!r} : attendu pays=raison, pays sans run")
+        countries[country] = {"status": "not_available", "reason": reason, "run_id": None}
+    gate = gate_a1b(countries)
+    artifacts.write_json(settings.state_dir, "benchmarks/a1b_gate.json",
+                         {"runs": {c: e["run_id"] for c, e in countries.items()}, "gate": gate})
+    typer.echo(f"gate A1b : {'PASSÉ' if gate['passed'] else 'NON PASSÉ'} — retenue : {gate['retained']}")
+    for vid, v in (gate.get("per_variant") or {}).items():
+        typer.echo(f"  {vid:18s} admissible {'oui' if v['admissible'] else 'non':3s} couverture "
+                   f"{v['countries_covered']} score log moyen {v['mean_log_score']:.3f} "
+                   f"échecs de non-infériorité {len(v['noninferiority_failures'])}")
+    for r in gate["reasons"]:
+        typer.echo(f"  raison : {r}")

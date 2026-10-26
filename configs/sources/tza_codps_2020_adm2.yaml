@@ -1,0 +1,84 @@
+# Tanzanie : population par district (conseil), COD-PS 2020 v2 (UNFPA). PROJECTION fondee sur le
+# recensement 2012 : statut M. Sert au benchmark A1b (ADR-0029 § 6) : jamais une marge.
+source_id: tza_codps_2020_adm2
+name: Tanzania COD-PS 2020 - population par district (projection)
+provider: UNFPA (HDX, cod-ps-tza)
+release: "2020-adm2-v2"
+url: https://data.humdata.org/dataset/cod-ps-tza
+citation: "UNFPA, Tanzania subnational population statistics 2020 (v2), via OCHA HDX cod-ps-tza, CC BY-IGO."
+license:
+  license_id: CC-BY-IGO
+  name: Creative Commons Attribution for Intergovernmental Organisations
+  url: https://creativecommons.org/licenses/by/3.0/igo/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [multiscale_validation]
+  forbidden: [group_territory_inference]
+method: Projection demographique par district a partir du recensement 2012.
+temporal_start: 2020-01-01
+temporal_end: 2020-12-31
+default_evidence_status: M
+quality: {source_reliability: 0.6, spatial_precision: 0.5, temporal_precision: 0.4, construct_validity: 0.6,
+          representativeness: 1.0, license_usability: 0.9, privacy_usability: 1.0}
+retrieval:
+  kind: http
+  adapter: admin_table
+  resources:
+    - name: tza_admpop_adm2_2020_v2.csv
+      url: https://data.humdata.org/dataset/fcd33248-774d-4be2-aa16-86b10519330e/resource/8af542c3-9f80-4f5c-9362-d5954d7824ec/download/tza_admpop_adm2_2020_v2.csv
+      sha256: 88850f5d0d3985d29230189e8ed8884884fe09e903363b267df981785508c89d
+    - name: geoBoundaries-TZA-ADM2.geojson
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/TZA/ADM2/geoBoundaries-TZA-ADM2.geojson
+      sha256: 1eb3cbe313f1213bbcb1fb9c9aaf72c10d1c8d02ea24caa5d10d953c0a949c7c
+    - name: geoBoundaries-TZA-ADM2-metaData.json
+      url: https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/TZA/ADM2/geoBoundaries-TZA-ADM2-metaData.json
+      sha256: 4660b48a4aea31f5485656d945a30e4b81cd381934f397d17e6935eeea8fdb40
+  parameters:
+    variable: population_total_admin2
+    table: {resource: tza_admpop_adm2_2020_v2.csv, code_field: ADM2_PCODE, name_field: ADM2_EN, total_field: T_TL}
+    boundaries: {resource: geoBoundaries-TZA-ADM2.geojson, code_field: shapeID, name_field: shapeName}
+    license_check: {resource: geoBoundaries-TZA-ADM2-metaData.json, field: boundaryLicense,
+                    expected: "Creative Commons Attribution 3.0 Intergovernmental Organisations (CC BY 3.0 IGO)"}
+    join: name
+    # Conseils urbains : « X CITY / MUNICIPAL / TOWN » dans le tableau, « X Urban / Township Authority / Mji »
+    # dans les polygones (coquilles de geoBoundaries comprises). Noms seulement, etablis avant toute valeur.
+    aliases:
+      "ARUSHA CITY": "Arusha Urban"
+      "BABATI TOWN": "Babati UrbanBabati Urban"
+      "BUKOBA MUNICIPAL": "Bukoba Urban"
+      "BUTIAMA": "Butiam"
+      "DODOMA MUNICIPAL": "Dodoma Urban"
+      "HANDENI TOWN": "Handeni Mji"
+      "IRINGA MUNICIPAL": "Iringa Urban"
+      "KAHAMA TOWN": "Kahama Township Authority"
+      "KASULU TOWN": "Kasulu Township Authority"
+      "KIBAHA TOWN": "Kibaha Urban"
+      "KIGOMA UJIJI MUNICIPAL": "Kigoma Urban"
+      "KOROGWE TOWN": "Korogwe Township Authority"
+      "LINDI MUNICIPAL": "Lindi Urban"
+      "MAFINGA": "Mafinga Township Authority"
+      "MAKAMBAKO TOWN": "Makambako Township Authority"
+      "MASASI TOWN": "Masasi Township Authority"
+      "MBEYA CITY": "Mbeya Urban"
+      "MOROGORO MUNICIPAL": "Morogoro Urban"
+      "MOSHI MUNICIPAL": "Moshi Urban"
+      "MPANDA TOWN": "Mpanda Urban"
+      "MTWARA MIKINDANI": "Mtwara Urban"
+      "MUSOMA MUNICIPAL": "Musoma Urban"
+      "NJOMBE TOWN": "Njombe Urban"
+      "SHINYANGA MUNICIPAL": "Shinyanga Urban"
+      "SINGIDA MUNICIPAL": "Singida Urban"
+      "SONGEA MUNICIPAL": "Songea Urban"
+      "SUMBAWANGA MUNICIPAL": "Sumbawanga Urban"
+      "TABORA MUNICIPAL": "Tabora Urban"
+      "TANGA": "Tanga Urban"
+    # Le district de Songwe (cree en 2016, detache de Chunya) a un polygone mais pas de ligne : regroupe avec
+    # Chunya. Plus longue frontiere commune de Songwe : Chunya (296 km sur 747), verifie sur les polygones.
+    group_boundaries:
+      "Chunya": ["Chunya", "Songwe"]
+    relative_error: 0.10   # PROVISOIRE : meme erreur declaree que les regions (projection a 8 ans)

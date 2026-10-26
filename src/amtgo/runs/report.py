@@ -371,6 +371,22 @@ def _benchmark_section(a: Any, manifest: RunManifest, b: dict[str, Any]) -> None
                        if pm["cv"].get("status") == "done" else "non disponible")
         for mid, pm in b["per_mesh"].items()) + ".\n")
     g = b["gate_a1"]
+    if b.get("gate_rule") == "a1b":
+        ev = b["a1b_evidence"]
+        a(f"**Règle stricte A1, pour information** : {'passée' if g['passed'] else 'non passée'}. "
+          "Le gate de ce run est **A1b** (ADR-0029 § 6), combiné entre pays hors du run : ce run n'en écrit "
+          "que les pièces.\n")
+        if ev.get("status") != "done":
+            a(f"Pièces A1b non disponibles : {ev.get('reason')}.\n")
+            return
+        a(f"| variante | écart max. à la meilleure (δ = {spec.noninferiority_margin:g}) | non inférieure | "
+          "couverture tenue |")
+        a("|---|---|---|---|")
+        for vid, v in ev["variants"].items():
+            a(f"| `{vid}` | {v['max_gap']:+.3f} | {'oui' if v['noninferior'] else 'non'} | "
+              f"{'oui' if v['coverage_ok'] else 'non (' + ' ; '.join(v['coverage_failures']) + ')'} |")
+        a("")
+        return
     a(f"**Gate A1 : {'passé' if g['passed'] else 'non passé'}**" + (
         "." if g["passed"] else " — " + " ; ".join(g["reasons"]) + ".") + "\n")
 

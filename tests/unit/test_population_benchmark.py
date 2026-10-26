@@ -148,3 +148,52 @@ def test_benchmark_source_cannot_be_a_likelihood(configs_dir) -> None:  # type: 
         MeasurementManifest.model_validate(leak)
     with pytest.raises(ValueError, match="dupliqués"):
         spec(variants=[{"variant_id": "va", "log_sd": 1.0}, {"variant_id": "va", "log_sd": 0.5}])
+
+
+def _a1b_spec() -> PopulationBenchmark:
+    return spec(gate="a1b", noninferiority_margin=0.05)
+
+
+def _country(gap_b: float, cover_b: bool = True) -> dict:
+    """Deux maillages ; « va » meilleure partout, « vb » à ``gap_b`` derrière."""
+    folds = np.array([0, 0, 1, 1])
+    res = {"va": _result(np.array([1.0] * 4), np.ones(4)),
+           "vb": _result(np.array([1.0 + gap_b] * 4), np.ones(4) if cover_b else np.zeros(4))}
+    for vid, r in res.items():
+        sc = {k: np.asarray(v) for k, v in r["per_unit"].items()}
+        r["all"] = bm.summarize(sc, np.ones(4, bool), (0.5, 0.8, 0.95))
+        del vid
+    return bm.a1b_evidence({"m1": res, "m2": res}, {"m1": folds, "m2": folds}, _a1b_spec())
+
+
+def test_a1b_schema_requires_margin_only_for_a1b() -> None:
+    with pytest.raises(ValueError, match="noninferiority_margin"):
+        spec(gate="a1b")
+    with pytest.raises(ValueError, match="noninferiority_margin"):
+        spec(noninferiority_margin=0.05)
+
+
+def test_a1b_noninferiority_margin_and_tiebreak() -> None:
+    gate = bm.gate_a1b({"p1": _country(0.03), "p2": _country(0.04)})
+    assert gate["passed"] and gate["admissible"] == ["va", "vb"] and gate["retained"] == "va"
+    gate = bm.gate_a1b({"p1": _country(0.03), "p2": _country(0.08)})  # « vb » hors marge sur p2
+    assert gate["admissible"] == ["va"] and gate["per_variant"]["vb"]["noninferiority_failures"]
+
+
+def test_a1b_coverage_on_two_countries_and_removed_country() -> None:
+    ok, under = _country(0.0), _country(0.0, cover_b=False)
+    assert bm.gate_a1b({"p1": ok, "p2": ok, "p3": under})["per_variant"]["vb"]["admissible"]  # 2 pays sur 3
+    assert not bm.gate_a1b({"p1": ok, "p2": under, "p3": under})["per_variant"]["vb"]["admissible"]
+    removed = {"status": "not_available", "reason": "jointure non exhaustive"}
+    g = bm.gate_a1b({"p1": ok, "p2": under, "p3": removed})  # pays retiré : couverture exigée sur tous les restants
+    assert g["required_countries"] == 2 and not g["per_variant"]["vb"]["admissible"] and g["removed"] == {
+        "p3": "jointure non exhaustive"}
+    g = bm.gate_a1b({"p1": ok, "p3": removed})
+    assert not g["evaluable"] and not g["passed"]
+
+
+def test_a1b_refuses_mixed_declarations() -> None:
+    other = _country(0.0)
+    other["declared"] = {**other["declared"], "noninferiority_margin": 0.5}
+    g = bm.gate_a1b({"p1": _country(0.0), "p2": other})
+    assert not g["passed"] and "déclarations différentes" in g["reasons"][0]

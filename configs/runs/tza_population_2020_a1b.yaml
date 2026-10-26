@@ -1,0 +1,23 @@
+# Run de test A1b (ADR-0029 § 6) : Tanzanie 2020, prior note sur les districts COD-PS (jamais marges).
+# Preenregistrement : commit d8d91dc. Aucune composition, aucun candidat ; rien n'est publie.
+name: tza_population_2020_a1b
+description: >
+  Tanzanie 2020, benchmark A1b du modele spatial de population : marges regionales COD-PS,
+  WorldPop 2020 en prior, quatre variantes d'erreur declarees d'avance, notees sur les totaux
+  de district (validation seulement). Aucune composition, aucun candidat, aucune recommandation.
+region: tanzania
+map_mode: R
+constitutional_regime: R0_CURRENT_LIKE
+normative_manifest: normative/default.yaml
+sources:
+  - {manifest: sources/tza_geoboundaries_adm1.yaml, roles: [status_quo_geometry, analysis_extent], redistribute: false}
+  - {manifest: sources/tza_codps_2020_adm1.yaml, roles: [population_measurement, multiscale_validation], redistribute: false}
+  - {manifest: sources/tza_worldpop_2020.yaml, roles: [population_prior], redistribute: false}
+  - {manifest: sources/tza_codps_2020_adm2.yaml, roles: [multiscale_validation], redistribute: false}
+measurement_model: measurement/tza_population_2020_a1b.yaml
+mesh_set:
+  - meshes/tza_h3_r4.yaml
+  - meshes/tza_h3_r5.yaml
+  - meshes/tza_grid_l4.yaml
+  - meshes/tza_grid_l5.yaml
+seeds: [0]

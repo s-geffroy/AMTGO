@@ -109,6 +109,7 @@ Ce biais n'est pas corrigé ici : il est rapporté.
 ## Conséquences
 - **Le champ gelé reste celui du modèle en place** (`laea50_s100`, v0.2.0), prudent à l'échelle du district. Aucune variante n'est promue, puisque le gate n'est pas passé.
 - **Changer de modèle demandera une donnée nouvelle**, plus fine ou indépendante : comptes par zone d'énumération, enquêtes géocodées (R3), ou recensement d'un autre pays. Ce choix sera déclaré avant de voir ces données.
+- **Second test préenregistré (A1b)** : non passé, voir le [rapport A1b](A1B_REPORT.md).
 
 ## Tests
 - **Unitaires** (`test_population_benchmark.py`) :

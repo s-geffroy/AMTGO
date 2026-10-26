@@ -22,6 +22,7 @@ from amtgo.data.adapters.admin import (
     group_units,
     join_table,
     normalize_name,
+    read_xlsx_sheet,
 )
 from amtgo.data.adapters.worldpop import WorldPopAdapter
 from amtgo.data.sources import SourceManifest
@@ -244,3 +245,35 @@ def test_expected_total_guards_exclusions(tmp_path: Path) -> None:
     wrong = manifest("admin_table", res, {**params, "expected_total": 1600})
     with pytest.raises(ConfigurationError, match="total déclaré"):
         list(AdminTableAdapter().normalize(wrong, files, NOW))
+
+
+def _xlsx() -> bytes:
+    import io
+
+    ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+    rns = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("xl/workbook.xml", f'<workbook {ns} {rns}><sheets><sheet name="Notes" r:id="rId1"/>'
+                                      f'<sheet name="adm2" r:id="rId2"/></sheets></workbook>')
+        z.writestr("xl/_rels/workbook.xml.rels",
+                   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                   '<Relationship Id="rId1" Target="worksheets/sheet1.xml"/>'
+                   '<Relationship Id="rId2" Target="/xl/worksheets/sheet2.xml"/></Relationships>')
+        z.writestr("xl/sharedStrings.xml", f'<sst {ns}><si><t>NAME</t></si><si><t>TOTAL</t></si>'
+                                           f'<si><r><t>Al</t></r><r><t>pha</t></r></si></sst>')
+        z.writestr("xl/worksheets/sheet1.xml", f'<worksheet {ns}><sheetData/></worksheet>')
+        z.writestr("xl/worksheets/sheet2.xml", f'<worksheet {ns}><sheetData>'
+                   '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+                   '<row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2"><v>1200.5</v></c></row>'
+                   '<row r="3"><c r="A3" t="inlineStr"><is><t>Beta</t></is></c></row>'
+                   '<row r="4"><c r="B4" t="s"><v>1</v></c></row>'
+                   '<row r="5"/></sheetData></worksheet>')
+    return buf.getvalue()
+
+
+def test_xlsx_sheet_reader_stdlib() -> None:
+    rows = read_xlsx_sheet(_xlsx(), "adm2")
+    assert rows == [{"NAME": "Alpha", "TOTAL": "1200.5"}, {"NAME": "Beta", "TOTAL": ""}, {"NAME": "", "TOTAL": "TOTAL"}]
+    with pytest.raises(ConfigurationError, match="absente"):
+        read_xlsx_sheet(_xlsx(), "adm3")

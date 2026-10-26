@@ -244,6 +244,8 @@ def benchmark_summary(ctx: StageContext, _: str) -> dict[str, Any]:
     if spec is None:
         raise ConfigurationError("aucun benchmark dans ce modèle de mesure")
     per_mesh: dict[str, Any] = {}
+    results_by_mesh: dict[str, dict[str, Any]] = {}
+    folds_by_mesh: dict[str, np.ndarray] = {}
     for d in ctx.manifest.mesh_set:
         u = artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/benchmark/units.json")
         results = {v.variant_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/benchmark/{v.variant_id}.json")
@@ -254,10 +256,18 @@ def benchmark_summary(ctx: StageContext, _: str) -> dict[str, Any]:
             "variants": {vid: {"all": r["all"], "units_ge_min_cells": r["units_ge_min_cells"]}
                          for vid, r in results.items()},
             "cv": bm.cross_validate(results, np.asarray(u["folds"]), spec)}
+        results_by_mesh[d.mesh_id], folds_by_mesh[d.mesh_id] = results, np.asarray(u["folds"])
     gate = bm.gate_a1({mid: v["cv"] for mid, v in per_mesh.items()}, spec)
-    artifacts.write_json(ctx.run_dir, "artifacts/population_benchmark.json",
-                         {"per_mesh": per_mesh, "gate_a1": gate, "selection_score": spec.selection_score})
-    return {"detail": f"gate_A1={'PASSED' if gate['passed'] else 'FAILED'}"}
+    out: dict[str, Any] = {"per_mesh": per_mesh, "gate_a1": gate, "selection_score": spec.selection_score,
+                           "gate_rule": spec.gate}
+    detail = f"gate_A1={'PASSED' if gate['passed'] else 'FAILED'}"
+    if spec.gate == "a1b":
+        # Pièces de ce pays seulement : le gate A1b se calcule entre pays (`amtgo benchmark gate-a1b`).
+        out["a1b_evidence"] = ev = bm.a1b_evidence(results_by_mesh, folds_by_mesh, spec)
+        ok = [vid for vid, v in ev.get("variants", {}).items() if v["noninferior"] and v["coverage_ok"]]
+        detail = f"A1b : pièces écrites, {len(ok)} candidate(s) non inférieure(s) et couvrantes ici"
+    artifacts.write_json(ctx.run_dir, "artifacts/population_benchmark.json", out)
+    return {"detail": detail}
 
 
 def measurement_freeze(ctx: StageContext, _: str) -> dict[str, Any]:

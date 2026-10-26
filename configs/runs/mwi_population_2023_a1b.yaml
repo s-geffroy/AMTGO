@@ -1,0 +1,24 @@
+# Run de test A1b (ADR-0029 § 6) : Malawi 2023, marges sur les 3 regions, prior note sur les 28 districts
+# COD-PS (jamais marges ici ; marges du run mwi_population_2023 : independance plus faible, declaree).
+# Preenregistrement : commit d8d91dc. Aucune composition, aucun candidat ; rien n'est publie.
+name: mwi_population_2023_a1b
+description: >
+  Malawi 2023, benchmark A1b du modele spatial de population : marges regionales COD-PS (3),
+  WorldPop 2023 en prior, quatre variantes d'erreur declarees d'avance, notees sur les totaux
+  de district (validation seulement). Aucune composition, aucun candidat, aucune recommandation.
+region: malawi
+map_mode: R
+constitutional_regime: R0_CURRENT_LIKE
+normative_manifest: normative/default.yaml
+sources:
+  - {manifest: sources/mwi_geoboundaries_adm2.yaml, roles: [status_quo_geometry, analysis_extent], redistribute: false}
+  - {manifest: sources/mwi_codps_2023_adm1.yaml, roles: [population_measurement, multiscale_validation], redistribute: false}
+  - {manifest: sources/mwi_worldpop_2023.yaml, roles: [population_prior], redistribute: false}
+  - {manifest: sources/mwi_codps_2023_adm2.yaml, roles: [multiscale_validation], redistribute: false}
+measurement_model: measurement/mwi_population_2023_a1b.yaml
+mesh_set:
+  - meshes/mwi_h3_r5.yaml
+  - meshes/mwi_h3_r6.yaml
+  - meshes/mwi_grid_l5.yaml
+  - meshes/mwi_grid_l6.yaml
+seeds: [0]

@@ -1,0 +1,63 @@
+# Malawi 2023, run de test A1b (ADR-0029 § 6) : marges sur les 3 regions (et non les 28 districts du run
+# mwi_population_2023), pour noter le prior sur les districts. Memes parametres de prior que v0.2.0.
+model_id: population_worldpop_census_rake
+version: "0.3.0"
+variable_id: population_count
+description: >
+  Population par cellule, Malawi 2023. Prior log-normal independant centre sur la densite
+  WorldPop 2023 agregee a la cellule, recalage exact de chaque tirage sur les totaux
+  regionaux (projections, 3 regions) tires selon leur erreur declaree.
+target_period: {start: 2023-01-01, end: 2023-12-31}
+prior:
+  kind: raster_lognormal_density
+  source_id: mwi_worldpop_2023
+  variable_id: population_prior_raster
+  log_sd: 1.0                    # PROVISOIRE : terme propre a la cellule (facteur ~2,7)
+  floor_density_per_km2: 1.0     # PROVISOIRE : aucun bati detecte n'est pas une absence prouvee
+  block_pixels: 10               # blocs de 1 km avant affectation aux cellules
+  # Erreur correlee de WorldPop (R2_REPORT, Challenge 1). PROVISOIRES, fixees avant tout run avec
+  # correlation et jamais reglees ensuite sur le holdout. Reserve : le niveau (0,10) a ete choisi APRES
+  # avoir vu l'ecart national WorldPop/recensement (+4,5 % au Ghana) ; il n'est pas independant du holdout.
+  correlation:
+    level_sd: 0.10               # biais de niveau commun : totaux WorldPop/ONU vs recensement, ~quelques %
+    block_km: 50                 # echelle de l'erreur de repartition dasymetrique
+    block_sd: 0.25               # ~25 % d'erreur de repartition a l'echelle de 50 km
+likelihoods:
+  - source_id: mwi_codps_2023_adm1
+    variable_id: population_total_admin1
+    model: area_total
+    use: margin
+    variance_inflation: 1.0
+quality_gates:
+  min_construct_validity: 0.5
+  min_privacy_usability: 0.5
+  min_license_usability: 0.5
+sampling:
+  n_samples: 200
+  seed: 7
+  interval_level: 0.9
+validation:
+  holdout_fraction: 0.2
+computability:
+  a_min: 0.9
+  b_min: 0.6
+  c_min: 0.3
+  max_negative_sample_fraction: 0.05
+# Benchmark A1b (ADR-0029 § 6) : candidates, niveaux, damier, delta et tolerance fixes dans le preenregistrement
+# (commit d8d91dc) AVANT toute lecture des totaux de district. Le gate se combine entre pays, hors du run.
+benchmark:
+  source_id: mwi_codps_2023_adm2
+  variable_id: population_total_admin2
+  levels: [0.5, 0.8, 0.95]
+  cv_block_km: 100
+  selection_score: log_score
+  max_coverage_shortfall: 0.10
+  min_cells_per_unit: 4
+  gate: a1b
+  noninferiority_margin: 0.05
+  variants:
+    - {variant_id: laea50_s100, log_sd: 1.0, level_sd: 0.10, scales: [{block_km: 50, sd: 0.25}]}
+    - {variant_id: laea50_s050, log_sd: 0.5, level_sd: 0.10, scales: [{block_km: 50, sd: 0.25}]}
+    - {variant_id: district_s050, log_sd: 0.5, level_sd: 0.10, unit_sd: 0.25}
+    - {variant_id: multiscale_s050, log_sd: 0.5, level_sd: 0.10,
+       scales: [{block_km: 25, sd: 0.15}, {block_km: 50, sd: 0.15}, {block_km: 100, sd: 0.15}]}

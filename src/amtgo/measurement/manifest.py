@@ -182,6 +182,10 @@ class PopulationBenchmark(_Strict):
     max_coverage_shortfall: float = Field(ge=0, lt=1)
     # Unités plus petites que ce nombre de cellules médianes : strate rapportée à part (MAUP).
     min_cells_per_unit: float = Field(gt=0)
+    # Règle du gate (ADR-0029) : « a1 » (même variante stable sur chaque maillage) ou « a1b » (non-infériorité
+    # de chaque variante, à δ près, sur chaque maillage et chaque moitié ; gate combiné entre pays, hors run).
+    gate: Literal["a1", "a1b"] = "a1"
+    noninferiority_margin: float | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def _coherent(self) -> Self:
@@ -190,6 +194,8 @@ class PopulationBenchmark(_Strict):
             raise ValueError("benchmark : identifiants de variantes dupliqués")
         if not all(0 < lv < 1 for lv in self.levels):
             raise ValueError("benchmark : niveaux hors ]0, 1[")
+        if (self.gate == "a1b") != (self.noninferiority_margin is not None):
+            raise ValueError("benchmark : noninferiority_margin requis pour le gate a1b, et seulement pour lui")
         return self
 
 

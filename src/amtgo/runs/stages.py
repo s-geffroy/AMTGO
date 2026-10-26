@@ -283,6 +283,9 @@ def _measurement_summary(ctx: StageContext) -> dict[str, Any]:
     }
     if benchmark is not None:
         outputs["a1_gate"] = {"passed": benchmark["gate_a1"]["passed"], "retained": benchmark["gate_a1"]["retained"]}
+        if "a1b_evidence" in benchmark:
+            outputs["a1b_evidence"] = {vid: {"noninferior": v["noninferior"], "coverage_ok": v["coverage_ok"]}
+                                       for vid, v in benchmark["a1b_evidence"].get("variants", {}).items()}
     return {"per_mesh": per_mesh, "comparison": comparison, "freeze": freeze, "computability": worst,
             "outputs": outputs, "composition": composition, "dfi": dfi, "viability": viability,
             "benchmark": benchmark}

@@ -219,3 +219,78 @@ def gate_a1(per_mesh_cv: dict[str, dict[str, Any]], spec: PopulationBenchmark) -
     if len({r for r in retained.values()}) > 1:
         reasons.append(f"variantes retenues différentes selon le maillage : {retained}")
     return {"passed": not reasons, "reasons": reasons, "retained": retained}
+
+
+def a1b_evidence(results_by_mesh: dict[str, dict[str, dict[str, Any]]], folds_by_mesh: dict[str, np.ndarray],
+                 spec: PopulationBenchmark) -> dict[str, Any]:
+    """Pièces d'UN pays pour le gate A1b (ADR-0029 § 6) ; le gate lui-même combine les pays (``gate_a1b``).
+
+    Par variante :
+    - écart de score logarithmique moyen à la meilleure candidate, par (maillage, moitié du damier) ;
+    - couverture sur toutes les unités, à chaque niveau, sur chaque maillage.
+    Aucune sélection ici : toutes les candidates sont notées sur les mêmes unités.
+    """
+    assert spec.gate == "a1b" and spec.noninferiority_margin is not None
+    vids = [v.variant_id for v in spec.variants]
+    out: dict[str, dict[str, Any]] = {vid: {"gaps": {}, "coverage_failures": [], "log_score_by_mesh": {}}
+                                      for vid in vids}
+    for mid, results in results_by_mesh.items():
+        folds = folds_by_mesh[mid]
+        for h in (0, 1):
+            mask = folds == h
+            if not mask.any():
+                return {"status": "not_available", "reason": f"{mid} : moitié {h} du damier vide"}
+            means = {vid: float(np.mean(np.asarray(results[vid]["per_unit"]["log_score"])[mask])) for vid in vids}
+            best = min(means.values())
+            for vid in vids:
+                out[vid]["gaps"][f"{mid}/{h}"] = means[vid] - best
+        for vid in vids:
+            al = results[vid]["all"]
+            out[vid]["log_score_by_mesh"][mid] = float(al["log_score"])
+            for lv, cov in al["coverage"].items():
+                if cov < float(lv) - spec.max_coverage_shortfall:
+                    out[vid]["coverage_failures"].append(f"{mid} : {cov:.2f} < {lv} − {spec.max_coverage_shortfall:g}")
+    for v in out.values():
+        v["max_gap"] = max(v["gaps"].values())
+        v["noninferior"] = v["max_gap"] <= spec.noninferiority_margin
+        v["coverage_ok"] = not v["coverage_failures"]
+    declared = {"variants": vids, "levels": list(spec.levels), "cv_block_km": spec.cv_block_km,
+                "noninferiority_margin": spec.noninferiority_margin,
+                "max_coverage_shortfall": spec.max_coverage_shortfall, "meshes": len(results_by_mesh)}
+    return {"status": "done", "declared": declared, "variants": out}
+
+
+def gate_a1b(countries: dict[str, dict[str, Any]], min_countries_covered: int = 2) -> dict[str, Any]:
+    """Gate A1b (ADR-0029 § 6), combiné entre pays. Règle déclarée avant toute lecture des données de test.
+
+    Une variante est admissible si :
+    - elle est non inférieure (écart ≤ δ) sur chaque pays, chaque maillage et chaque moitié ;
+    - sa couverture tient (≥ niveau − tolérance, chaque niveau, chaque maillage) sur au moins
+      ``min_countries_covered`` pays.
+    Un pays inutilisable est retiré ; la couverture est alors exigée sur tous les pays restants (au moins deux).
+    Départage déclaré entre admissibles : score logarithmique moyen sur l'ensemble des (pays, maillage).
+    """
+    usable = {c: e for c, e in countries.items() if e.get("status") == "done"}
+    removed = {c: e.get("reason", "non disponible") for c, e in countries.items() if c not in usable}
+    if len({repr(sorted(e["declared"].items())) for e in usable.values()}) > 1:
+        return {"passed": False, "evaluable": False, "removed": removed, "admissible": [], "retained": None,
+                "reasons": ["déclarations différentes entre pays (variantes, niveaux, δ ou tolérance)"]}
+    required = min_countries_covered if not removed else len(usable)
+    if len(usable) < 2 or required < 2:
+        return {"passed": False, "evaluable": False, "removed": removed, "admissible": [], "retained": None,
+                "reasons": [f"pays utilisables insuffisants ({len(usable)})"]}
+    vids = next(iter(usable.values()))["declared"]["variants"]
+    per_variant: dict[str, Any] = {}
+    for vid in vids:
+        ni_fail = [f"{c} {k} : +{g:.3f}" for c, e in usable.items() for k, g in e["variants"][vid]["gaps"].items()
+                   if not g <= e["declared"]["noninferiority_margin"]]
+        covered = [c for c, e in usable.items() if e["variants"][vid]["coverage_ok"]]
+        scores = [s for e in usable.values() for s in e["variants"][vid]["log_score_by_mesh"].values()]
+        per_variant[vid] = {"noninferiority_failures": ni_fail, "countries_covered": covered,
+                            "mean_log_score": float(np.mean(scores)),
+                            "admissible": not ni_fail and len(covered) >= required}
+    admissible = [vid for vid in vids if per_variant[vid]["admissible"]]
+    retained = min(admissible, key=lambda vid: per_variant[vid]["mean_log_score"]) if admissible else None
+    reasons = [] if admissible else ["aucune variante admissible"]
+    return {"passed": bool(admissible), "evaluable": True, "removed": removed, "required_countries": required,
+            "per_variant": per_variant, "admissible": admissible, "retained": retained, "reasons": reasons}

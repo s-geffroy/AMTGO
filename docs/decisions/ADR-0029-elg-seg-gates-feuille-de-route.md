@@ -133,6 +133,8 @@ La revue apporte quatre amendements :
    - **Échoué** : le modèle en place reste, et il n'y a **pas de troisième tour** sur ces données. A2 attend une donnée nouvelle.
 6. **Écarts de traitement.** Les jointures, alias et fusions nécessaires seront consignés dans les manifestes. Ils ne changent ni les candidates, ni la règle.
 
+**Résultat (2026-10-26)** : gate A1b **non passé** ([rapport A1b](../milestones/A1B_REPORT.md)). La Zambie a été retirée avant toute lecture de valeur (jointure impossible). En Tanzanie, toutes les variantes sous-couvrent sur les maillages grossiers.
+
 ## Conséquences
 - **Pas encore de code ELG-Seg.** Il ne commence qu'après le Gate E. Les lots suivants sont A1, puis A2, puis B1 (sur fixture tant que l'accès manque).
 - **Une zone ELG n'est robuste** que si elle tient sous trois stabilités, chacune au-dessus de son seuil : S_mesh > τ_m, S_ontology > τ_o et S_time > τ_t. Son posterior doit en plus être concentré. Elle ne doit dépendre ni d'un seul jeu de données, ni d'une seule ontologie, ni d'un seul maillage, ni d'une seule période. Les seuils seront fixés dans le manifeste normatif avant tout run réel, et non après.

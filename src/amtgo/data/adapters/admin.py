@@ -53,6 +53,51 @@ def _read_bytes(files: dict[str, Path], resource: str, member: str | None) -> by
         return z.read(member)
 
 
+_XL = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+_XL_REL = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+
+
+def read_xlsx_sheet(data: bytes, sheet: str) -> list[dict[str, str]]:
+    """Lignes d'une feuille xlsx (première ligne = en-têtes), bibliothèque standard seulement.
+
+    Cellules lues comme texte : chaînes partagées, chaînes en ligne, nombres tels qu'écrits.
+    """
+    import xml.etree.ElementTree as ET  # fichiers épinglés par sha256 ; expat 2.6+ borne les entités
+
+    z = zipfile.ZipFile(io.BytesIO(data))
+    wb = ET.fromstring(z.read("xl/workbook.xml"))
+    rid = next((s.get(_XL_REL) for s in wb.iter(_XL + "sheet") if s.get("name") == sheet), None)
+    if rid is None:
+        raise ConfigurationError(f"xlsx : feuille {sheet!r} absente")
+    rels = ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))
+    target = next(r.get("Target") or "" for r in rels if r.get("Id") == rid)
+    path = target.lstrip("/") if target.startswith("/") else "xl/" + target
+    shared: list[str] = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        shared = ["".join(t.text or "" for t in si.iter(_XL + "t"))
+                  for si in ET.fromstring(z.read("xl/sharedStrings.xml")).iter(_XL + "si")]
+    grid: list[dict[int, str]] = []
+    for row in ET.fromstring(z.read(path)).iter(_XL + "row"):
+        cells: dict[int, str] = {}
+        for c in row.iter(_XL + "c"):
+            letters = re.match(r"[A-Z]+", c.get("r", "")).group(0)  # type: ignore[union-attr]
+            col = 0
+            for ch in letters:
+                col = col * 26 + ord(ch) - 64
+            kind, v = c.get("t"), c.find(_XL + "v")
+            if kind == "s" and v is not None:
+                cells[col] = shared[int(v.text or 0)]
+            elif kind == "inlineStr":
+                cells[col] = "".join(t.text or "" for t in c.iter(_XL + "t"))
+            elif v is not None:
+                cells[col] = v.text or ""
+        grid.append(cells)
+    if not grid:
+        return []
+    header = grid[0]
+    return [{header[k]: r.get(k, "") for k in header} for r in grid[1:] if any(x.strip() for x in r.values())]
+
+
 def read_units(files: dict[str, Path], spec: dict[str, Any]) -> dict[str, tuple[str, BaseGeometry]]:
     """{code: (nom, géométrie valide)} d'une couche de polygones GeoJSON (éventuellement zippée)."""
     fc = json.loads(_read_bytes(files, spec["resource"], spec.get("member")))
@@ -241,8 +286,11 @@ class AdminTableAdapter(PinnedFileMixin):
             raise ConfigurationError(f"{manifest.source_id} : relative_error hors ]0, 1[")
         check_declared_license(manifest, files)
         units = group_units(read_units(files, p["boundaries"]), p.get("group_boundaries"))
-        raw = _read_bytes(files, p["table"]["resource"], p["table"].get("member")).decode("utf-8-sig")
-        rows, n_excluded = exclude_rows(list(csv.DictReader(io.StringIO(raw))), p)
+        raw = _read_bytes(files, p["table"]["resource"], p["table"].get("member"))
+        sheet = p["table"].get("sheet")
+        table_rows = (read_xlsx_sheet(raw, sheet) if sheet
+                      else list(csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))))
+        rows, n_excluded = exclude_rows(table_rows, p)
         joined = join_table(units, rows, p)
         expected = p.get("expected_total")
         total = sum(t for t, _ in joined.values())
