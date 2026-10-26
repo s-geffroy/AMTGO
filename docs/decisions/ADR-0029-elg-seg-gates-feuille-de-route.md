@@ -98,6 +98,41 @@ La revue apporte quatre amendements :
 - un M16 (raffinement des interfaces régionales) immédiat ;
 - un nombre d'États fixé ou pénalisé.
 
+### 6. Amendement A1b (2026-10-26) : second test, déclaré avant toute lecture des données de test
+**Motif.** Au Ghana, le gate A1 a échoué ([rapport A1](../milestones/A1_REPORT.md)). Les deux variantes de tête (`district_s050`, `multiscale_s050`) y sont restées à 0,002–0,06 nat de score logarithmique l'une de l'autre selon le maillage : la règle « même variante partout » échoue alors sur un quasi-ex æquo, même quand le modèle se comporte bien. Les 260 districts du Ghana ont été vus : ils **sortent du gate**. Ils restent rapportés.
+
+**Ce qui est fixé ici, avant de télécharger ou de lire un seul total de district des pays de test, et qui ne bouge plus ensuite :**
+
+1. **Variantes candidates** (paramètres identiques à A1) :
+   - `laea50_s100` (modèle en place) ;
+   - `laea50_s050` ;
+   - `district_s050` ;
+   - `multiscale_s050`.
+2. **Données de test**, jamais marges ni vraisemblances des runs de test :
+
+   | pays | marges de l'ajustement | unités notées | bruit déclaré du total |
+   |---|---|---|---|
+   | Zambie | 10 provinces, COD-PS 2020 (déjà en place) | districts, COD-PS 2020, feuille `zmb_admpop_adm2_2020` (CC BY 4.0), polygones geoBoundaries ZMB ADM2 | 8 % |
+   | Tanzanie | régions, COD-PS 2020 v2 (déjà en place) | districts, `tza_admpop_adm2_2020_v2.csv` (CC BY-IGO), polygones geoBoundaries TZA ADM2 | 10 % |
+   | Malawi | 3 régions, `mwi_admpop_adm1_2023.csv`, sur les polygones ADM2 regroupés (le ADM1 de geoBoundaries est sous ODbL, décision n° 6) | districts, COD-PS 2023 (villes fusionnées, comme aujourd'hui) | 5 % |
+
+   - Le bruit est celui déjà déclaré pour chaque source ; il élargit les intervalles prédits, donc facilite la couverture. C'est rapporté, pas corrigé.
+   - **Réserves déclarées** : ce sont des projections, pas des recensements. Les totaux de district du Malawi servaient de marges au run Malawi existant : le prior n'y a jamais été noté, mais l'indépendance est plus faible.
+3. **Maillages** : les quatre déjà déclarés pour chaque pays. **Scores et damier** : ceux d'A1 (blocs LAEA de 100 km, niveaux 50/80/95 %).
+4. **Règle du gate A1b.** Une variante `v` est **admissible** si les deux conditions suivantes sont remplies :
+   - **non-infériorité, partout** : pour chaque pays, chaque maillage et chaque moitié du damier, son score logarithmique moyen sur la moitié dépasse celui de la meilleure candidate sur cette même moitié d'au plus **δ = 0,05 nat par unité** ;
+   - **couverture, sur au moins 2 des 3 pays** : sur tous les maillages du pays, et sur toutes ses unités, la couverture est au moins égale au niveau moins 0,10, à chaque niveau.
+   
+   Le gate est **passé** si au moins une variante est admissible.
+   - **Départage déclaré** entre admissibles : le score logarithmique moyen sur l'ensemble des (pays, maillage). Ce départage ne qualifie aucune variante de meilleure dans l'absolu ; il fixe celle qui devient le modèle d'erreur du prior.
+   - **Si un pays est inutilisable** (jointure non exhaustive, source introuvable), il est retiré, et la couverture est alors exigée sur tous les pays restants, au moins deux. Sinon, le gate n'est pas évaluable.
+   - **δ n'est pas indépendant du Ghana** : la valeur a été choisie après avoir vu les écarts ghanéens. C'est la raison pour laquelle le Ghana est hors du gate.
+   - Le critère porte sur une estimation ponctuelle, sans intervalle d'échantillonnage. Sur le Malawi (28 districts, environ 14 par moitié), il est donc bruité.
+5. **Conséquences, fixées d'avance.**
+   - **Passé** : la variante retenue devient le modèle d'erreur du prior (nouvelle version gelée), dans les quatre pays, et A2 peut commencer.
+   - **Échoué** : le modèle en place reste, et il n'y a **pas de troisième tour** sur ces données. A2 attend une donnée nouvelle.
+6. **Écarts de traitement.** Les jointures, alias et fusions nécessaires seront consignés dans les manifestes. Ils ne changent ni les candidates, ni la règle.
+
 ## Conséquences
 - **Pas encore de code ELG-Seg.** Il ne commence qu'après le Gate E. Les lots suivants sont A1, puis A2, puis B1 (sur fixture tant que l'accès manque).
 - **Une zone ELG n'est robuste** que si elle tient sous trois stabilités, chacune au-dessus de son seuil : S_mesh > τ_m, S_ontology > τ_o et S_time > τ_t. Son posterior doit en plus être concentré. Elle ne doit dépendre ni d'un seul jeu de données, ni d'une seule ontologie, ni d'un seul maillage, ni d'une seule période. Les seuils seront fixés dans le manifeste normatif avant tout run réel, et non après.
