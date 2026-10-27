@@ -167,6 +167,8 @@ La revue apporte quatre amendements :
    - une circularité partielle de WorldPop, sous le seuil de 0,02, n'est pas exclue et sera rapportée ;
    - les comtés sont grands : le test porte sur l'erreur de répartition intra-provinciale à l'échelle du comté, pas plus fin.
 
+**Résultat (2026-10-27)** : test évaluable (pas de circularité : 0,062), mais gate A1c **non passé** ([rapport A1c](../milestones/A1C_REPORT.md)). Toutes les variantes tiennent la couverture ; les deux de tête dépassent δ de 0,003 et 0,013 nat, chacune sur une seule moitié d'un seul maillage.
+
 ## Conséquences
 - **Pas encore de code ELG-Seg.** Il ne commence qu'après le Gate E. Les lots suivants sont A1, puis A2, puis B1 (sur fixture tant que l'accès manque).
 - **Une zone ELG n'est robuste** que si elle tient sous trois stabilités, chacune au-dessus de son seuil : S_mesh > τ_m, S_ontology > τ_o et S_time > τ_t. Son posterior doit en plus être concentré. Elle ne doit dépendre ni d'un seul jeu de données, ni d'une seule ontologie, ni d'un seul maillage, ni d'une seule période. Les seuils seront fixés dans le manifeste normatif avant tout run réel, et non après.

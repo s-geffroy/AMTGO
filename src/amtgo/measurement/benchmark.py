@@ -64,6 +64,14 @@ class Units:
             raise InsufficientEvidence(f"benchmark : aucune observation {variable_id}")
         return cls(codes, np.array(y), np.array(sd), geoms)
 
+    def without(self, excluded: tuple[str, ...]) -> Units:
+        """Unités sans les codes exclus ; un code exclu absent est une erreur de déclaration."""
+        missing = sorted(set(excluded) - set(self.codes))
+        if missing:
+            raise InsufficientEvidence(f"benchmark : unités exclues absentes {missing}")
+        keep = [i for i, c in enumerate(self.codes) if c not in excluded]
+        return Units([self.codes[i] for i in keep], self.y[keep], self.sd[keep], [self.geoms[i] for i in keep])
+
 
 def unit_groups(idx: MeshIndex, geoms: list[BaseGeometry]) -> np.ndarray:
     """Unité contenant le centroïde de chaque cellule (−1 : aucune)."""
@@ -158,7 +166,9 @@ def deterministic_check(idx: MeshIndex, density: np.ndarray, w: np.ndarray, unit
     return {"units_without_margin": int((which < 0).sum()),
             "median_abs_log_error": float(np.median(np.abs(err))),
             "p90_abs_log_error": float(np.quantile(np.abs(err), 0.9)),
-            "sd_log_error": float(err.std(ddof=1))}
+            "sd_log_error": float(err.std(ddof=1)),
+            # Par unité : sert au contrôle de circularité du gate a1c, restreint aux unités notées.
+            "abs_log_error": [float(x) for x in np.abs(err)]}
 
 
 def score_variant(prep: Prepared, density: np.ndarray, v: ErrorModel, units: Units, w: np.ndarray,
@@ -294,3 +304,73 @@ def gate_a1b(countries: dict[str, dict[str, Any]], min_countries_covered: int = 
     reasons = [] if admissible else ["aucune variante admissible"]
     return {"passed": bool(admissible), "evaluable": True, "removed": removed, "required_countries": required,
             "per_variant": per_variant, "admissible": admissible, "retained": retained, "reasons": reasons}
+
+
+def gate_a1c(results_by_mesh: dict[str, dict[str, dict[str, Any]]], folds_by_mesh: dict[str, np.ndarray],
+             small_by_mesh: dict[str, np.ndarray], det_abs_by_mesh: dict[str, np.ndarray],
+             spec: PopulationBenchmark) -> dict[str, Any]:
+    """Gate A1c (ADR-0029 § 7), un seul pays. Règle déclarée avant toute lecture des données de test.
+
+    - unités notées : au moins ``min_cells_per_unit`` cellules médianes ;
+    - maillage retenu si la part d'unités notées atteint ``min_scored_unit_share`` ; au moins
+      ``min_gated_meshes`` maillages retenus, sinon non évaluable ;
+    - circularité : erreur log médiane du raster seul recalé, aux unités notées, médiane sur les
+      maillages retenus, sous ``circularity_floor`` : non évaluable ;
+    - admissible : non-infériorité (écart ≤ δ) sur chaque maillage retenu et chaque moitié, et
+      couverture ≥ niveau − tolérance à chaque niveau sur chaque maillage retenu ;
+    - départage déclaré : score logarithmique moyen sur les maillages retenus.
+    """
+    assert spec.gate == "a1c" and spec.noninferiority_margin is not None
+    assert spec.min_scored_unit_share is not None and spec.circularity_floor is not None
+    vids = [v.variant_id for v in spec.variants]
+    meshes: dict[str, Any] = {}
+    for mid in results_by_mesh:
+        scored = ~small_by_mesh[mid]
+        meshes[mid] = {"scored_units": int(scored.sum()), "units": int(scored.size),
+                       "share": float(scored.mean()), "gated": bool(scored.mean() >= spec.min_scored_unit_share)}
+    gated = [mid for mid, m in meshes.items() if m["gated"]]
+    out: dict[str, Any] = {"meshes": meshes, "gated_meshes": gated, "passed": False, "evaluable": False,
+                           "admissible": [], "retained": None, "reasons": []}
+    if len(gated) < spec.min_gated_meshes:
+        out["reasons"].append(f"maillages retenus insuffisants ({len(gated)} < {spec.min_gated_meshes})")
+        return out
+    circ = float(np.median([np.median(det_abs_by_mesh[mid][~small_by_mesh[mid]]) for mid in gated]))
+    out["raster_only_median_abs_log_error"] = circ
+    if circ < spec.circularity_floor:
+        out["reasons"].append(f"circularité : erreur médiane du raster seul {circ:.3f} < {spec.circularity_floor:g}")
+        return out
+    out["evaluable"] = True
+    per_variant: dict[str, Any] = {vid: {"gaps": {}, "coverage": {}, "coverage_failures": [], "log_score": {}}
+                                   for vid in vids}
+    for mid in gated:
+        res, scored, folds = results_by_mesh[mid], ~small_by_mesh[mid], folds_by_mesh[mid]
+        ls = {vid: np.asarray(res[vid]["per_unit"]["log_score"]) for vid in vids}
+        for h in (0, 1):
+            mask = scored & (folds == h)
+            if not mask.any():
+                out["evaluable"] = False
+                out["reasons"].append(f"{mid} : moitié {h} sans unité notée")
+                return out
+            means = {vid: float(ls[vid][mask].mean()) for vid in vids}
+            best = min(means.values())
+            for vid in vids:
+                per_variant[vid]["gaps"][f"{mid}/{h}"] = means[vid] - best
+        for vid in vids:
+            per_variant[vid]["log_score"][mid] = float(ls[vid][scored].mean())
+            cov = {f"{lv:g}": float(np.asarray(res[vid]["per_unit"][f"covered_{lv:g}"])[scored].mean())
+                   for lv in spec.levels}
+            per_variant[vid]["coverage"][mid] = cov
+            for lv, c in cov.items():
+                if c < float(lv) - spec.max_coverage_shortfall:
+                    per_variant[vid]["coverage_failures"].append(
+                        f"{mid} : {c:.2f} < {lv} − {spec.max_coverage_shortfall:g}")
+    for v in per_variant.values():
+        v["max_gap"] = max(v["gaps"].values())
+        v["mean_log_score"] = float(np.mean(list(v["log_score"].values())))
+        v["admissible"] = v["max_gap"] <= spec.noninferiority_margin and not v["coverage_failures"]
+    admissible = [vid for vid in vids if per_variant[vid]["admissible"]]
+    out.update(per_variant=per_variant, admissible=admissible, passed=bool(admissible),
+               retained=min(admissible, key=lambda vid: per_variant[vid]["mean_log_score"]) if admissible else None)
+    if not admissible:
+        out["reasons"].append("aucune variante admissible")
+    return out

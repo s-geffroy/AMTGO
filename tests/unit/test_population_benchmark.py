@@ -197,3 +197,52 @@ def test_a1b_refuses_mixed_declarations() -> None:
     other["declared"] = {**other["declared"], "noninferiority_margin": 0.5}
     g = bm.gate_a1b({"p1": _country(0.0), "p2": other})
     assert not g["passed"] and "déclarations différentes" in g["reasons"][0]
+
+
+def _a1c_spec(**kw: object) -> PopulationBenchmark:
+    return spec(gate="a1c", noninferiority_margin=0.05, min_scored_unit_share=0.75, circularity_floor=0.02, **kw)
+
+
+def _a1c_inputs(gap_b: float, small: np.ndarray, det: float = 0.1, cover_b: bool = True) -> tuple:
+    folds = np.array([0, 1] * 4)
+    res = {"va": _result(np.full(8, 1.0), np.ones(8)),
+           "vb": _result(np.full(8, 1.0 + gap_b), np.ones(8) if cover_b else np.zeros(8))}
+    meshes = ("m1", "m2")
+    return ({m: res for m in meshes}, {m: folds for m in meshes}, {m: small for m in meshes},
+            {m: np.full(8, det) for m in meshes})
+
+
+def test_a1c_schema_requires_its_parameters() -> None:
+    with pytest.raises(ValueError, match="min_scored_unit_share"):
+        spec(gate="a1c", noninferiority_margin=0.05)
+    with pytest.raises(ValueError, match="dupliquées"):
+        _a1c_spec(exclude_units=["u1", "u1"])
+
+
+def test_a1c_gate_admissibility_tiebreak_and_unscored_units() -> None:
+    small = np.zeros(8, bool)
+    g = bm.gate_a1c(*_a1c_inputs(0.03, small), _a1c_spec())
+    assert g["passed"] and g["admissible"] == ["va", "vb"] and g["retained"] == "va"
+    assert not bm.gate_a1c(*_a1c_inputs(0.08, small), _a1c_spec())["per_variant"]["vb"]["admissible"]
+    assert not bm.gate_a1c(*_a1c_inputs(0.0, small, cover_b=False), _a1c_spec())["per_variant"]["vb"]["admissible"]
+    # Une unité trop petite n'est pas notée : sa sous-couverture ne compte pas (7/8 ≥ 75 %).
+    res, folds, sm, det = _a1c_inputs(0.0, np.array([True] + [False] * 7))
+    res = {m: {**r, "vb": {"per_unit": {**r["vb"]["per_unit"], **{f"covered_{lv:g}": [0.0] + [1.0] * 7
+                                                                    for lv in (0.5, 0.8, 0.95)}}}}
+           for m, r in res.items()}
+    assert bm.gate_a1c(res, folds, sm, det, _a1c_spec())["per_variant"]["vb"]["admissible"]
+
+
+def test_a1c_not_evaluable_when_meshes_too_coarse_or_circular() -> None:
+    coarse = np.array([True] * 3 + [False] * 5)  # 5/8 < 75 % : aucun maillage retenu
+    g = bm.gate_a1c(*_a1c_inputs(0.0, coarse), _a1c_spec())
+    assert not g["evaluable"] and not g["passed"] and "maillages retenus" in g["reasons"][0]
+    g = bm.gate_a1c(*_a1c_inputs(0.0, np.zeros(8, bool), det=0.01), _a1c_spec())
+    assert not g["evaluable"] and "circularité" in g["reasons"][0]
+
+
+def test_units_exclusion_is_declared_and_checked() -> None:
+    u = _units(np.array([1.0, 2.0, 3.0]))
+    assert u.without(("u1",)).codes == ["u0", "u2"]
+    with pytest.raises(Exception, match="absentes"):
+        u.without(("u9",))

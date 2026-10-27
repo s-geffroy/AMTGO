@@ -1,0 +1,23 @@
+# Run de test A1c (ADR-0029 § 7) : Kenya 2019, prior note sur les 47 comtes du recensement (Nairobi exclu),
+# jamais marges. Preenregistrement : commit e2efb1b. Aucune composition, aucun candidat ; rien n'est publie.
+name: ken_population_2019_a1c
+description: >
+  Kenya 2019, benchmark A1c du modele spatial de population : marges des 8 anciennes provinces
+  (recensement 2019), WorldPop 2019 en prior, quatre variantes d'erreur declarees d'avance, notees
+  sur les totaux de comte (validation seulement). Aucune composition, aucun candidat, aucune recommandation.
+region: kenya
+map_mode: R
+constitutional_regime: R0_CURRENT_LIKE
+normative_manifest: normative/default.yaml
+sources:
+  - {manifest: sources/ken_codab_admin.yaml, roles: [status_quo_geometry, analysis_extent], redistribute: false}
+  - {manifest: sources/ken_census_2019_provinces.yaml, roles: [population_measurement, multiscale_validation], redistribute: false}
+  - {manifest: sources/ken_worldpop_2019.yaml, roles: [population_prior], redistribute: false}
+  - {manifest: sources/ken_census_2019_adm1.yaml, roles: [multiscale_validation], redistribute: false}
+measurement_model: measurement/ken_population_2019_a1c.yaml
+mesh_set:
+  - meshes/ken_h3_r5.yaml
+  - meshes/ken_h3_r6.yaml
+  - meshes/ken_grid_l5.yaml
+  - meshes/ken_grid_l6.yaml
+seeds: [0]

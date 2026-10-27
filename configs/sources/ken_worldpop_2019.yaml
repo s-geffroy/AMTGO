@@ -1,0 +1,45 @@
+# WorldPop, population maillee a 100 m, Kenya 2019, contrainte au bati (R2025A). Produit MODELISE :
+# prior de densite seulement, jamais observation, jamais identite (03 §5).
+# Circularite a garder en tete : les totaux WorldPop sont ajustes aux estimations des Nations unies
+# et ses covariables incluent des donnees de recensement ; un accord avec le recensement n'est donc
+# pas une validation independante.
+source_id: ken_worldpop_2019
+name: WorldPop Kenya 2019, 100 m, contrainte (R2025A)
+provider: WorldPop, University of Southampton
+release: "R2025A-v1-2019"
+url: https://hub.worldpop.org/
+citation: "WorldPop (www.worldpop.org), Global2 2015-2030 constrained 100 m, R2025A v1, Kenya 2019. CC BY 4.0."
+license:
+  license_id: CC-BY-4.0
+  name: Creative Commons Attribution 4.0 International
+  url: https://creativecommons.org/licenses/by/4.0/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [population_prior]
+  forbidden: [population_measurement, group_territory_inference, identity_inference]
+method: Redistribution dasymetrique (foret aleatoire) des totaux sur le bati detecte.
+temporal_start: 2019-01-01
+temporal_end: 2019-12-31
+default_evidence_status: M
+quality:
+  source_reliability: 0.7
+  spatial_precision: 0.8
+  temporal_precision: 0.6
+  construct_validity: 0.5
+  representativeness: 0.8
+  license_usability: 1.0
+  privacy_usability: 1.0
+retrieval:
+  kind: http
+  adapter: worldpop
+  resources:
+    - name: ken_pop_2019_CN_100m_R2025A_v1.tif
+      url: https://data.worldpop.org/GIS/Population/Global_2015_2030/R2025A/2019/KEN/v1/100m/constrained/ken_pop_2019_CN_100m_R2025A_v1.tif
+      sha256: aebe3e07e36b5ab31e6363fcbe7a7f44875a41f2a52983e7226d0b793885719a
+  parameters:
+    variable: population_prior_raster

@@ -1,0 +1,5 @@
+# Kenya, H3 resolution 5. Maillage d analyse du test A1c (ADR-0029 § 7), pas une proposition.
+mesh_id: ken_h3_r5
+family: h3
+resolution: 5
+extent: {kind: source_union, source_id: ken_codab_admin, variable_id: admin1_polygon}

@@ -184,8 +184,16 @@ class PopulationBenchmark(_Strict):
     min_cells_per_unit: float = Field(gt=0)
     # Règle du gate (ADR-0029) : « a1 » (même variante stable sur chaque maillage) ou « a1b » (non-infériorité
     # de chaque variante, à δ près, sur chaque maillage et chaque moitié ; gate combiné entre pays, hors run).
-    gate: Literal["a1", "a1b"] = "a1"
+    gate: Literal["a1", "a1b", "a1c"] = "a1"
     noninferiority_margin: float | None = Field(default=None, gt=0)
+    # Unités exclues de toute notation (codes), p. ex. une unité identique à une marge (Nairobi, ADR-0029 § 7).
+    exclude_units: tuple[str, ...] = ()
+    # Gate a1c : seules les unités d'au moins min_cells_per_unit cellules sont notées ; un maillage n'entre dans le
+    # gate que si cette part atteint min_scored_unit_share ; au moins min_gated_meshes maillages retenus.
+    min_scored_unit_share: float | None = Field(default=None, gt=0, le=1)
+    min_gated_meshes: int = Field(default=2, ge=1)
+    # Gate a1c : erreur log médiane du raster seul recalé sous laquelle le test est déclaré circulaire.
+    circularity_floor: float | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def _coherent(self) -> Self:
@@ -194,8 +202,15 @@ class PopulationBenchmark(_Strict):
             raise ValueError("benchmark : identifiants de variantes dupliqués")
         if not all(0 < lv < 1 for lv in self.levels):
             raise ValueError("benchmark : niveaux hors ]0, 1[")
-        if (self.gate == "a1b") != (self.noninferiority_margin is not None):
-            raise ValueError("benchmark : noninferiority_margin requis pour le gate a1b, et seulement pour lui")
+        if (self.gate in ("a1b", "a1c")) != (self.noninferiority_margin is not None):
+            raise ValueError("benchmark : noninferiority_margin requis pour les gates a1b et a1c, "
+                             "et seulement pour eux")
+        a1c_params = self.min_scored_unit_share is not None and self.circularity_floor is not None
+        if (self.gate == "a1c") != a1c_params:
+            raise ValueError("benchmark : min_scored_unit_share et circularity_floor requis pour le gate a1c, "
+                             "et seulement pour lui")
+        if len(set(self.exclude_units)) != len(self.exclude_units):
+            raise ValueError("benchmark : unités exclues dupliquées")
         return self
 
 

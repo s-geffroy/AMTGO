@@ -1,0 +1,45 @@
+# Kenya : population par comte (47), recensement 2019 (KNBS, volume III), via COD-PS (UNFPA / HDX).
+# DENOMBREMENT (statut D), pas une projection. Unites notees du test A1c (ADR-0029 § 7) : jamais une marge.
+source_id: ken_census_2019_adm1
+name: Kenya 2019 Population and Housing Census - population par comte
+provider: Kenya National Bureau of Statistics (HDX, cod-ps-ken)
+release: "2019-adm1"
+url: https://data.humdata.org/dataset/cod-ps-ken
+citation: "Kenya National Bureau of Statistics, 2019 Kenya Population and Housing Census vol. III, via OCHA HDX cod-ps-ken, CC BY-IGO."
+license:
+  license_id: CC-BY-IGO
+  name: Creative Commons Attribution for Intergovernmental Organisations
+  url: https://creativecommons.org/licenses/by/3.0/igo/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [multiscale_validation]
+  forbidden: [group_territory_inference]
+method: Denombrement general de la population, nuit du 24 au 25 aout 2019.
+temporal_start: 2019-08-24
+temporal_end: 2019-08-25
+default_evidence_status: D
+quality: {source_reliability: 0.8, spatial_precision: 0.6, temporal_precision: 0.9, construct_validity: 0.8,
+          representativeness: 1.0, license_usability: 0.9, privacy_usability: 1.0}
+retrieval:
+  kind: http
+  adapter: admin_table
+  resources:
+    - name: ken_admpop_2019.xlsx
+      url: https://data.humdata.org/dataset/26801642-7088-4149-9605-6ae282897937/resource/e57fb9a8-96dc-4a21-849b-1ddbc4ed7803/download/ken_admpop_2019.xlsx
+      sha256: 1b1453a9a652117c03858158c4801f94d0669d30c9c3f7e6158b16fc65d214bc
+    - name: ken_admin_boundaries.geojson.zip
+      url: https://data.humdata.org/dataset/2c0b7571-4bef-4347-9b81-b2174c13f9ef/resource/674ea496-5451-4312-bcab-8aa95fa3f36c/download/ken_admin_boundaries.geojson.zip
+      sha256: ee7c9f02eb91f902ac53aa3be63d9cd195fbfc60eb56a6cc9c240b4a39767d18
+  parameters:
+    variable: population_total_admin1
+    table: {resource: ken_admpop_2019.xlsx, sheet: ken_admpop_ADM1_2019, code_field: ADM1_PCODE,
+            name_field: ADM1_NAME, total_field: T_TL}
+    boundaries: {resource: ken_admin_boundaries.geojson.zip, member: ken_admin1.geojson,
+                 code_field: adm1_pcode, name_field: adm1_name}
+    join: code
+    relative_error: 0.02   # PROVISOIRE : meme erreur declaree que le recensement du Ghana

@@ -200,7 +200,8 @@ def _benchmark_inputs(ctx: StageContext, mesh_id: str) -> tuple[Any, ...]:
     mesh = artifacts.read_mesh(ctx.run_dir, mesh_id)
     obs, slugs, roles, _, _ = _inputs(ctx)
     prep = prepare(mesh, obs, m, slugs, roles, prior_density(ctx, mesh_id))
-    units = bm.Units.from_observations(read_observations(ctx.observations_path(spec.source_id)), spec.variable_id)
+    obs_units = read_observations(ctx.observations_path(spec.source_id))
+    units = bm.Units.from_observations(obs_units, spec.variable_id).without(spec.exclude_units)
     return m, spec, mesh, obs, prep, units
 
 
@@ -246,6 +247,8 @@ def benchmark_summary(ctx: StageContext, _: str) -> dict[str, Any]:
     per_mesh: dict[str, Any] = {}
     results_by_mesh: dict[str, dict[str, Any]] = {}
     folds_by_mesh: dict[str, np.ndarray] = {}
+    small_by_mesh: dict[str, np.ndarray] = {}
+    det_by_mesh: dict[str, np.ndarray] = {}
     for d in ctx.manifest.mesh_set:
         u = artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/benchmark/units.json")
         results = {v.variant_id: artifacts.read_json(ctx.run_dir, f"fields/{d.mesh_id}/benchmark/{v.variant_id}.json")
@@ -257,6 +260,8 @@ def benchmark_summary(ctx: StageContext, _: str) -> dict[str, Any]:
                          for vid, r in results.items()},
             "cv": bm.cross_validate(results, np.asarray(u["folds"]), spec)}
         results_by_mesh[d.mesh_id], folds_by_mesh[d.mesh_id] = results, np.asarray(u["folds"])
+        small_by_mesh[d.mesh_id] = np.asarray(u["small"], dtype=bool)
+        det_by_mesh[d.mesh_id] = np.asarray(u["deterministic"].get("abs_log_error", []))
     gate = bm.gate_a1({mid: v["cv"] for mid, v in per_mesh.items()}, spec)
     out: dict[str, Any] = {"per_mesh": per_mesh, "gate_a1": gate, "selection_score": spec.selection_score,
                            "gate_rule": spec.gate}
@@ -266,6 +271,10 @@ def benchmark_summary(ctx: StageContext, _: str) -> dict[str, Any]:
         out["a1b_evidence"] = ev = bm.a1b_evidence(results_by_mesh, folds_by_mesh, spec)
         ok = [vid for vid, v in ev.get("variants", {}).items() if v["noninferior"] and v["coverage_ok"]]
         detail = f"A1b : pièces écrites, {len(ok)} candidate(s) non inférieure(s) et couvrantes ici"
+    if spec.gate == "a1c":
+        out["gate_a1c"] = g = bm.gate_a1c(results_by_mesh, folds_by_mesh, small_by_mesh, det_by_mesh, spec)
+        detail = (f"gate_A1c={'PASSED' if g['passed'] else ('FAILED' if g['evaluable'] else 'NOT_EVALUABLE')}"
+                  f" retenue={g['retained']}")
     artifacts.write_json(ctx.run_dir, "artifacts/population_benchmark.json", out)
     return {"detail": detail}
 

@@ -1,0 +1,38 @@
+# Kenya : limites administratives communes (COD-AB, OCHA / IEBC), comtes (ADM1, 47). Statu quo et emprise
+# d'analyse du test A1c (ADR-0029 § 7) ; ni frontiere juridique, ni territoire de groupe.
+source_id: ken_codab_admin
+name: Kenya - Subnational Administrative Boundaries (COD-AB)
+provider: OCHA FISS, source IEBC (HDX, cod-ab-ken)
+release: "cod-ab-ken-2025"
+url: https://data.humdata.org/dataset/cod-ab-ken
+citation: "OCHA, Kenya - Subnational Administrative Boundaries (COD-AB), source IEBC, via HDX cod-ab-ken, CC BY-IGO."
+license:
+  license_id: CC-BY-IGO
+  name: Creative Commons Attribution for Intergovernmental Organisations
+  url: https://creativecommons.org/licenses/by/3.0/igo/
+  redistribution: true
+  commercial_use: true
+  attribution_required: true
+access: open
+data_zone: OPEN_CORE
+privacy_class: PUBLIC
+roles:
+  allowed: [status_quo_geometry, analysis_extent]
+  forbidden: [legal_boundary_truth, group_territory_inference]
+method: Limites administratives officielles numerisees, harmonisees par OCHA (codes pcode).
+temporal_start: 2019-10-31
+temporal_note: Debut de la periode declaree par HDX ; aucune date de fin.
+default_evidence_status: P
+quality: {source_reliability: 0.8, spatial_precision: 0.7, temporal_precision: 0.6, construct_validity: 0.8,
+          representativeness: 1.0, license_usability: 0.9, privacy_usability: 1.0}
+retrieval:
+  kind: http
+  adapter: admin_boundaries
+  resources:
+    - name: ken_admin_boundaries.geojson.zip
+      url: https://data.humdata.org/dataset/2c0b7571-4bef-4347-9b81-b2174c13f9ef/resource/674ea496-5451-4312-bcab-8aa95fa3f36c/download/ken_admin_boundaries.geojson.zip
+      sha256: ee7c9f02eb91f902ac53aa3be63d9cd195fbfc60eb56a6cc9c240b4a39767d18
+  parameters:
+    layers:
+      - {resource: ken_admin_boundaries.geojson.zip, member: ken_admin1.geojson, variable: admin1_polygon,
+         level: 1, code_field: adm1_pcode, name_field: adm1_name}

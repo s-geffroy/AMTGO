@@ -371,6 +371,29 @@ def _benchmark_section(a: Any, manifest: RunManifest, b: dict[str, Any]) -> None
                        if pm["cv"].get("status") == "done" else "non disponible")
         for mid, pm in b["per_mesh"].items()) + ".\n")
     g = b["gate_a1"]
+    if b.get("gate_rule") == "a1c":
+        c = b["gate_a1c"]
+        a(f"**Gate A1c** (ADR-0029 § 7, un seul pays ; règle stricte A1, pour information : "
+          f"{'passée' if g['passed'] else 'non passée'}). Maillages retenus (unités d'au moins "
+          f"{spec.min_cells_per_unit:g} cellules ≥ {spec.min_scored_unit_share:.0%}) : "
+          + ", ".join(f"`{mid}` {m['scored_units']}/{m['units']}{'' if m['gated'] else ' (exclu)'}"
+                      for mid, m in c["meshes"].items()) + ".\n")
+        if "raster_only_median_abs_log_error" in c:
+            a(f"Contrôle de circularité : erreur log médiane du raster seul recalé "
+              f"{c['raster_only_median_abs_log_error']:.3f} (seuil {spec.circularity_floor:g}).\n")
+        if c.get("per_variant"):
+            a(f"| variante | écart max. à la meilleure (δ = {spec.noninferiority_margin:g}) | couverture tenue | "
+              "score log moyen | admissible |")
+            a("|---|---|---|---|---|")
+            for vid, v in c["per_variant"].items():
+                a(f"| `{vid}` | {v['max_gap']:+.3f} | "
+                  f"{'oui' if not v['coverage_failures'] else 'non (' + ' ; '.join(v['coverage_failures']) + ')'} | "
+                  f"{v['mean_log_score']:.3f} | {'oui' if v['admissible'] else 'non'} |")
+            a("")
+        verdict = "passé" if c["passed"] else ("non passé" if c["evaluable"] else "non évaluable")
+        a(f"**Gate A1c : {verdict}**" + (f", variante retenue `{c['retained']}`." if c["passed"] else
+                                         " — " + " ; ".join(c["reasons"]) + ".") + "\n")
+        return
     if b.get("gate_rule") == "a1b":
         ev = b["a1b_evidence"]
         a(f"**Règle stricte A1, pour information** : {'passée' if g['passed'] else 'non passée'}. "
