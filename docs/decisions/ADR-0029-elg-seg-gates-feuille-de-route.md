@@ -135,6 +135,38 @@ La revue apporte quatre amendements :
 
 **Résultat (2026-10-26)** : gate A1b **non passé** ([rapport A1b](../milestones/A1B_REPORT.md)). La Zambie a été retirée avant toute lecture de valeur (jointure impossible). En Tanzanie, toutes les variantes sous-couvrent sur les maillages grossiers.
 
+### 7. Amendement A1c (2026-10-27) : troisième test, au Kenya, déclaré avant toute lecture des données de test
+**Motif.** A1b a échoué parce qu'en Tanzanie, sur les maillages grossiers, la plupart des districts étaient plus petits que 4 cellules : c'est un défaut de support, que la variance du prior ne règle pas. La règle corrigée ci-dessous vient de ce résultat. Elle ne s'applique donc qu'à une **donnée jamais touchée** : le recensement du Kenya de 2019. Ghana, Tanzanie et Malawi sont hors du gate.
+
+**Ce qui est fixé ici, avant de lire un seul total kényan, et qui ne bouge plus ensuite :**
+
+1. **Variantes candidates** : les quatre d'A1b, avec des paramètres identiques.
+2. **Unités notées** :
+   - les **47 comtés** du recensement 2019 (KNBS, via COD-PS `ken_admpop_2019.xlsx`, feuille `ken_admpop_ADM1_2019`, CC BY-IGO) ;
+   - polygones COD-AB ADM1 (CC BY-IGO), jointure par code ;
+   - **Nairobi (KE047) est exclu** : c'est à la fois un comté et une province, donc l'unité serait identique à une marge.
+3. **Marges** :
+   - les **8 anciennes provinces**, sommes des comtés sur les polygones regroupés ;
+   - l'appartenance comté → province est lue dans `ke_subcounty.dbf` (American Red Cross, HDX `kenya-sub-counties`, CC BY), champs `province` et `county`.
+4. **Bruit déclaré** : 2 % (recensement, comme au Ghana), pour les marges comme pour les unités.
+5. **Prior** : WorldPop R2025A, Kenya 2019, contraint, 100 m. Paramètres identiques aux autres pays.
+6. **Maillages**, déclarés ici : H3 r5 et r6, grilles LAEA l5 (12,5 km) et l6 (6,25 km), sur l'emprise des comtés.
+7. **Règle du gate A1c (un seul pays).**
+   - **Unités notées** : celles d'au moins **4 cellules médianes**. Un maillage n'entre dans le gate que si au moins **75 %** des unités notables atteignent ce seuil, et le gate exige **au moins deux** maillages retenus.
+   - **Circularité** : si l'erreur log médiane du raster seul, recalé sur les provinces, aux comtés notés (médiane sur les maillages retenus), est **inférieure à 0,02**, le test est déclaré circulaire et non évaluable. WorldPop aurait alors réparti les totaux mêmes du recensement 2019.
+   - **Une variante est admissible si** :
+     - sur chaque maillage retenu et chaque moitié du damier de 100 km, son score logarithmique moyen dépasse celui de la meilleure candidate d'au plus **δ = 0,05** nat par unité ;
+     - sur chaque maillage retenu, sa couverture est au moins égale au niveau moins **0,10**, à 50, 80 et 95 %.
+   - Le gate est **passé** si au moins une variante est admissible.
+   - **Départage déclaré** : le score logarithmique moyen sur les maillages retenus.
+8. **Conséquences, fixées d'avance.**
+   - **Passé** : la variante retenue devient le modèle d'erreur du prior, avec de nouvelles versions gelées pour tous les pays, et A2 commence.
+   - **Échoué ou non évaluable** : le modèle en place reste. Il n'y a pas d'autre tour sur les comtés kényans, et la suite d'A2 revient au porteur.
+9. **Réserves déclarées** :
+   - 46 unités, soit environ 23 par moitié : le critère, ponctuel, reste bruité ;
+   - une circularité partielle de WorldPop, sous le seuil de 0,02, n'est pas exclue et sera rapportée ;
+   - les comtés sont grands : le test porte sur l'erreur de répartition intra-provinciale à l'échelle du comté, pas plus fin.
+
 ## Conséquences
 - **Pas encore de code ELG-Seg.** Il ne commence qu'après le Gate E. Les lots suivants sont A1, puis A2, puis B1 (sur fixture tant que l'accès manque).
 - **Une zone ELG n'est robuste** que si elle tient sous trois stabilités, chacune au-dessus de son seuil : S_mesh > τ_m, S_ontology > τ_o et S_time > τ_t. Son posterior doit en plus être concentré. Elle ne doit dépendre ni d'un seul jeu de données, ni d'une seule ontologie, ni d'un seul maillage, ni d'une seule période. Les seuils seront fixés dans le manifeste normatif avant tout run réel, et non après.
